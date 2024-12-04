@@ -17,6 +17,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      run: cargo build --verbose --workspace
+    # Tests: we only run library and documentation tests (integration tests are using the remote server!)
+    - name: Run tests (unittests)
+      run: cargo test --lib --verbose --workspace
+    - name: Run tests (documentation tests)
+      run: cargo test --doc --verbose --workspace
