@@ -18,7 +18,7 @@ pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::http;
 use crate::client::property::Property;
 pub use crate::client::property_proxy::PropertyProxy;
-use crate::errors::{ConfigurationAccessError, Result};
+use crate::errors::{ConfigurationAccessError, Result, Error};
 use crate::models::Segment;
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
@@ -83,7 +83,7 @@ impl AppConfigurationClient {
     }
 
     fn get_configuration_snapshot(
-        access_token: &String,
+        access_token: &str,
         region: &str,
         guid: &str,
         environment_id: &str,
@@ -100,6 +100,37 @@ impl AppConfigurationClient {
         ConfigurationSnapshot::new(environment_id, configuration)
     }
 
+    fn wait_for_configuration_update(
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+        access_token: &str,
+        region: &str,
+        guid: &str,
+        collection_id: &str,
+        environment_id: &str,
+    ) -> Result<ConfigurationSnapshot>{
+        loop{
+            // read() blocks until something happens.
+            match socket.read()? {
+                Message::Text(text) => match text.as_str() {
+                    "test message" => {} // periodically sent by the server
+                    _ => {
+                        return Self::get_configuration_snapshot(
+                            access_token,
+                            region,
+                            guid,
+                            environment_id,
+                            collection_id,
+                        );
+                    }
+                },
+                Message::Close(_) => {
+                    return Err(Error::Other("Connection closed by the server".into()));
+                },
+                _ => {}
+            }
+        }
+    }
+
     fn update_configuration_on_change(
         mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
         latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
@@ -111,62 +142,25 @@ impl AppConfigurationClient {
     ) -> std::sync::mpsc::Sender<()> {
         let (sender, receiver) = std::sync::mpsc::channel();
 
-        thread::spawn(move || loop {
-            // If the sender has gone (AppConfiguration instance is dropped), then finish this thread
-            if let Err(e) = receiver.try_recv() {
-                if e == std::sync::mpsc::TryRecvError::Disconnected {
-                    break;
+        thread::spawn(move || {
+            loop {
+                // If the sender has gone (AppConfiguration instance is dropped), then finish this thread
+                if let Err(e) = receiver.try_recv() {
+                    if e == std::sync::mpsc::TryRecvError::Disconnected {
+                        break;
+                    }
+                }
+
+                let config_snapshot = Self::wait_for_configuration_update(&mut socket, &access_token, &region, &guid, &collection_id, &environment_id);
+
+                match config_snapshot{
+                    Ok(config_snapshot) => *latest_config_snapshot.lock()? = config_snapshot,
+                    Err(e) => {println!("Waiting for configuration update failed. Stopping to monitor for changes.: {e}"); break;}
                 }
             }
-
-            // Wait for new data
-            match socket.read() {
-                Ok(Message::Text(text)) => match text.as_str() {
-                    "test message" => {
-                        println!("\t*** Test message received.");
-                    }
-                    _ => {
-                        let config_result = Self::get_configuration_snapshot(
-                            &access_token,
-                            &region,
-                            &guid,
-                            &environment_id,
-                            &collection_id,
-                        );
-                        let mut config_snapshot = latest_config_snapshot.lock().unwrap();
-                        match config_result {
-                            Ok(config) => *config_snapshot = config,
-                            Err(e) => println!("Error getting config snapshot: {}", e),
-                        }
-                    }
-                },
-                Ok(Message::Close(_)) => {
-                    println!("Connection closed by the server.");
-                    break;
-                }
-                Ok(Message::Binary(data)) => {
-                    println!("\t*** Received a message that has binary data {:?}", data);
-                }
-                Ok(Message::Ping(data)) => {
-                    println!("\t*** Received a ping message {:?}", data);
-                }
-                Ok(Message::Pong(data)) => {
-                    println!("\t*** Received a pong message {:?}", data);
-                }
-                Ok(Message::Frame(frame)) => {
-                    println!("\t*** Received a frame message {:?}", frame);
-                }
-                Err(e) => {
-                    // TODO: how to handle temporary connectivity issues / errors?
-                    // In current implementation we would terminate this thread.
-                    // Effectively freezing the configuration.
-                    println!("Error: {}", e);
-                    break;
-                }
-            }
-
-            thread::sleep(Duration::from_millis(100));
-        });
+            Ok::<(), Error>(())
+        }
+        );
 
         sender
     }
