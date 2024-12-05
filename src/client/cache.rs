@@ -12,54 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, sync::PoisonError};
+use std::collections::HashMap;
 
+use crate::errors::{ConfigurationAccessError, Result};
 use crate::models::{Configuration, Feature, Property, Segment};
-
-#[derive(Debug)]
-pub enum ConfigurationAccessError {
-    LockAcquisitionError,
-    EnvironmentNotFound { environment_id: String },
-    FeatureNotFound { feature_id: String },
-    PropertyNotFound { property_id: String },
-    MissingSegments { resource_id: String },
-}
-
-impl std::error::Error for ConfigurationAccessError {}
-
-impl std::fmt::Display for ConfigurationAccessError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::LockAcquisitionError => {
-                write!(formatter, "Error acquiring index cache lock.")
-            }
-            Self::EnvironmentNotFound { environment_id } => {
-                write!(
-                    formatter,
-                    "Environment `{}` indicated as key not found in the configuration instance.",
-                    environment_id
-                )
-            }
-            Self::FeatureNotFound { feature_id } => {
-                write!(formatter, "Feature `{feature_id}` not found.")
-            }
-            Self::PropertyNotFound { property_id } => {
-                write!(formatter, "Property `{property_id}` not found.")
-            }
-            Self::MissingSegments { resource_id } => {
-                write!(formatter, "Missing Segments for Resource `{resource_id}`.")
-            }
-        }
-    }
-}
-
-impl<T> From<PoisonError<T>> for ConfigurationAccessError {
-    fn from(_value: PoisonError<T>) -> Self {
-        ConfigurationAccessError::LockAcquisitionError
-    }
-}
-
-pub type Result<T> = std::result::Result<T, ConfigurationAccessError>;
 
 #[derive(Debug, Default)]
 pub(crate) struct ConfigurationSnapshot {
@@ -70,19 +26,21 @@ pub(crate) struct ConfigurationSnapshot {
 
 impl ConfigurationSnapshot {
     pub fn get_feature(&self, feature_id: &str) -> Result<&Feature> {
-        self.features
-            .get(feature_id)
-            .ok_or_else(|| ConfigurationAccessError::FeatureNotFound {
+        self.features.get(feature_id).ok_or_else(|| {
+            ConfigurationAccessError::FeatureNotFound {
                 feature_id: feature_id.to_string(),
-            })
+            }
+            .into()
+        })
     }
 
     pub fn get_property(&self, property_id: &str) -> Result<&Property> {
-        self.properties
-            .get(property_id)
-            .ok_or_else(|| ConfigurationAccessError::PropertyNotFound {
+        self.properties.get(property_id).ok_or_else(|| {
+            ConfigurationAccessError::PropertyNotFound {
                 property_id: property_id.to_string(),
-            })
+            }
+            .into()
+        })
     }
 
     pub fn new(environment_id: &str, configuration: Configuration) -> Result<Self> {
@@ -110,9 +68,9 @@ impl ConfigurationSnapshot {
             segments.insert(segment.segment_id.clone(), segment.clone());
         }
         Ok(ConfigurationSnapshot {
-            features: features,
-            properties: properties,
-            segments: segments,
+            features,
+            properties,
+            segments,
         })
     }
 }
@@ -120,6 +78,7 @@ impl ConfigurationSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::errors::Error;
     use crate::models::tests::example_configuration_enterprise;
     use crate::models::Configuration;
     use rstest::*;
@@ -132,7 +91,7 @@ mod tests {
 
         assert!(matches!(
                 result.unwrap_err(),
-                ConfigurationAccessError::EnvironmentNotFound{ref environment_id}
-                if environment_id == "does_for_sure_not_exist"));
+                Error::ConfigurationAccessError(ref e)
+                if matches!(e, ConfigurationAccessError::EnvironmentNotFound { ref environment_id} if environment_id == "does_for_sure_not_exist")));
     }
 }

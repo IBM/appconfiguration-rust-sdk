@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::cache::{ConfigurationAccessError, ConfigurationSnapshot};
+use crate::client::cache::ConfigurationSnapshot;
 use crate::client::feature::Feature;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::http;
 use crate::client::property::Property;
 pub use crate::client::property_proxy::PropertyProxy;
+use crate::errors::{ConfigurationAccessError, Result};
 use crate::models::Segment;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fmt::Display;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -29,78 +28,6 @@ use std::time::Duration;
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::Message;
 use tungstenite::WebSocket;
-
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
-
-#[derive(Debug)]
-pub enum AppConfigurationClientError {
-    CannotAcquireLock,
-    FeatureDoesNotExist {
-        collection_id: String,
-        environment_id: String,
-        feature_id: String,
-    },
-    PropertyDoesNotExist {
-        collection_id: String,
-        environment_id: String,
-        property_id: String,
-    },
-    ClientRequestError {
-        cause: reqwest::Error,
-    },
-    ProtocolError,
-    ClientNotConfigured,
-}
-
-impl Error for AppConfigurationClientError {
-    fn cause(&self) -> Option<&dyn Error> {
-        match self {
-            Self::ClientRequestError { cause } => Some(cause),
-            _ => None,
-        }
-    }
-}
-
-impl Display for AppConfigurationClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CannotAcquireLock => write!(
-                f,
-                "Cannot acquire the lock on the `AppConfigurationClient` instance.",
-            ),
-            Self::FeatureDoesNotExist {
-                collection_id,
-                environment_id,
-                feature_id,
-            } => write!(
-                f,
-                "Feature {} does not exist in collection `{}` and environment `{}`",
-                collection_id, environment_id, feature_id
-            ),
-            Self::PropertyDoesNotExist {
-                collection_id,
-                environment_id,
-                property_id,
-            } => write!(
-                f,
-                "Property {} does not exist in collection `{}` and environment `{}`",
-                collection_id, environment_id, property_id
-            ),
-            Self::ClientNotConfigured => write!(
-                f,
-                "`AppConfigurationClient` is not configured. Call `AppConfigurationClient::set_context()` first."
-            ),
-            Self::ProtocolError => write!(f, "Protocol error"),
-            Self::ClientRequestError { cause } => write!(f, "{cause}"),
-        }
-    }
-}
-
-impl From<reqwest::Error> for AppConfigurationClientError {
-    fn from(value: reqwest::Error) -> Self {
-        Self::ClientRequestError { cause: value }
-    }
-}
 
 /// App Configuration client for browsing, and evaluating features and
 /// properties.
@@ -148,7 +75,7 @@ impl AppConfigurationClient {
         )?;
 
         let client = AppConfigurationClient {
-            latest_config_snapshot: latest_config_snapshot,
+            latest_config_snapshot,
             _thread_terminator: terminator,
         };
 
@@ -170,7 +97,7 @@ impl AppConfigurationClient {
             &collection_id,
             &environment_id,
         )?;
-        Ok(ConfigurationSnapshot::new(environment_id, configuration).map_err(|e| Box::new(e))?)
+        ConfigurationSnapshot::new(environment_id, configuration)
     }
 
     fn update_configuration_on_change(
@@ -247,8 +174,7 @@ impl AppConfigurationClient {
     pub fn get_feature_ids(&self) -> Result<Vec<String>> {
         Ok(self
             .latest_config_snapshot
-            .lock()
-            .map_err(|_| ConfigurationAccessError::LockAcquisitionError)?
+            .lock()?
             .features
             .keys()
             .cloned()
@@ -256,10 +182,7 @@ impl AppConfigurationClient {
     }
 
     pub fn get_feature(&self, feature_id: &str) -> Result<Feature> {
-        let config_snapshot = self
-            .latest_config_snapshot
-            .lock()
-            .map_err(|_| AppConfigurationClientError::CannotAcquireLock)?;
+        let config_snapshot = self.latest_config_snapshot.lock()?;
 
         // Get the feature from the snapshot
         let feature = config_snapshot.get_feature(feature_id)?;
@@ -286,7 +209,6 @@ impl AppConfigurationClient {
 
             // Integrity DB check: all segment_ids should be available in the snapshot
             if all_segment_ids.len() != segments.len() {
-                // FIXME: Return some kind of DBIntegrity error
                 return Err(ConfigurationAccessError::MissingSegments {
                     resource_id: feature_id.to_string(),
                 }
@@ -325,10 +247,7 @@ impl AppConfigurationClient {
     }
 
     pub fn get_property(&self, property_id: &str) -> Result<Property> {
-        let config_snapshot = self
-            .latest_config_snapshot
-            .lock()
-            .map_err(|_| AppConfigurationClientError::CannotAcquireLock)?;
+        let config_snapshot = self.latest_config_snapshot.lock()?;
 
         // Get the property from the snapshot
         let property = config_snapshot.get_property(property_id)?;

@@ -24,7 +24,7 @@ use crate::{
 
 use crate::entity::Entity;
 
-use super::cache::ConfigurationAccessError;
+use crate::errors::ConfigurationAccessError;
 
 const MISSING_FEATURE_ERROR_MSG: &str = "The feature should exist in the configuration_snapshot. It should have been validated in `AppConfigurationClient::get_feature()`.";
 

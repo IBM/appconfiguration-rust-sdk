@@ -15,13 +15,11 @@
 use crate::client::value::{NumericValue, Value};
 use crate::entity::Entity;
 use std::collections::HashMap;
-use std::error::Error;
 
-use super::app_configuration_client::AppConfigurationClientError;
 use super::feature_proxy::random_value;
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
 
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+use crate::errors::{Error, Result};
 
 #[derive(Debug)]
 pub struct Feature {
@@ -44,17 +42,14 @@ impl Feature {
             crate::models::ValueKind::Numeric => {
                 Value::Numeric(NumericValue(model_value.0.clone()))
             }
-            crate::models::ValueKind::Boolean => Value::Boolean(
-                model_value
-                    .0
-                    .as_bool()
-                    .ok_or(AppConfigurationClientError::ProtocolError)?,
-            ),
+            crate::models::ValueKind::Boolean => {
+                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError)?)
+            }
             crate::models::ValueKind::String => Value::String(
                 model_value
                     .0
                     .as_str()
-                    .ok_or(AppConfigurationClientError::ProtocolError)?
+                    .ok_or(Error::ProtocolError)?
                     .to_string(),
             ),
         };
@@ -106,30 +101,6 @@ impl Feature {
             }
             None => self.use_rollout_percentage_to_get_value_from_feature_directly(entity),
         }
-
-        // ---------------------
-
-        // let tag = format!("{}:{}", entity.get_id(), self.get_id());
-
-        // if self.get_targeting_rules().len() == 0 && entity.get_attributes().len() == 0{
-        //     // TODO rollout percentage evaluation
-        // }
-
-        // if let Some(segment_rule) = segment_rule {
-        //     let rollout_percentage = self.resolve_rollout_percentage(&segment_rule);
-        //     if rollout_percentage == 100 || random_value(&tag) < rollout_percentage {
-        //         self.resolve_enabled_value(&segment_rule)
-        //     } else {
-        //         self.get_disabled_value()
-        //     }
-        // } else {
-        //     let rollout_percentage = self.get_rollout_percentage();
-        //     if rollout_percentage == 100 || random_value(&tag) < rollout_percentage {
-        //         self.get_enabled_value()
-        //     } else {
-        //         self.get_disabled_value()
-        //     }
-        // }
     }
 
     fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
@@ -203,7 +174,7 @@ pub mod tests {
             format: None,
             enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
             disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules: segment_rules,
+            segment_rules,
             enabled: true,
             rollout_percentage: 50,
         };

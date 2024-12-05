@@ -17,16 +17,14 @@ use std::net::TcpStream;
 
 use reqwest::blocking::Client;
 use serde::Deserialize;
-use std::error::Error;
 use tungstenite::client::IntoClientRequest;
 use tungstenite::handshake::client::Response;
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{connect, WebSocket};
 use url::Url;
 
+use crate::errors::{Error, Result};
 use crate::models;
-
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 #[derive(Deserialize)]
 struct AccessTokenResponse {
@@ -55,8 +53,10 @@ pub fn get_access_token(apikey: &str) -> Result<String> {
         .post("https://iam.cloud.ibm.com/identity/token")
         .header("Accept", "application/json")
         .form(&form_data)
-        .send()?
-        .json::<AccessTokenResponse>()?
+        .send()
+        .map_err(Error::ReqwestError)?
+        .json::<AccessTokenResponse>()
+        .map_err(Error::ReqwestError)? // FIXME: This is a deserialization error (extract it from Reqwest)
         .access_token)
 }
 
@@ -68,8 +68,9 @@ pub fn get_configuration(
     environment_id: &str,
 ) -> Result<models::Configuration> {
     let client = Client::new();
-    Ok(client
-        .get(get_base_url(region, guid))
+    let url = get_base_url(region, guid);
+    client
+        .get(&url)
         .query(&[
             ("action", "sdkConfig"),
             ("collection_id", collection_id),
@@ -78,8 +79,10 @@ pub fn get_configuration(
         .header("Accept", "application/json")
         .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
         .bearer_auth(access_token)
-        .send()?
-        .json()?)
+        .send()
+        .map_err(Error::ReqwestError)?
+        .json()
+        .map_err(Error::ReqwestError) // FIXME: This is a deserialization error (extract it from Reqwest)
 }
 
 pub fn get_configuration_monitoring_websocket(
@@ -89,17 +92,32 @@ pub fn get_configuration_monitoring_websocket(
     collection_id: &str,
     environment_id: &str,
 ) -> Result<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
-    let mut url = Url::parse(&get_ws_url(region))?;
+    let url = get_ws_url(region);
+    let mut url = Url::parse(&url)
+        .map_err(|e| Error::Other(format!("Cannot parse '{}' as URL: {}", url, e)))?;
 
     url.query_pairs_mut()
         .append_pair("instance_id", guid)
         .append_pair("collection_id", collection_id)
         .append_pair("environment_id", environment_id);
 
-    let mut request = url.as_str().into_client_request()?;
+    let mut request = url
+        .as_str()
+        .into_client_request()
+        .map_err(Error::TungsteniteError)?;
     let headers = request.headers_mut();
-    headers.insert("User-Agent", "appconfiguration-rust-sdk/0.0.1".parse()?);
-    headers.insert("Authorization", format!("Bearer {}", access_token).parse()?);
+    headers.insert(
+        "User-Agent",
+        "appconfiguration-rust-sdk/0.0.1"
+            .parse()
+            .map_err(|_| Error::Other("Invalid header value for 'User-Agent'".to_string()))?,
+    );
+    headers.insert(
+        "Authorization",
+        format!("Bearer {}", access_token)
+            .parse()
+            .map_err(|_| Error::Other("Invalid header value for 'Authorization'".to_string()))?,
+    );
 
     Ok(connect(request)?)
 }

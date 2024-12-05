@@ -15,12 +15,9 @@
 use crate::client::value::{NumericValue, Value};
 use crate::entity::Entity;
 use std::collections::HashMap;
-use std::error::Error;
 
-use super::app_configuration_client::AppConfigurationClientError;
+use crate::errors::{Error, Result};
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
-
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 #[derive(Debug)]
 pub struct Property {
@@ -43,17 +40,14 @@ impl Property {
             crate::models::ValueKind::Numeric => {
                 Value::Numeric(NumericValue(model_value.0.clone()))
             }
-            crate::models::ValueKind::Boolean => Value::Boolean(
-                model_value
-                    .0
-                    .as_bool()
-                    .ok_or(AppConfigurationClientError::ProtocolError)?,
-            ),
+            crate::models::ValueKind::Boolean => {
+                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError)?)
+            }
             crate::models::ValueKind::String => Value::String(
                 model_value
                     .0
                     .as_str()
-                    .ok_or(AppConfigurationClientError::ProtocolError)?
+                    .ok_or(Error::ProtocolError)?
                     .to_string(),
             ),
         };
