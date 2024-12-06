@@ -41,13 +41,13 @@ impl Property {
                 Value::Numeric(NumericValue(model_value.0.clone()))
             }
             crate::models::ValueKind::Boolean => {
-                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError)?)
+                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError("Expected Boolean".into()))?)
             }
             crate::models::ValueKind::String => Value::String(
                 model_value
                     .0
                     .as_str()
-                    .ok_or(Error::ProtocolError)?
+                    .ok_or(Error::ProtocolError("Expected String".into()))?
                     .to_string(),
             ),
         };
@@ -69,7 +69,7 @@ impl Property {
             &self.segments,
             self.property.segment_rules.clone().into_iter(),
             entity,
-        ) {
+        )? {
             Some(segment_rule) => {
                 if segment_rule.value.is_default() {
                     Ok(self.property.value.clone())

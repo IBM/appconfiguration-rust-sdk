@@ -126,7 +126,7 @@ impl PropertyProxy {
                 .segments,
             self.get_targeting_rules().into_iter(),
             entity,
-        );
+        ).unwrap_or_else(|e| panic!("Failed to evaluate segment rules: {e}"));
         if let Some(segment_rule) = segment_rule {
             self.resolve_value(&segment_rule)
         } else {
