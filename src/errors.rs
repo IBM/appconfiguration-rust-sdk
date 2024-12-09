@@ -30,7 +30,7 @@ pub enum Error {
     TungsteniteError(#[from] tungstenite::Error),
 
     #[error("Protocol error. Unexpected data received from server")]
-    ProtocolError,
+    ProtocolError(String),
 
     #[error(transparent)]
     DeserializationError(#[from] DeserializationError),
@@ -40,6 +40,9 @@ pub enum Error {
 
     #[error(transparent)]
     ConfigurationAccessError(#[from] ConfigurationAccessError),
+
+    #[error("Failed to evaluate entity: {0}")]
+    EntityEvaluationError(String),
 
     #[error("{0}")]
     Other(String),
