@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod app_configuration_client;
+mod resource;
 
 pub(crate) mod cache;
 pub mod feature;
@@ -23,5 +24,5 @@ pub(crate) mod property_proxy;
 pub mod value;
 
 pub use app_configuration_client::AppConfigurationClient;
-
+pub use resource::Resource;
 pub const REGION_US_SOUTH: &str = "us-south";
