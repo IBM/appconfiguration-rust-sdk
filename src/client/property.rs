@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::value::{NumericValue, Value};
 use crate::entity::Entity;
 use std::collections::HashMap;
 
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
+use super::Resource;
 
 #[derive(Debug)]
 pub struct Property {
@@ -32,26 +32,11 @@ impl Property {
     ) -> Self {
         Self { property, segments }
     }
+}
 
-    pub fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        let model_value = self.evaluate_feature_for_entity(entity)?;
-
-        let value = match self.property.kind {
-            crate::models::ValueKind::Numeric => {
-                Value::Numeric(NumericValue(model_value.0.clone()))
-            }
-            crate::models::ValueKind::Boolean => {
-                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError)?)
-            }
-            crate::models::ValueKind::String => Value::String(
-                model_value
-                    .0
-                    .as_str()
-                    .ok_or(Error::ProtocolError)?
-                    .to_string(),
-            ),
-        };
-        Ok(value)
+impl Resource for Property {
+    fn value_type(&self) -> &crate::models::ValueKind {
+        &self.property.kind
     }
 
     fn evaluate_feature_for_entity(
@@ -89,6 +74,7 @@ pub mod tests {
         models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind},
         AttrValue,
     };
+    use crate::client::value::Value;
 
     #[test]
     fn test_get_value_segment_with_default_value() {

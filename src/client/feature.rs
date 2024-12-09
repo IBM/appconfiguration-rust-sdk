@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::value::{NumericValue, Value};
 use crate::entity::Entity;
 use std::collections::HashMap;
 
 use super::feature_proxy::random_value;
+use super::Resource;
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
-
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 
 #[derive(Debug)]
 pub struct Feature {
@@ -35,25 +34,27 @@ impl Feature {
         Self { feature, segments }
     }
 
-    pub fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        let model_value = self.evaluate_feature_for_entity(entity)?;
+    fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
+        let tag = format!("{}:{}", entity.get_id(), feature_id);
+        rollout_percentage == 100 || random_value(&tag) < rollout_percentage
+    }
 
-        let value = match self.feature.kind {
-            crate::models::ValueKind::Numeric => {
-                Value::Numeric(NumericValue(model_value.0.clone()))
-            }
-            crate::models::ValueKind::Boolean => {
-                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError)?)
-            }
-            crate::models::ValueKind::String => Value::String(
-                model_value
-                    .0
-                    .as_str()
-                    .ok_or(Error::ProtocolError)?
-                    .to_string(),
-            ),
-        };
-        Ok(value)
+    fn use_rollout_percentage_to_get_value_from_feature_directly(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<crate::models::ConfigValue> {
+        let rollout_percentage = self.feature.rollout_percentage;
+        if Self::should_rollout(rollout_percentage, entity, &self.feature.feature_id) {
+            Ok(self.feature.enabled_value.clone())
+        } else {
+            Ok(self.feature.disabled_value.clone())
+        }
+    }
+}
+
+impl Resource for Feature {
+    fn value_type(&self) -> &crate::models::ValueKind {
+        &self.feature.kind
     }
 
     fn evaluate_feature_for_entity(
@@ -102,23 +103,6 @@ impl Feature {
             None => self.use_rollout_percentage_to_get_value_from_feature_directly(entity),
         }
     }
-
-    fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
-        let tag = format!("{}:{}", entity.get_id(), feature_id);
-        rollout_percentage == 100 || random_value(&tag) < rollout_percentage
-    }
-
-    fn use_rollout_percentage_to_get_value_from_feature_directly(
-        &self,
-        entity: &impl Entity,
-    ) -> Result<crate::models::ConfigValue> {
-        let rollout_percentage = self.feature.rollout_percentage;
-        if Self::should_rollout(rollout_percentage, entity, &self.feature.feature_id) {
-            Ok(self.feature.enabled_value.clone())
-        } else {
-            Ok(self.feature.disabled_value.clone())
-        }
-    }
 }
 
 #[cfg(test)]
@@ -126,10 +110,10 @@ pub mod tests {
 
     use super::*;
     use crate::{
-        entity,
         models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind},
         AttrValue,
     };
+    use crate::client::value::Value;
     use rstest::rstest;
 
     #[rstest]

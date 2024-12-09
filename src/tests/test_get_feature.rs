@@ -15,7 +15,7 @@
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::AppConfigurationClient;
+use crate::client::{AppConfigurationClient, Resource};
 use rstest::*;
 
 use super::client_enterprise;
