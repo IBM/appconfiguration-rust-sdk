@@ -1,0 +1,40 @@
+# Use 'pre-commit autoupdate' to upgrade them
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # - id: no-commit-to-branch
+      - id: check-yaml
+        args:
+          - "--unsafe"
+      - id: end-of-file-fixer
+        exclude: "(.whitesource|.patch|.drawio|apikey)"
+      - id: trailing-whitespace
+        exclude: ".patch"
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: fix-byte-order-marker
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: mixed-line-ending
+      - id: check-added-large-files
+        args:
+          - --maxkb=1000
+          - --enforce-all
+      - id: forbid-submodules
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+      - id: cargo-check
+
+  - repo: https://github.com/ibm/detect-secrets
+    rev: 0.13.1+ibm.62.dss
+    hooks:
+      - id: detect-secrets # pragma: whitelist secret
+        # Update baseline file with:
+        #   detect-secrets scan --update .secrets.baseline
+        # Add options for detect-secrets-hook binary. You can run `detect-secrets-hook --help` to list out all possible options.
+        # add "--fail-on-unaudited" to fail pre-commit for unaudited potential secrets
+        args: [--baseline, .secrets.baseline, --use-all-plugins]
