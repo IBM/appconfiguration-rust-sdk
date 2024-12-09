@@ -81,14 +81,39 @@ fn belong_to_segment(segment: &Segment, attrs: HashMap<String, AttrValue>) -> An
         let operator = &rule.operator;
         let attr_name = &rule.attribute_name;
         let attr_value = attrs
-            .get(attr_name)
-            .ok_or(Error::Other(format!("Operation '{attr_name}' '{operator}' '[...]' failed to evaluate: '{attr_name}' not found in entity")))?;
-        for value in rule.values.iter()
-        {
-            let result = check_operator(attr_value, operator, value).context(format!("Operation '{attr_name}' '{operator}' '{value}' failed to evaluate."))?;
-            if result {return Ok(true)}
+            .get(attr_name);
+        if attr_value.is_none(){
+            return Ok(false)
         }
-        return Ok(false);
+        let rule_result = match attr_value{
+            None => {
+                println!("Warning: Operation '{attr_name}' '{operator}' '[...]' failed to evaluate: '{attr_name}' not found in entity");
+                Ok(false)
+            },
+            Some(attr_value) => {
+                // FIXME: the following algorithm is too hard to read. Is it just me or do we need to simplify this?
+                // One of the values needs to match.
+                // Find a candidate (a candidate corresponds to a value which matches or which might match but the operator failed):
+                let candidate = rule.values.iter().find_map(|value| {
+                    let result_for_value = check_operator(attr_value, operator, value).context(format!("Operation '{attr_name}' '{operator}' '{value}' failed to evaluate."));
+                    match result_for_value{
+                        Ok(true) => Some(Ok(())),
+                        Ok(false) => None,
+                        Err(e) => Some(Err(e))
+                    }
+                });
+                // check if the candidate is good, or if the operator failed:
+                match candidate{
+                    None => Ok(false),
+                    Some(Ok(())) => Ok(true),
+                    Some(Err(e)) => Err(e)
+                }
+            }
+        }?;
+        // All rules must match:
+        if !rule_result {
+            return Ok(false)
+        }
     }
     Ok(true)
 }
@@ -212,6 +237,9 @@ pub mod tests {
         }]
     }
 
+    // SCENARIO - If the SDK user fail to pass the “attributes” for evaluation of featureflag which is segmented - we have considered that evaluation as “does not belong to any segment” and we serve the enabled_value.
+    // EXAMPLE - Assume two teams are using same featureflag. One team is interested only in enabled_value & disabled_value. This team doesn’t pass attributes for  their evaluation. Other team wants to have overridden_value, as a result they update the featureflag by adding segment rules to it. This team passes attributes in their evaluation to get the overridden_value for matching segment, and enabled_value for non-matching segment.
+    //  We should not fail the evaluation.
     #[rstest]
     fn test_attribute_not_found(segments: HashMap<String, Segment>, segment_rules: Vec<TargetingRule>) {
         let entity = crate::tests::GenericEntity {
@@ -219,20 +247,45 @@ pub mod tests {
             attributes: HashMap::from([("name2".into(), AttrValue::from("heinz".to_string()))]),
         };
         let rule =
-            find_applicable_segment_rule_for_entity(&segments, segment_rules.clone().into_iter(), &entity);
-        // Error message should look something like this:
-        //  Failed to evaluate entity 'a2' against targeting rule '0'.
-        //  Caused by: Failed to evaluate segment 'some_segment_id_1'
-        //  Caused by: Operation 'name' 'is' '[...]' failed to evaluate: 'name' not found in entity
-        // We are checking here that the parts are present to allow debugging of config by the user:
-        let msg = rule.unwrap_err().to_string();
-        assert!(msg.contains("'name' not found in entity"));
-        assert!(msg.contains("'a2'"));
-        assert!(msg.contains("'0'"));
-        assert!(msg.contains("'some_segment_id_1'"));
-        assert!(msg.contains("'is'"));
+            find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);
+        // Segment evaluation should not fail:
+        let rule = rule.unwrap();
+        // But no segment should be found:
+        assert!(rule.is_none())
     }
 
+    // SCENARIO - The segment_id present in featureflag is invalid. In other words - the /config json dump has a featureflag, which has segment_rules. The segment_id in this segment_rules is invalid. Because this segment_id is not found in segments array.
+    // This is a very good question. Firstly, the our server-side API are strongly validating inputs and give the responses. We have unittests & integration tests that verifies the input & output of /config API.  The response is always right. It is very much rare scenario where the API response has segment_id in featureflag object, that is not present is segments array.
+    // We can agree to return error and mark evaluation as failed.
+    #[rstest]
+    fn test_invalid_segment_id(segments: HashMap<String, Segment>) {
+        let entity = crate::tests::GenericEntity {
+            id: "a2".into(),
+            attributes: HashMap::from([("name".into(), AttrValue::from(42.0))]),
+        };
+        let segment_rules = vec![TargetingRule {
+            rules: vec![Segments {
+                segments: vec!["non_existing_segment_id".into()],
+            }],
+            value: ConfigValue(serde_json::Value::Number((-48).into())),
+            order: 0,
+            rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+        }];
+        let rule =
+            find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);
+        // Error message should look something like this:
+        //  Failed to evaluate entity: Failed to evaluate entity 'a2' against targeting rule '0'.
+        //  Caused by: Segment 'non_existing_segment_id' not found.
+        // We are checking here that the parts are present to allow debugging of config by the user:
+        let msg = rule.unwrap_err().to_string();
+        assert!(msg.contains("'a2'"));
+        assert!(msg.contains("'0'"));
+        assert!(msg.contains("'non_existing_segment_id'"));
+        assert!(msg.contains("not found"));
+    }
+
+    // SCENARIO - evaluating an operator fails. Meaning, [for example] user has added a numeric value(int/float) in appconfig segment attribute, but in their application they pass the attribute with a boolean value.
+    // We can mark this as failure and return error.
     #[rstest]
     fn test_operator_failed(segments: HashMap<String, Segment>, segment_rules: Vec<TargetingRule>) {
         let entity = crate::tests::GenericEntity {
