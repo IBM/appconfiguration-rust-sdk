@@ -42,9 +42,12 @@ impl Feature {
             crate::models::ValueKind::Numeric => {
                 Value::Numeric(NumericValue(model_value.0.clone()))
             }
-            crate::models::ValueKind::Boolean => {
-                Value::Boolean(model_value.0.as_bool().ok_or(Error::ProtocolError("Expected Boolean".into()))?)
-            }
+            crate::models::ValueKind::Boolean => Value::Boolean(
+                model_value
+                    .0
+                    .as_bool()
+                    .ok_or(Error::ProtocolError("Expected Boolean".into()))?,
+            ),
             crate::models::ValueKind::String => Value::String(
                 model_value
                     .0

@@ -14,9 +14,9 @@
 
 pub mod client;
 pub mod entity;
+pub mod errors;
 pub mod models;
 mod segment_evaluation;
-pub mod errors;
 
 pub use entity::{AttrValue, Entity};
 

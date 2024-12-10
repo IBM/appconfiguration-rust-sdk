@@ -18,7 +18,7 @@ pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::http;
 use crate::client::property::Property;
 pub use crate::client::property_proxy::PropertyProxy;
-use crate::errors::{ConfigurationAccessError, Result, Error};
+use crate::errors::{ConfigurationAccessError, Error, Result};
 use crate::models::Segment;
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
@@ -107,8 +107,8 @@ impl AppConfigurationClient {
         guid: &str,
         collection_id: &str,
         environment_id: &str,
-    ) -> Result<ConfigurationSnapshot>{
-        loop{
+    ) -> Result<ConfigurationSnapshot> {
+        loop {
             // read() blocks until something happens.
             match socket.read()? {
                 Message::Text(text) => match text.as_str() {
@@ -125,7 +125,7 @@ impl AppConfigurationClient {
                 },
                 Message::Close(_) => {
                     return Err(Error::Other("Connection closed by the server".into()));
-                },
+                }
                 _ => {}
             }
         }
@@ -151,16 +151,25 @@ impl AppConfigurationClient {
                     }
                 }
 
-                let config_snapshot = Self::wait_for_configuration_update(&mut socket, &access_token, &region, &guid, &collection_id, &environment_id);
+                let config_snapshot = Self::wait_for_configuration_update(
+                    &mut socket,
+                    &access_token,
+                    &region,
+                    &guid,
+                    &collection_id,
+                    &environment_id,
+                );
 
-                match config_snapshot{
+                match config_snapshot {
                     Ok(config_snapshot) => *latest_config_snapshot.lock()? = config_snapshot,
-                    Err(e) => {println!("Waiting for configuration update failed. Stopping to monitor for changes.: {e}"); break;}
+                    Err(e) => {
+                        println!("Waiting for configuration update failed. Stopping to monitor for changes.: {e}");
+                        break;
+                    }
                 }
             }
             Ok::<(), Error>(())
-        }
-        );
+        });
 
         sender
     }
