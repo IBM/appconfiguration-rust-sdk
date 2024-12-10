@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod errors;
+
 use std::collections::HashMap;
 
-use crate::errors::{CheckOperatorErrorDetail, Result, SegmentEvaluationError};
+use crate::entity::{AttrValue, Entity};
+use crate::errors::Result;
 use crate::models::Segment;
-use crate::{
-    entity::{AttrValue, Entity},
-    models::TargetingRule,
-};
+use crate::models::TargetingRule;
+pub(crate) use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
 pub(crate) fn find_applicable_segment_rule_for_entity(
     segments: &HashMap<String, Segment>,
@@ -164,7 +165,7 @@ fn check_operator(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::errors::{EntityEvaluationError, Error, SegmentEvaluationErrorKind};
+    use crate::errors::{EntityEvaluationError, Error};
     use crate::{
         models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule},
         AttrValue,
