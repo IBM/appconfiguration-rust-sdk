@@ -54,7 +54,7 @@ pub enum Error {
 }
 
 #[derive(Debug, Error)]
-#[error("sdaf '{0}'")]
+#[error(transparent)]
 pub struct EntityEvaluationError(pub(crate) SegmentEvaluationError);
 
 impl From<SegmentEvaluationError> for Error {
@@ -111,6 +111,35 @@ impl<T> From<PoisonError<T>> for ConfigurationAccessError {
 }
 
 #[derive(Debug, Error)]
+pub(crate) enum SegmentEvaluationError {
+    #[error(transparent)]
+    SegmentEvaluationFailed(#[from] SegmentEvaluationErrorKind),
+
+    #[error("Segment ID '{0}' not found")]
+    SegmentIdNotFound(String),
+}
+#[derive(Debug, Error)]
+#[error("Operation '{}' '{}' '{}' failed to evaluate: {}", segment_rule.attribute_name, segment_rule.operator,  value, source)]
+pub(crate) struct SegmentEvaluationErrorKind {
+    pub(crate) segment: Segment,
+    pub(crate) segment_rule: SegmentRule,
+    pub(crate) value: String,
+    pub(crate) source: CheckOperatorErrorDetail,
+}
+
+impl From<(CheckOperatorErrorDetail, &Segment, &SegmentRule, &String)> for SegmentEvaluationError {
+    fn from(value: (CheckOperatorErrorDetail, &Segment, &SegmentRule, &String)) -> Self {
+        let (source, segment, segment_rule, value) = value;
+        Self::SegmentEvaluationFailed(SegmentEvaluationErrorKind {
+            segment: segment.clone(),
+            segment_rule: segment_rule.clone(),
+            value: value.clone(),
+            source,
+        })
+    }
+}
+
+#[derive(Debug, Error)]
 pub(crate) enum CheckOperatorErrorDetail {
     #[error("Entity attribute is not a string.")]
     StringExpected,
@@ -126,35 +155,4 @@ pub(crate) enum CheckOperatorErrorDetail {
 
     #[error("Operator not implemented.")]
     OperatorNotImplemented,
-}
-
-#[derive(Debug, Error)]
-pub(crate) enum SegmentEvaluationError {
-    #[error("Operation")]
-    SegmentEvaluationFailed(#[from] SegmentEvaluationErrorKind),
-
-    #[error("Segment ID '{0}' not found")]
-    SegmentIdNotFound(String),
-}
-#[derive(Debug, Error)]
-#[error("Operation")]
-pub(crate) struct SegmentEvaluationErrorKind {
-    pub(crate) segment: Segment,
-    pub(crate) segment_rule: SegmentRule,
-    pub(crate) attr_value: AttrValue,
-    pub(crate) source: CheckOperatorErrorDetail,
-}
-
-impl From<(CheckOperatorErrorDetail, &Segment, &SegmentRule, &AttrValue)>
-    for SegmentEvaluationError
-{
-    fn from(value: (CheckOperatorErrorDetail, &Segment, &SegmentRule, &AttrValue)) -> Self {
-        let (source, segment, segment_rule, attr_value) = value;
-        Self::SegmentEvaluationFailed(SegmentEvaluationErrorKind {
-            segment: segment.clone(),
-            segment_rule: segment_rule.clone(),
-            attr_value: attr_value.clone(),
-            source,
-        })
-    }
 }

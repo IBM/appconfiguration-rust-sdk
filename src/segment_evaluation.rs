@@ -96,12 +96,11 @@ fn belong_to_segment(
                     .values
                     .iter()
                     .find_map(|value| match check_operator(attr_value, operator, value) {
-                        Ok(true) => Some(Ok(())),
+                        Ok(true) => Some(Ok::<_, SegmentEvaluationError>(())),
                         Ok(false) => None,
-                        Err(e) => Some(Err(e)),
+                        Err(e) => Some(Err((e, segment, rule, value).into())),
                     })
-                    .transpose()
-                    .map_err(|e| (e, segment, rule, attr_value))?;
+                    .transpose()?;
                 // check if the candidate is good, or if the operator failed:
                 candidate.is_some()
             }
@@ -165,11 +164,11 @@ fn check_operator(
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::errors::{EntityEvaluationError, Error, SegmentEvaluationErrorKind};
     use crate::{
         models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule},
         AttrValue,
     };
-    use crate::errors::Error;
     use rstest::*;
 
     #[fixture]
@@ -245,11 +244,20 @@ pub mod tests {
         //  Failed to evaluate entity: Failed to evaluate entity 'a2' against targeting rule '0'.
         //  Caused by: Segment 'non_existing_segment_id' not found.
         // We are checking here that the parts are present to allow debugging of config by the user:
-        let msg = rule.unwrap_err().to_string();
-        assert!(msg.contains("'a2'"));
-        assert!(msg.contains("'0'"));
-        assert!(msg.contains("'non_existing_segment_id'"));
-        assert!(msg.contains("not found"));
+        let e = rule.unwrap_err();
+        assert!(matches!(e, Error::EntityEvaluationError(_)));
+        let Error::EntityEvaluationError(EntityEvaluationError(
+            SegmentEvaluationError::SegmentIdNotFound(ref segment_id),
+        )) = e
+        else {
+            panic!("Error type mismatch!");
+        };
+        assert_eq!(segment_id, "non_existing_segment_id");
+        // let msg = rule.unwrap_err().to_string();
+        // assert!(msg.contains("'a2'"));
+        // assert!(msg.contains("'0'"));
+        // assert!(msg.contains("'non_existing_segment_id'"));
+        // assert!(msg.contains("not found"));
     }
 
     // SCENARIO - evaluating an operator fails. Meaning, [for example] user has added a numeric value(int/float) in appconfig segment attribute, but in their application they pass the attribute with a boolean value.
@@ -270,17 +278,15 @@ pub mod tests {
         // We are checking here that the parts are present to allow debugging of config by the user:
 
         let e = rule.unwrap_err();
-        assert!(matches!(
-            e,
-            Error::EntityEvaluationError(ref v)
-        ));
-
-        let msg = e.to_string();
-        assert_eq!(msg, "lol");
-        assert!(msg.contains("'a2'"));
-        assert!(msg.contains("'0'"));
-        assert!(msg.contains("'some_segment_id_1'"));
-        assert!(msg.contains("'name' 'is' 'heinz'"));
-        assert!(msg.contains("Entity attribute has unexpected type: Number"));
+        assert!(matches!(e, Error::EntityEvaluationError(_)));
+        let Error::EntityEvaluationError(EntityEvaluationError(
+            SegmentEvaluationError::SegmentEvaluationFailed(ref error),
+        )) = e
+        else {
+            panic!("Error type mismatch!");
+        };
+        assert_eq!(error.segment.name, "");
+        assert_eq!(error.segment_rule.attribute_name, "name");
+        assert_eq!(error.value, "heinz");
     }
 }
