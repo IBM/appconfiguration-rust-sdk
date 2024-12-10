@@ -1,6 +1,11 @@
-use std::sync::PoisonError;
+use std::{str::ParseBoolError, sync::PoisonError};
 
 use thiserror::Error;
+
+use crate::{
+    models::{Segment, SegmentRule},
+    AttrValue,
+};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -42,10 +47,20 @@ pub enum Error {
     ConfigurationAccessError(#[from] ConfigurationAccessError),
 
     #[error("Failed to evaluate entity: {0}")]
-    EntityEvaluationError(String),
+    EntityEvaluationError(EntityEvaluationError),
 
     #[error("{0}")]
     Other(String),
+}
+
+#[derive(Debug, Error)]
+#[error("sdaf '{0}'")]
+pub struct EntityEvaluationError(pub(crate) SegmentEvaluationError);
+
+impl From<SegmentEvaluationError> for Error {
+    fn from(value: SegmentEvaluationError) -> Self {
+        Self::EntityEvaluationError(EntityEvaluationError(value))
+    }
 }
 
 impl<T> From<PoisonError<T>> for Error {
@@ -92,5 +107,54 @@ pub enum ConfigurationAccessError {
 impl<T> From<PoisonError<T>> for ConfigurationAccessError {
     fn from(_value: PoisonError<T>) -> Self {
         ConfigurationAccessError::LockAcquisitionError
+    }
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum CheckOperatorErrorDetail {
+    #[error("Entity attribute is not a string.")]
+    StringExpected,
+
+    #[error("Entity attribute has unexpected type: Boolean.")]
+    BooleanExpected(#[from] std::str::ParseBoolError),
+
+    #[error("Entity attribute has unexpected type: Number.")]
+    NumberExpected(#[from] std::num::ParseFloatError),
+
+    #[error("Entity attribute is not a number.")]
+    EntityAttrNotANumber,
+
+    #[error("Operator not implemented.")]
+    OperatorNotImplemented,
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum SegmentEvaluationError {
+    #[error("Operation")]
+    SegmentEvaluationFailed(#[from] SegmentEvaluationErrorKind),
+
+    #[error("Segment ID '{0}' not found")]
+    SegmentIdNotFound(String),
+}
+#[derive(Debug, Error)]
+#[error("Operation")]
+pub(crate) struct SegmentEvaluationErrorKind {
+    pub(crate) segment: Segment,
+    pub(crate) segment_rule: SegmentRule,
+    pub(crate) attr_value: AttrValue,
+    pub(crate) source: CheckOperatorErrorDetail,
+}
+
+impl From<(CheckOperatorErrorDetail, &Segment, &SegmentRule, &AttrValue)>
+    for SegmentEvaluationError
+{
+    fn from(value: (CheckOperatorErrorDetail, &Segment, &SegmentRule, &AttrValue)) -> Self {
+        let (source, segment, segment_rule, attr_value) = value;
+        Self::SegmentEvaluationFailed(SegmentEvaluationErrorKind {
+            segment: segment.clone(),
+            segment_rule: segment_rule.clone(),
+            attr_value: attr_value.clone(),
+            source,
+        })
     }
 }
