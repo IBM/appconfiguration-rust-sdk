@@ -14,7 +14,7 @@
 
 use std::{collections::HashMap, env, thread, time::Duration};
 
-use appconfiguration_rust_sdk::{client::AppConfigurationClient, AttrValue, Entity, Feature};
+use appconfiguration_rust_sdk::{client::AppConfigurationClient, AttrValue, Entity, Feature, Property};
 use dotenvy::dotenv;
 use std::error::Error;
 
@@ -86,12 +86,12 @@ fn main() -> Result<()> {
         println!("\n\nPROPERTY OPERATIONS\n");
         match client.get_property_proxy(&property_id) {
             Ok(property) => {
-                println!("Property name: {}", property.get_name());
+                println!("Property name: {}", property.get_name()?);
                 println!("Property id: {}", property.get_id());
-                println!("Property data type: {}", property.get_data_type());
+                println!("Property data type: {}", property.get_data_type()?);
                 println!(
-                    "Property evaluated value is: {}",
-                    property.get_current_value(&entity)
+                    "Property evaluated value is: {:?}",
+                    property.get_value(&entity)?
                 );
             }
             Err(error) => {

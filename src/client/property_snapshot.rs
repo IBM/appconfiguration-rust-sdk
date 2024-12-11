@@ -14,47 +14,24 @@
 
 use crate::client::value::{NumericValue, Value};
 use crate::entity::Entity;
+use crate::Property;
 use std::collections::HashMap;
 
 use crate::errors::{Error, Result};
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
 
 #[derive(Debug)]
-pub struct Property {
+pub struct PropertySnapshot {
     property: crate::models::Property,
     segments: HashMap<String, crate::models::Segment>,
 }
 
-impl Property {
+impl PropertySnapshot {
     pub(crate) fn new(
         property: crate::models::Property,
         segments: HashMap<String, crate::models::Segment>,
     ) -> Self {
         Self { property, segments }
-    }
-
-    pub fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        let model_value = self.evaluate_feature_for_entity(entity)?;
-
-        let value = match self.property.kind {
-            crate::models::ValueKind::Numeric => {
-                Value::Numeric(NumericValue(model_value.0.clone()))
-            }
-            crate::models::ValueKind::Boolean => Value::Boolean(
-                model_value
-                    .0
-                    .as_bool()
-                    .ok_or(Error::ProtocolError("Expected Boolean".into()))?,
-            ),
-            crate::models::ValueKind::String => Value::String(
-                model_value
-                    .0
-                    .as_str()
-                    .ok_or(Error::ProtocolError("Expected String".into()))?
-                    .to_string(),
-            ),
-        };
-        Ok(value)
     }
 
     fn evaluate_feature_for_entity(
@@ -85,6 +62,49 @@ impl Property {
     }
 }
 
+impl Property for PropertySnapshot {
+    fn get_id(&self) -> &str {
+        &self.property.property_id
+    }
+
+    fn get_name(&self) -> Result<String> {
+        Ok(self.property.name.clone())
+    }
+
+    fn get_data_type(&self) -> Result<crate::models::ValueKind> {
+        Ok(self.property.kind)
+    }
+
+    fn get_value_default(&self) -> Result<crate::models::ConfigValue> {
+        Ok(self.property.value.clone())
+    }
+
+    fn get_value(&self, entity: &impl Entity) -> Result<Value> {
+        let model_value = self.evaluate_feature_for_entity(entity)?;
+
+        let value = match self.property.kind {
+            crate::models::ValueKind::Numeric => {
+                Value::Numeric(NumericValue(model_value.0.clone()))
+            }
+            crate::models::ValueKind::Boolean => Value::Boolean(
+                model_value
+                    .0
+                    .as_bool()
+                    .ok_or(Error::ProtocolError("Expected Boolean".into()))?,
+            ),
+            crate::models::ValueKind::String => Value::String(
+                model_value
+                    .0
+                    .as_str()
+                    .ok_or(Error::ProtocolError("Expected String".into()))?
+                    .to_string(),
+            ),
+        };
+        Ok(value)
+    }
+}
+
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -111,7 +131,7 @@ pub mod tests {
             }],
             tags: None,
         };
-        let property = Property::new(
+        let property = PropertySnapshot::new(
             inner_property,
             HashMap::from([(
                 "some_segment_id_1".into(),
@@ -166,7 +186,7 @@ pub mod tests {
             ],
             tags: None,
         };
-        let property = Property::new(
+        let property = PropertySnapshot::new(
             inner_property,
             HashMap::from([
                 (

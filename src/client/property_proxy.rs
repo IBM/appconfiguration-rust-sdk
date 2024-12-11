@@ -12,134 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Mutex};
-
-use crate::{
-    client::cache::ConfigurationSnapshot, models,
-    segment_evaluation::find_applicable_segment_rule_for_entity,
-};
+use crate::Property;
 
 use crate::entity::Entity;
 
-use crate::errors::ConfigurationAccessError;
+use super::property_snapshot::PropertySnapshot;
+use super::AppConfigurationClient;
 
-const MISSING_PROPERTY_ERROR_MSG: &str = "The property should exist in the index. It should have been validated in `AppConfigurationClient::get_property()`.";
-
-/// A property in a collection and environment. Use the `get_property()`
-/// method of the `AppConfigurationClient` to create instances of properties.
-#[derive(Debug)]
-pub struct PropertyProxy {
-    configuration_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
+pub struct PropertyProxy<'a> {
+    client: &'a AppConfigurationClient,
     property_id: String,
 }
 
-impl PropertyProxy {
-    pub(crate) fn new(
-        configuration_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
-        property_id: String,
-    ) -> Self {
-        PropertyProxy {
-            configuration_snapshot,
+impl<'a> PropertyProxy<'a> {
+    pub(crate) fn new(client: &'a AppConfigurationClient, property_id: String) -> Self {
+        Self {
+            client,
             property_id,
         }
     }
 
-    /// Returns the name of the property.
-    pub fn get_name(&self) -> String {
-        self.configuration_snapshot
-            .lock()
-            .unwrap_or_else(|_| panic!("{}", ConfigurationAccessError::LockAcquisitionError))
-            .get_property(&self.property_id)
-            .expect(MISSING_PROPERTY_ERROR_MSG)
-            .name
-            .clone()
+    pub fn snapshot(&self) -> crate::errors::Result<PropertySnapshot> {
+        self.client.get_property(&self.property_id)
+    }
+}
+
+impl<'a> Property for PropertyProxy<'a> {
+    fn get_id(&self) -> &str {
+        &self.property_id
     }
 
-    /// Returns the value of the property as a `models::ConfigValue`.
-    pub fn get_value(&self) -> models::ConfigValue {
-        self.configuration_snapshot
-            .lock()
-            .unwrap_or_else(|_| panic!("{}", ConfigurationAccessError::LockAcquisitionError))
-            .get_property(&self.property_id)
-            .expect(MISSING_PROPERTY_ERROR_MSG)
-            .value
-            .clone()
+    fn get_name(&self) -> crate::errors::Result<String> {
+        self.client.get_property(&self.property_id)?.get_name()
     }
 
-    /// Returns the id of the property.
-    pub fn get_id(&self) -> String {
-        self.configuration_snapshot
-            .lock()
-            .unwrap_or_else(|_| panic!("{}", ConfigurationAccessError::LockAcquisitionError))
-            .get_property(&self.property_id)
-            .expect(MISSING_PROPERTY_ERROR_MSG)
-            .property_id
-            .clone()
+    fn get_data_type(&self) -> crate::errors::Result<crate::models::ValueKind> {
+        self.client.get_property(&self.property_id)?.get_data_type()
     }
 
-    /// Returns the data type as a member of the `models::ValueKind` enumeration.
-    pub fn get_data_type(&self) -> models::ValueKind {
-        self.configuration_snapshot
-            .lock()
-            .unwrap_or_else(|_| panic!("{}", ConfigurationAccessError::LockAcquisitionError))
-            .get_property(&self.property_id)
-            .expect(MISSING_PROPERTY_ERROR_MSG)
-            .kind
+    fn get_value_default(&self) -> crate::errors::Result<crate::models::ConfigValue> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_value_default()
     }
 
-    /// Gets the `Some(data_format)` if the feature data type is
-    /// `models::ValueKind::STRING`, or `None` otherwise.
-    pub fn get_data_format(&self) -> Option<String> {
-        self.configuration_snapshot
-            .lock()
-            .unwrap_or_else(|_| panic!("{}", ConfigurationAccessError::LockAcquisitionError))
-            .get_property(&self.property_id)
-            .expect(MISSING_PROPERTY_ERROR_MSG)
-            .format
-            .clone()
-    }
-
-    /// Returns the targeting rules for the property. I.e.: what value to
-    /// associate with an entity, and under what circumstances it applies.
-    pub fn get_targeting_rules(&self) -> Vec<models::TargetingRule> {
-        self.configuration_snapshot
-            .lock()
-            .unwrap_or_else(|_| panic!("{}", ConfigurationAccessError::LockAcquisitionError))
-            .get_property(&self.property_id)
-            .expect(MISSING_PROPERTY_ERROR_MSG)
-            .segment_rules
-            .clone()
-    }
-
-    /// Evaluates the property for `entity` and returns the evaluation as a
-    /// `models::ConfigValue`.
-    pub fn get_current_value(&self, entity: &impl Entity) -> models::ConfigValue {
-        self.evaluate_feature_for_entity(entity)
-    }
-
-    fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> models::ConfigValue {
-        let segment_rule = find_applicable_segment_rule_for_entity(
-            &self
-                .configuration_snapshot
-                .lock()
-                .unwrap_or_else(|e| panic!("Failed to acquire configuration snapshot lock: {e}"))
-                .segments,
-            self.get_targeting_rules().into_iter(),
-            entity,
-        )
-        .unwrap_or_else(|e| panic!("Failed to evaluate segment rules: {e}"));
-        if let Some(segment_rule) = segment_rule {
-            self.resolve_value(&segment_rule)
-        } else {
-            self.get_value()
-        }
-    }
-
-    fn resolve_value(&self, segment_rule: &models::TargetingRule) -> models::ConfigValue {
-        if segment_rule.value.is_default() {
-            self.get_value()
-        } else {
-            segment_rule.value.clone()
-        }
+    fn get_value(&self, entity: &impl Entity) -> crate::errors::Result<super::value::Value> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_value(entity)
     }
 }

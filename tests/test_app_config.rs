@@ -18,7 +18,7 @@ use rstest::*;
 use appconfiguration_rust_sdk::client::AppConfigurationClient;
 use appconfiguration_rust_sdk::models::ValueKind;
 use std::env;
-use appconfiguration_rust_sdk::Feature;
+use appconfiguration_rust_sdk::{Feature, Property};
 
 #[fixture]
 fn setup_client() -> AppConfigurationClient {
@@ -67,8 +67,8 @@ fn test_get_list_of_properties(setup_client: AppConfigurationClient) {
 fn test_get_a_specific_property(setup_client: AppConfigurationClient) {
     let property = setup_client.get_property_proxy("test-property-1").unwrap();
 
-    let name = property.get_name();
-    let data_type = property.get_data_type();
+    let name = property.get_name().unwrap();
+    let data_type = property.get_data_type().unwrap();
 
     assert_eq!(name, "Test Property 1");
     assert_eq!(data_type, ValueKind::Boolean);

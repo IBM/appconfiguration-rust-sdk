@@ -20,6 +20,7 @@ use rstest::*;
 
 use super::client_enterprise;
 use crate::models::tests::configuration_property1_enabled;
+use crate::property::Property;
 
 #[rstest]
 fn test_get_property_persistence(

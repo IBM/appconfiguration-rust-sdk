@@ -16,7 +16,7 @@ use crate::client::cache::ConfigurationSnapshot;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::http;
-use crate::client::property::Property;
+use crate::client::property_snapshot::PropertySnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::errors::{ConfigurationAccessError, Error, Result};
 use crate::models::Segment;
@@ -246,7 +246,7 @@ impl AppConfigurationClient {
             .collect())
     }
 
-    pub fn get_property(&self, property_id: &str) -> Result<Property> {
+    pub fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         let config_snapshot = self.latest_config_snapshot.lock()?;
 
         // Get the property from the snapshot
@@ -284,7 +284,7 @@ impl AppConfigurationClient {
             segments
         };
 
-        Ok(Property::new(property.clone(), segments))
+        Ok(PropertySnapshot::new(property.clone(), segments))
     }
 
     /// Searches for the property `property_id` inside the current configured
@@ -292,10 +292,7 @@ impl AppConfigurationClient {
     ///
     /// Return `Ok(property)` if the feature exists or `Err` if it does not.
     pub fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        Ok(PropertyProxy::new(
-            self.latest_config_snapshot.clone(),
-            property_id.to_string(),
-        ))
+        Ok(PropertyProxy::new(self, property_id.to_string()))
     }
 
     fn update_cache_in_background(

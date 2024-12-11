@@ -17,7 +17,7 @@ use crate::client::AppConfigurationClient;
 use rstest::*;
 
 use super::client_enterprise;
-use crate::feature::Feature;
+use crate::{Feature, Property};
 
 #[rstest]
 fn test_get_a_specific_feature(client_enterprise: AppConfigurationClient) {
@@ -39,10 +39,10 @@ fn test_get_a_specific_property(client_enterprise: AppConfigurationClient) {
     use crate::models::ValueKind;
     let property = client_enterprise.get_property_proxy("p1").unwrap();
 
-    let name = property.get_name();
-    let data_type = property.get_data_type();
+    let name = property.get_name().unwrap();
+    let data_type = property.get_data_type().unwrap();
 
     assert_eq!(name, "p1");
     assert_eq!(data_type, ValueKind::Numeric);
-    assert_eq!(property.get_value().as_u64().unwrap(), 5);
+    assert_eq!(property.get_value_default().unwrap().as_u64().unwrap(), 5);
 }
