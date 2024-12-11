@@ -141,8 +141,6 @@ fn check_operator(
             // TODO: Go implementation also compares strings (by parsing them as floats). Do we need this?
             //       https://github.com/IBM/appconfiguration-go-sdk/blob/master/lib/internal/models/Rule.go#L82
             // TODO: we could have numbers not representable as f64, maybe we should try to parse it to i64 and u64 too?
-            // TODO: we should have a different nesting style here: match the reference_value first and error out when given
-            //       entity attr does not match. This would yield more natural error messages
             AttrValue::Numeric(data) => Ok(*data > reference_value.parse()?),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         },
