@@ -31,8 +31,7 @@ use tungstenite::WebSocket;
 
 use super::AppConfigurationClient;
 
-/// App Configuration client for browsing, and evaluating features and
-/// properties.
+/// AppConfiguration client connection to IBM Cloud.
 #[derive(Debug)]
 pub struct AppConfigurationClientIBMCloud {
     pub(crate) latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
@@ -40,13 +39,16 @@ pub struct AppConfigurationClientIBMCloud {
 }
 
 impl AppConfigurationClientIBMCloud {
-    /// Creates a client to retrieve configurations for a specific collection.
-    /// To uniquely address a collection the following is required:
-    /// - `region`
-    /// - `guid`: Identifies an instance
-    /// - `environment_id`
-    /// - `collection_id`
-    /// In addition `api_key` is required for authentication
+
+    /// Creates a new [`AppConfigurationClient`] connecting to IBM Cloud
+    ///
+    /// # Arguments
+    ///
+    /// * `apikey` - The encrypted API key.
+    /// * `region` - Region name where the App Configuration service instance is created
+    /// * `guid` - Instance ID of the App Configuration service. Obtain it from the service credentials section of the App Configuration dashboard
+    /// * `environment_id` - ID of the environment created in App Configuration service instance under the Environments section.
+    /// * `collection_id` - ID of the collection created in App Configuration service instance under the Collections section
     pub fn new(
         apikey: &str,
         region: &str,
@@ -54,7 +56,7 @@ impl AppConfigurationClientIBMCloud {
         environment_id: &str,
         collection_id: &str,
     ) -> Result<Self> {
-        let access_token = http::get_access_token(&apikey)?;
+        let access_token = http::get_access_token(apikey)?;
 
         // Populate initial configuration
         let latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>> =
@@ -258,10 +260,6 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
         Ok(FeatureSnapshot::new(feature.clone(), segments))
     }
 
-    /// Searches for the feature `feature_id` inside the current configured
-    /// collection, and environment.
-    ///
-    /// Return `Ok(feature)` if the feature exists or `Err` if it does not.
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
         // FIXME: there is and was no validation happening if the feature exists.
         // Comments and error messages in FeatureProxy suggest that this should happen here.
@@ -321,10 +319,6 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
         Ok(PropertySnapshot::new(property.clone(), segments))
     }
 
-    /// Searches for the property `property_id` inside the current configured
-    /// collection, and environment.
-    ///
-    /// Return `Ok(property)` if the feature exists or `Err` if it does not.
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
         Ok(PropertyProxy::new(self, property_id.to_string()))
     }

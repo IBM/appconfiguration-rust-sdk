@@ -19,16 +19,25 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 
+/// AppConfiguration client for browsing, and evaluating features and properties.
 pub trait AppConfigurationClient {
     fn get_feature_ids(&self) -> Result<Vec<String>>;
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot>;
 
+    /// Searches for the feature `feature_id` inside the current configured
+    /// collection, and environment.
+    ///
+    /// Return `Ok(feature)` if the feature exists or `Err` if it does not.
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>>;
 
     fn get_property_ids(&self) -> Result<Vec<String>>;
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot>;
 
+    /// Searches for the property `property_id` inside the current configured
+    /// collection, and environment.
+    ///
+    /// Return `Ok(property)` if the feature exists or `Err` if it does not.
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy>;
 }
