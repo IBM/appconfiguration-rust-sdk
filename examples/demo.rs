@@ -14,9 +14,7 @@
 
 use std::{collections::HashMap, env, thread, time::Duration};
 
-use appconfiguration_rust_sdk::{
-    AppConfigurationClient, AttrValue, Entity, Feature, Property, Value,
-};
+use appconfiguration_rust_sdk::{AppConfigurationClient, Entity, Feature, Property, Value};
 use dotenvy::dotenv;
 use std::error::Error;
 
@@ -32,10 +30,10 @@ impl Entity for CustomerEntity {
         self.id.clone()
     }
 
-    fn get_attributes(&self) -> HashMap<String, AttrValue> {
+    fn get_attributes(&self) -> HashMap<String, Value> {
         HashMap::from_iter(vec![
-            ("city".to_string(), AttrValue::String(self.city.clone())),
-            ("radius".to_string(), AttrValue::Numeric(self.radius as f64)),
+            ("city".to_string(), Value::from(self.city.clone())),
+            ("radius".to_string(), Value::from(self.radius as u64)),
         ])
     }
 }
@@ -69,12 +67,6 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
             Ok(feature) => {
                 println!("Feature name: {}", feature.get_name()?);
                 let value = feature.get_value(&entity)?;
-                let data_type = match &value {
-                    Value::Numeric(_) => "Numeric",
-                    Value::String(_) => "String",
-                    Value::Boolean(_) => "Boolean",
-                };
-                println!("Feature data type: {}", data_type);
                 println!("Is feature enabled: {}", feature.is_enabled()?);
                 println!("Feature evaluated value is: {value:?}");
             }
@@ -88,12 +80,6 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
             Ok(property) => {
                 println!("Property name: {}", property.get_name()?);
                 let value = property.get_value(&entity)?;
-                let data_type = match &value {
-                    Value::Numeric(_) => "Numeric",
-                    Value::String(_) => "String",
-                    Value::Boolean(_) => "Boolean",
-                };
-                println!("Property data type: {data_type}");
                 println!("Property evaluated value is: {value:?}");
             }
             Err(error) => {

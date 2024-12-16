@@ -16,6 +16,8 @@ use std::fmt::Display;
 
 use serde::Deserialize;
 
+use crate::Value;
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct Configuration {
     pub environments: Vec<Environment>,
@@ -122,6 +124,37 @@ impl ConfigValue {
 impl Display for ConfigValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl TryFrom<(ValueKind, ConfigValue)> for Value {
+    type Error = crate::Error;
+
+    fn try_from(value: (ValueKind, ConfigValue)) -> Result<Self, Self::Error> {
+        let (kind, value) = value;
+        match kind {
+            ValueKind::Numeric => {
+                if let Some(n) = value.as_i64() {
+                    Ok(Value::Int64(n))
+                } else if let Some(n) = value.as_u64() {
+                    Ok(Value::UInt64(n))
+                } else if let Some(n) = value.as_f64() {
+                    Ok(Value::Float64(n))
+                } else {
+                    Err(crate::Error::ProtocolError(
+                        "Cannot convert numeric type".to_string(),
+                    ))
+                }
+            }
+            ValueKind::Boolean => value
+                .as_boolean()
+                .map(|v| Value::Boolean(v))
+                .ok_or(crate::Error::MismatchType),
+            ValueKind::String => value
+                .as_string()
+                .map(|v| Value::String(v))
+                .ok_or(crate::Error::MismatchType),
+        }
     }
 }
 

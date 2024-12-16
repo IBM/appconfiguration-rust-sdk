@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::value::{NumericValue, Value};
 use crate::entity::Entity;
+use crate::value::Value;
 use crate::Feature;
 use std::collections::HashMap;
 
 use super::feature_proxy::random_value;
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
 
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 
 #[derive(Debug)]
 pub struct FeatureSnapshot {
@@ -112,26 +112,7 @@ impl Feature for FeatureSnapshot {
 
     fn get_value(&self, entity: &impl Entity) -> Result<Value> {
         let model_value = self.evaluate_feature_for_entity(entity)?;
-
-        let value = match self.feature.kind {
-            crate::models::ValueKind::Numeric => {
-                Value::Numeric(NumericValue(model_value.0.clone()))
-            }
-            crate::models::ValueKind::Boolean => Value::Boolean(
-                model_value
-                    .0
-                    .as_bool()
-                    .ok_or(Error::ProtocolError("Expected Boolean".into()))?,
-            ),
-            crate::models::ValueKind::String => Value::String(
-                model_value
-                    .0
-                    .as_str()
-                    .ok_or(Error::ProtocolError("Expected String".into()))?
-                    .to_string(),
-            ),
-        };
-        Ok(value)
+        (self.feature.kind, model_value).try_into()
     }
 }
 
@@ -139,7 +120,6 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::entity::AttrValue;
     use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind};
     use rstest::rstest;
 
@@ -171,12 +151,12 @@ pub mod tests {
     // no attrs, no segment rules
     #[case([].into(), [].into())]
     // attrs but no segment rules
-    #[case([].into(), [("key".into(), AttrValue::String("value".into()))].into())]
+    #[case([].into(), [("key".into(), Value::from("value".to_string()))].into())]
     // no attrs but segment rules
     #[case([TargetingRule{rules: Vec::new(), value: ConfigValue(serde_json::json!("")), order: 0, rollout_percentage: None}].into(), [].into())]
     fn test_get_value_no_match_50_50_rollout(
         #[case] segment_rules: Vec<TargetingRule>,
-        #[case] entity_attributes: HashMap<String, AttrValue>,
+        #[case] entity_attributes: HashMap<String, Value>,
     ) {
         let inner_feature = crate::models::Feature {
             name: "F1".to_string(),
@@ -201,7 +181,7 @@ pub mod tests {
             68
         );
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == 2));
+        assert!(matches!(value, Value::Int64(ref v) if v == &2));
 
         // One entity and feature combination which leads to rollout:
         let entity = crate::tests::GenericEntity {
@@ -213,7 +193,7 @@ pub mod tests {
             29
         );
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == -42));
+        assert!(matches!(value, Value::Int64(ref v) if v == &(-42)));
     }
 
     // If the feature is disabled, always the disabled value should be returned.
@@ -234,9 +214,7 @@ pub mod tests {
 
         let entity = crate::tests::TrivialEntity {};
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_f64().unwrap() == 2.0));
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == 2));
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_u64().unwrap() == 2));
+        assert!(matches!(value, Value::Int64(ref v) if v == &2));
     }
 
     // Get a feature value using different entities, matching or not matching a segment rule.
@@ -282,29 +260,29 @@ pub mod tests {
         // matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
         };
 
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == -48));
+        assert!(matches!(value, Value::Int64(ref v) if v == &(-48)));
 
         // matching the segment + rollout disallowed
         let entity = crate::tests::GenericEntity {
             id: "a1".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
         };
 
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == 2));
+        assert!(matches!(value, Value::Int64(ref v) if v == &2));
 
         // not matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from("heinzz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("heinzz".to_string()))]),
         };
 
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == -42));
+        assert!(matches!(value, Value::Int64(ref v) if v == &(-42)));
     }
 
     // The matched segment rule's value has a "$default" value.
@@ -350,11 +328,11 @@ pub mod tests {
         // matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
         };
 
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == -42));
+        assert!(matches!(value, Value::Int64(ref v) if v == &(-42)));
     }
 
     // The matched segment rule's rollout percentage has a "$default" value.
@@ -400,11 +378,11 @@ pub mod tests {
         // matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
         };
 
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == 2));
+        assert!(matches!(value, Value::Int64(ref v) if v == &2));
     }
 
     #[test]
@@ -474,9 +452,9 @@ pub mod tests {
         // Both segment rules match. Expect the one with smaller order to be used:
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
         };
         let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Numeric(ref v) if v.as_i64().unwrap() == -49));
+        assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
     }
 }

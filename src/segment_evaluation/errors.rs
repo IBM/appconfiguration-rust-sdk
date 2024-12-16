@@ -54,8 +54,11 @@ pub(crate) enum CheckOperatorErrorDetail {
     #[error("Entity attribute has unexpected type: Boolean.")]
     BooleanExpected(#[from] std::str::ParseBoolError),
 
-    #[error("Entity attribute has unexpected type: Number.")]
-    NumberExpected(#[from] std::num::ParseFloatError),
+    #[error("Entity attribute has unexpected type: float.")]
+    FloatExpected(#[from] std::num::ParseFloatError),
+
+    #[error("Entity attribute has unexpected type: integer.")]
+    IntegerExpected(#[from] std::num::ParseIntError),
 
     #[error("Entity attribute is not a number.")]
     EntityAttrNotANumber,

@@ -22,11 +22,11 @@ mod test_using_example_data;
 
 use crate::client::cache::ConfigurationSnapshot;
 use crate::client::AppConfigurationClient;
-use crate::entity::AttrValue;
 use crate::models::tests::example_configuration_enterprise;
 use crate::models::Configuration;
 use crate::Entity;
 use rstest::fixture;
+use crate::Value;
 use std::sync::{Arc, Mutex};
 
 pub struct TrivialEntity;
@@ -36,14 +36,14 @@ impl Entity for TrivialEntity {
         "TrivialId".into()
     }
 
-    fn get_attributes(&self) -> HashMap<String, AttrValue> {
+    fn get_attributes(&self) -> HashMap<String, Value> {
         HashMap::new()
     }
 }
 
 pub struct GenericEntity {
     pub id: String,
-    pub attributes: HashMap<String, AttrValue>,
+    pub attributes: HashMap<String, Value>,
 }
 
 impl Entity for GenericEntity {
@@ -51,7 +51,7 @@ impl Entity for GenericEntity {
         self.id.clone()
     }
 
-    fn get_attributes(&self) -> HashMap<String, AttrValue> {
+    fn get_attributes(&self) -> HashMap<String, Value> {
         self.attributes.clone()
     }
 }
