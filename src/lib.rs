@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod builders;
 mod client;
 mod entity;
 mod errors;
@@ -21,12 +22,13 @@ mod property;
 mod segment_evaluation;
 mod value;
 
+pub use builders::{AppConfigClientBuilder, AppConfigIBMCloudBuilder};
 pub use client::AppConfigurationClient;
-pub use entity::{Entity, AttrValue};
+pub use entity::{AttrValue, Entity};
+pub use errors::{Error, Result};
 pub use feature::Feature;
 pub use property::Property;
 pub use value::Value;
-pub use errors::{Result, Error};
 
 #[cfg(test)]
 mod tests;

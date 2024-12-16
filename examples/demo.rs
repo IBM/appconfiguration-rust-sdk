@@ -15,7 +15,7 @@
 use std::{collections::HashMap, env, thread, time::Duration};
 
 use appconfiguration_rust_sdk::{
-    AppConfigurationClient, AttrValue, Entity, Feature, Property, Value,
+    AppConfigClientBuilder, AppConfigIBMCloudBuilder, AttrValue, Entity, Feature, Property, Value,
 };
 use dotenvy::dotenv;
 use std::error::Error;
@@ -42,16 +42,17 @@ impl Entity for CustomerEntity {
 
 fn main() -> std::result::Result<(), Box<dyn Error>> {
     dotenv().ok();
-    let region = env::var("REGION").expect("REGION should be set.");
-    let guid = env::var("GUID").expect("GUID should be set.");
-    let apikey = env::var("APIKEY").expect("APIKEY should be set.");
-    let collection_id = env::var("COLLECTION_ID").expect("COLLECTION_ID should be set.");
-    let environment_id = env::var("ENVIRONMENT_ID").expect("ENVIRONMENT_ID should be set.");
-    let feature_id = env::var("FEATURE_ID").expect("FEATURE_ID should be set.");
-    let property_id = env::var("PROPERTY_ID").expect("PROPERTY_ID should be set.");
+    let region = env::var("REGION").or(Err("'REGION' envvar is required."))?;
+    let guid = env::var("GUID").or(Err("'GUID' envvar should be set."))?;
+    let apikey = env::var("APIKEY").or(Err("'APIKEY' envvar should be set."))?;
+    let collection_id = env::var("COLLECTION_ID").or(Err("'COLLECTION_ID' envvar should be set."))?;
+    let environment_id = env::var("ENVIRONMENT_ID").or(Err("'ENVIRONMENT_ID' envvar should be set."))?;
+    let feature_id = env::var("FEATURE_ID").or(Err("'FEATURE_ID' envvar should be set."))?;
+    let property_id = env::var("PROPERTY_ID").or(Err("'PROPERTY_ID' envvar should be set."))?;
 
     let client =
-        AppConfigurationClient::new(&apikey, &region, &guid, &environment_id, &collection_id)?;
+        AppConfigIBMCloudBuilder::new(&region, &apikey, &guid, &environment_id, &collection_id)
+            .build()?;
 
     let entity = CustomerEntity {
         id: "user123".to_string(),

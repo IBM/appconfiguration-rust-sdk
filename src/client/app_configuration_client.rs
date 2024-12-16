@@ -38,14 +38,7 @@ pub struct AppConfigurationClient {
 }
 
 impl AppConfigurationClient {
-    /// Creates a client to retrieve configurations for a specific collection.
-    /// To uniquely address a collection the following is required:
-    /// - `region`
-    /// - `guid`: Identifies an instance
-    /// - `environment_id`
-    /// - `collection_id`
-    /// In addition `api_key` is required for authentication
-    pub fn new(
+    pub(crate) fn new(
         apikey: &str,
         region: &str,
         guid: &str,
