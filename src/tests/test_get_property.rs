@@ -15,7 +15,7 @@
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::AppConfigurationClient;
+use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
 use rstest::*;
 
 use super::client_enterprise;
@@ -24,7 +24,7 @@ use crate::property::Property;
 
 #[rstest]
 fn test_get_property_persistence(
-    client_enterprise: AppConfigurationClient,
+    client_enterprise: AppConfigurationClientIBMCloud,
     configuration_property1_enabled: Configuration,
 ) {
     let property = client_enterprise.get_property("p1").unwrap();
@@ -48,7 +48,7 @@ fn test_get_property_persistence(
 }
 
 #[rstest]
-fn test_get_property_doesnt_exist(client_enterprise: AppConfigurationClient) {
+fn test_get_property_doesnt_exist(client_enterprise: AppConfigurationClientIBMCloud) {
     let property = client_enterprise.get_property("non-existing");
     assert!(property.is_err());
     assert_eq!(

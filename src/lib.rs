@@ -21,12 +21,12 @@ mod property;
 mod segment_evaluation;
 mod value;
 
-pub use client::AppConfigurationClient;
-pub use entity::{Entity, AttrValue};
+pub use client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
+pub use entity::{AttrValue, Entity};
+pub use errors::{Error, Result};
 pub use feature::Feature;
 pub use property::Property;
 pub use value::Value;
-pub use errors::{Result, Error};
 
 #[cfg(test)]
 mod tests;

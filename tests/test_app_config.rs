@@ -16,7 +16,8 @@ use dotenvy::dotenv;
 use rstest::*;
 
 use appconfiguration_rust_sdk::{
-    AppConfigurationClient, AttrValue, Entity, Feature, Property, Value,
+    AppConfigurationClient, AppConfigurationClientIBMCloud, AttrValue, Entity, Feature, Property,
+    Value,
 };
 use std::collections::HashMap;
 use std::env;
@@ -34,7 +35,7 @@ impl Entity for TrivialEntity {
 }
 
 #[fixture]
-fn setup_client() -> AppConfigurationClient {
+fn setup_client() -> AppConfigurationClientIBMCloud {
     dotenv().expect(
         ".env file not found. Create one with the required variables in order to run the tests.",
     );
@@ -44,18 +45,18 @@ fn setup_client() -> AppConfigurationClient {
 
     //TODO: Our current pricing plan doesn't allow more than 1 collection, so we are using
     // car-rentals so far.
-    AppConfigurationClient::new(&apikey, &region, &guid, "testing", "car-rentals").unwrap()
+    AppConfigurationClientIBMCloud::new(&apikey, &region, &guid, "testing", "car-rentals").unwrap()
 }
 
 #[rstest]
-fn test_get_list_of_features(setup_client: AppConfigurationClient) {
+fn test_get_list_of_features(setup_client: AppConfigurationClientIBMCloud) {
     let features = setup_client.get_feature_ids().unwrap();
 
     assert_eq!(features.len(), 4);
 }
 
 #[rstest]
-fn test_get_a_specific_feature(setup_client: AppConfigurationClient) {
+fn test_get_a_specific_feature(setup_client: AppConfigurationClientIBMCloud) {
     let specific_feature = setup_client
         .get_feature_proxy("test-feature-flag-1")
         .unwrap();
@@ -70,14 +71,14 @@ fn test_get_a_specific_feature(setup_client: AppConfigurationClient) {
 }
 
 #[rstest]
-fn test_get_list_of_properties(setup_client: AppConfigurationClient) {
+fn test_get_list_of_properties(setup_client: AppConfigurationClientIBMCloud) {
     let properties = setup_client.get_property_ids().unwrap();
 
     assert_eq!(properties.len(), 2);
 }
 
 #[rstest]
-fn test_get_a_specific_property(setup_client: AppConfigurationClient) {
+fn test_get_a_specific_property(setup_client: AppConfigurationClientIBMCloud) {
     let property = setup_client.get_property_proxy("test-property-1").unwrap();
 
     let name = property.get_name().unwrap();

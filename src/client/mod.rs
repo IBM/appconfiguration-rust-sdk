@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod app_configuration_client;
+mod app_configuration_ibm_cloud;
 
 pub(crate) mod cache;
 pub(crate) mod feature_snapshot;
@@ -23,5 +24,6 @@ pub(crate) mod property_proxy;
 
 
 pub use app_configuration_client::AppConfigurationClient;
+pub use app_configuration_ibm_cloud::AppConfigurationClientIBMCloud;
 
 pub const REGION_US_SOUTH: &str = "us-south";

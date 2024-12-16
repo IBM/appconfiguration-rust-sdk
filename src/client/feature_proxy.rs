@@ -23,12 +23,12 @@ use super::feature_snapshot::FeatureSnapshot;
 use super::AppConfigurationClient;
 
 pub struct FeatureProxy<'a> {
-    client: &'a AppConfigurationClient,
+    client: &'a dyn AppConfigurationClient,
     feature_id: String,
 }
 
 impl<'a> FeatureProxy<'a> {
-    pub(crate) fn new(client: &'a AppConfigurationClient, feature_id: String) -> Self {
+    pub(crate) fn new(client: &'a dyn AppConfigurationClient, feature_id: String) -> Self {
         Self { client, feature_id }
     }
 

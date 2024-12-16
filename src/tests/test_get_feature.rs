@@ -15,16 +15,16 @@
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::AppConfigurationClient;
+use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
 use rstest::*;
 
 use super::client_enterprise;
-use crate::models::tests::configuration_feature1_enabled;
 use crate::feature::Feature;
+use crate::models::tests::configuration_feature1_enabled;
 
 #[rstest]
 fn test_get_feature_persistence(
-    client_enterprise: AppConfigurationClient,
+    client_enterprise: AppConfigurationClientIBMCloud,
     configuration_feature1_enabled: Configuration,
 ) {
     let feature = client_enterprise.get_feature("f1").unwrap();
@@ -48,7 +48,7 @@ fn test_get_feature_persistence(
 }
 
 #[rstest]
-fn test_get_feature_doesnt_exist(client_enterprise: AppConfigurationClient) {
+fn test_get_feature_doesnt_exist(client_enterprise: AppConfigurationClientIBMCloud) {
     let feature = client_enterprise.get_feature("non-existing");
     assert!(feature.is_err());
     assert_eq!(

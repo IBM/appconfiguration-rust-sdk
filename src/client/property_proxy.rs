@@ -20,12 +20,12 @@ use crate::value::Value;
 use crate::Entity;
 
 pub struct PropertyProxy<'a> {
-    client: &'a AppConfigurationClient,
+    client: &'a dyn AppConfigurationClient,
     property_id: String,
 }
 
 impl<'a> PropertyProxy<'a> {
-    pub(crate) fn new(client: &'a AppConfigurationClient, property_id: String) -> Self {
+    pub(crate) fn new(client: &'a dyn AppConfigurationClient, property_id: String) -> Self {
         Self {
             client,
             property_id,

@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use super::client_enterprise;
-use crate::client::AppConfigurationClient;
+use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
 use rstest::*;
 
 #[rstest]
-fn test_get_property_ids(client_enterprise: AppConfigurationClient) {
+fn test_get_property_ids(client_enterprise: AppConfigurationClientIBMCloud) {
     let mut properties = client_enterprise.get_property_ids().unwrap();
     properties.sort();
     assert_eq!(
