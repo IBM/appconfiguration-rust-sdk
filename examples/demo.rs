@@ -33,10 +33,7 @@ impl Entity for CustomerEntity {
     fn get_attributes(&self) -> HashMap<String, Value> {
         HashMap::from_iter(vec![
             ("city".to_string(), Value::String(self.city.clone())),
-            (
-                "radius".to_string(),
-                (self.radius as f64).try_into().unwrap(),
-            ), // FIXME: unwrap here...
+            ("radius".to_string(), self.radius.into()),
         ])
     }
 }

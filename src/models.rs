@@ -90,24 +90,8 @@ impl Display for ValueKind {
 pub(crate) struct ConfigValue(pub(crate) serde_json::Value);
 
 impl ConfigValue {
-    pub fn as_i64(&self) -> Option<i64> {
-        self.0.as_i64()
-    }
-
     pub fn as_u64(&self) -> Option<u64> {
         self.0.as_u64()
-    }
-
-    pub fn as_f64(&self) -> Option<f64> {
-        self.0.as_f64()
-    }
-
-    pub fn as_boolean(&self) -> Option<bool> {
-        self.0.as_bool()
-    }
-
-    pub fn as_string(&self) -> Option<String> {
-        self.0.as_str().map(|s| s.to_string())
     }
 
     pub fn is_default(&self) -> bool {

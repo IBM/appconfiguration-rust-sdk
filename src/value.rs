@@ -93,6 +93,18 @@ impl TryFrom<f64> for Value {
     }
 }
 
+impl From<i32> for Value {
+    fn from(value: i32) -> Self {
+        Value::Numeric(NumericValue(value.into()))
+    }
+}
+
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Value::Numeric(NumericValue(value.into()))
+    }
+}
+
 impl From<i64> for Value {
     fn from(value: i64) -> Self {
         Value::Numeric(NumericValue(value.into()))
