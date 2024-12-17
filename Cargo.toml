@@ -2,6 +2,12 @@
 name = "appconfiguration_rust_sdk"
 version = "0.1.0"
 edition = "2021"
+description = "The IBM Cloud App Configuration Rust SDK is used to perform feature flag and property evaluation based on the configuration on IBM Cloud App Configuration service."
+repository = "https://github.com/IBM/appconfiguration-rust-sdk"
+readme = "README.md"
+keywords = ["ibm", "feature-flag", "remote-control"]
+categories = ["config"]
+license = "Apache-2.0"
 
 [dependencies]
 reqwest = { version = "0.12.7", features = ["json", "blocking"] }
@@ -19,3 +25,6 @@ thiserror = "2.0.4"
 [dev-dependencies]
 dotenvy = "0.15.7"
 rstest = "0.23.0"
+
+[badges]
+github = { repository = "IBM/appconfiguration-rust-sdk" }
