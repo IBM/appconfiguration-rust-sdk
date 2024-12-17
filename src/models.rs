@@ -26,7 +26,8 @@ pub(crate) struct Configuration {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Environment {
-    name: String,
+    #[serde(rename = "name")]
+    _name: String,
     pub environment_id: String,
     pub features: Vec<Feature>,
     pub properties: Vec<Property>,
@@ -34,10 +35,13 @@ pub(crate) struct Environment {
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct Segment {
-    pub name: String,
+    #[serde(rename = "name")]
+    pub _name: String,
     pub segment_id: String,
-    pub description: String,
-    pub tags: Option<String>,
+    #[serde(rename = "description")]
+    pub _description: String,
+    #[serde(rename = "tags")]
+    pub _tags: Option<String>,
     pub rules: Vec<SegmentRule>,
 }
 
@@ -45,9 +49,10 @@ pub(crate) struct Segment {
 pub(crate) struct Feature {
     pub name: String,
     pub feature_id: String,
-    #[serde(rename(deserialize = "type"))]
+    #[serde(rename = "type")]
     pub kind: ValueKind,
-    pub format: Option<String>,
+    #[serde(rename = "format")]
+    pub _format: Option<String>,
     pub enabled_value: ConfigValue,
     pub disabled_value: ConfigValue,
     pub segment_rules: Vec<TargetingRule>,
@@ -59,10 +64,12 @@ pub(crate) struct Feature {
 pub(crate) struct Property {
     pub name: String,
     pub property_id: String,
-    #[serde(rename(deserialize = "type"))]
+    #[serde(rename = "type")]
     pub kind: ValueKind,
-    pub tags: Option<String>,
-    pub format: Option<String>,
+    #[serde(rename = "tags")]
+    pub _tags: Option<String>,
+    #[serde(rename = "format")]
+    pub _format: Option<String>,
     pub value: ConfigValue,
     pub segment_rules: Vec<TargetingRule>,
 }
@@ -148,11 +155,11 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
             }
             ValueKind::Boolean => value
                 .as_boolean()
-                .map(|v| Value::Boolean(v))
+                .map(Value::Boolean)
                 .ok_or(crate::Error::MismatchType),
             ValueKind::String => value
                 .as_string()
-                .map(|v| Value::String(v))
+                .map(Value::String)
                 .ok_or(crate::Error::MismatchType),
         }
     }
@@ -202,13 +209,13 @@ pub(crate) mod tests {
     pub(crate) fn configuration_feature1_enabled() -> Configuration {
         Configuration {
             environments: vec![Environment {
-                name: "name".to_string(),
+                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
                     kind: ValueKind::Numeric,
-                    format: None,
+                    _format: None,
                     enabled_value: ConfigValue(serde_json::Value::Number(42.into())),
                     disabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
                     segment_rules: Vec::new(),
@@ -225,16 +232,16 @@ pub(crate) mod tests {
     pub(crate) fn configuration_property1_enabled() -> Configuration {
         Configuration {
             environments: vec![Environment {
-                name: "name".to_string(),
+                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 properties: vec![Property {
                     name: "P1".to_string(),
                     property_id: "p1".to_string(),
                     kind: ValueKind::Numeric,
-                    format: None,
+                    _format: None,
                     value: ConfigValue(serde_json::Value::Number(42.into())),
                     segment_rules: Vec::new(),
-                    tags: None,
+                    _tags: None,
                 }],
                 features: Vec::new(),
             }],

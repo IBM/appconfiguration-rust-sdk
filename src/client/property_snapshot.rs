@@ -92,7 +92,7 @@ pub mod tests {
             name: "F1".to_string(),
             property_id: "f1".to_string(),
             kind: ValueKind::Numeric,
-            format: None,
+            _format: None,
             value: ConfigValue(serde_json::Value::Number((-42).into())),
             segment_rules: vec![TargetingRule {
                 rules: vec![Segments {
@@ -102,17 +102,17 @@ pub mod tests {
                 order: 1,
                 rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
             }],
-            tags: None,
+            _tags: None,
         };
         let property = PropertySnapshot::new(
             inner_property,
             HashMap::from([(
                 "some_segment_id_1".into(),
                 Segment {
-                    name: "".into(),
+                    _name: "".into(),
                     segment_id: "".into(),
-                    description: "".into(),
-                    tags: None,
+                    _description: "".into(),
+                    _tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -137,7 +137,7 @@ pub mod tests {
             name: "F1".to_string(),
             property_id: "f1".to_string(),
             kind: ValueKind::Numeric,
-            format: None,
+            _format: None,
             value: ConfigValue(serde_json::Value::Number((-42).into())),
             segment_rules: vec![
                 TargetingRule {
@@ -157,7 +157,7 @@ pub mod tests {
                     rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
                 },
             ],
-            tags: None,
+            _tags: None,
         };
         let property = PropertySnapshot::new(
             inner_property,
@@ -165,10 +165,10 @@ pub mod tests {
                 (
                     "some_segment_id_1".into(),
                     Segment {
-                        name: "".into(),
+                        _name: "".into(),
                         segment_id: "".into(),
-                        description: "".into(),
-                        tags: None,
+                        _description: "".into(),
+                        _tags: None,
                         rules: vec![SegmentRule {
                             attribute_name: "name".into(),
                             operator: "is".into(),
@@ -179,10 +179,10 @@ pub mod tests {
                 (
                     "some_segment_id_2".into(),
                     Segment {
-                        name: "".into(),
+                        _name: "".into(),
                         segment_id: "".into(),
-                        description: "".into(),
-                        tags: None,
+                        _description: "".into(),
+                        _tags: None,
                         rules: vec![SegmentRule {
                             attribute_name: "name".into(),
                             operator: "is".into(),

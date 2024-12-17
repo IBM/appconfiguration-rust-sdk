@@ -183,10 +183,10 @@ pub mod tests {
         HashMap::from([(
             "some_segment_id_1".into(),
             Segment {
-                name: "".into(),
+                _name: "".into(),
                 segment_id: "some_segment_id_1".into(),
-                description: "".into(),
-                tags: None,
+                _description: "".into(),
+                _tags: None,
                 rules: vec![SegmentRule {
                     attribute_name: "name".into(),
                     operator: "is".into(),
