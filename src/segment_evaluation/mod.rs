@@ -281,7 +281,7 @@ pub mod tests {
             panic!("Error type mismatch!");
         };
         assert_eq!(error.segment_id, "some_segment_id_1");
-        assert_eq!(error.segment_rule.attribute_name, "name");
+        assert_eq!(error.segment_rule_attribute_name, "name");
         assert_eq!(error.value, "heinz");
     }
 }
