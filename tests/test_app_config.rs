@@ -15,7 +15,7 @@
 use dotenvy::dotenv;
 use rstest::*;
 
-use appconfiguration_rust_sdk::{
+use appconfiguration::{
     AppConfigurationClient, AppConfigurationClientIBMCloud, Entity, Feature, Property, Value,
 };
 use std::collections::HashMap;

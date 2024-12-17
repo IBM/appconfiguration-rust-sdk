@@ -29,7 +29,7 @@ pub trait Property {
     /// # Examples
     ///
     /// ```
-    /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity, Value};
+    /// # use appconfiguration::{AppConfigurationClient, Property, Result, Entity, Value};
     /// # fn doctest_get_value(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_property")?;
     ///     let value: Value = property.get_value(entity)?;
@@ -52,7 +52,7 @@ pub trait Property {
     /// # Examples
     ///
     /// ```
-    /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity};
+    /// # use appconfiguration::{AppConfigurationClient, Property, Result, Entity};
     /// # fn doctest_get_value_into(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_bool_feature")?;
     ///     let value: bool = property.get_value_into(entity)?;

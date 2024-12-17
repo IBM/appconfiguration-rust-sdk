@@ -39,7 +39,7 @@
 //! Create your client with the context (environment and collection) you want to connect to
 //!
 //! ```
-//! use appconfiguration_rust_sdk::{
+//! use appconfiguration::{
 //!     AppConfigurationClient, AppConfigurationClientIBMCloud,
 //!     Entity, Result, Value, Feature
 //! };

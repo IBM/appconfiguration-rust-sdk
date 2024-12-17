@@ -14,7 +14,7 @@
 
 use std::{collections::HashMap, env, thread, time::Duration};
 
-use appconfiguration_rust_sdk::{AppConfigurationClient, AppConfigurationClientIBMCloud, Entity, Feature, Property, Value};
+use appconfiguration::{AppConfigurationClient, AppConfigurationClientIBMCloud, Entity, Feature, Property, Value};
 use dotenvy::dotenv;
 use std::error::Error;
 
