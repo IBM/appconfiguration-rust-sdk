@@ -7,16 +7,24 @@ repository = "https://github.com/IBM/appconfiguration-rust-sdk"
 readme = "README.md"
 keywords = ["ibm", "feature-flag", "remote-control"]
 categories = ["config"]
-license = "Apache-2.0"
+license-file = "LICENSE"
+homepage = "https://cloud.ibm.com/docs/app-configuration"
+exclude = [
+    ".github/*",
+    ".gitignore",
+    ".pre-commit-config.yaml",
+    ".secrets.baseline",
+    "README.tpl",
+]
 
 [dependencies]
 reqwest = { version = "0.12.9", features = ["json", "blocking"] }
 serde = { version = "1.0.216", features = ["derive"] }
 serde_json = { version = "1.0.133" }
 murmur3 = "0.5.2"
-tungstenite = { version = "0.25.0", features = ["native-tls"] }
+tungstenite = { version = "0.26.0", features = ["native-tls"] }
 url = "2.5.4"
-thiserror = "2.0.4"
+thiserror = "2.0.7"
 
 [dev-dependencies]
 dotenvy = "0.15.7"
