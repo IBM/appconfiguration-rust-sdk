@@ -49,6 +49,10 @@ impl<'a> Feature for FeatureProxy<'a> {
     fn get_value(&self, entity: &impl Entity) -> crate::errors::Result<Value> {
         self.client.get_feature(&self.feature_id)?.get_value(entity)
     }
+
+    fn get_value_t<T: TryFrom<Value, Error = crate::Error>>(&self, entity: &impl Entity) -> crate::errors::Result<T> {
+        self.client.get_feature(&self.feature_id)?.get_value_t(entity)
+    }
 }
 
 pub fn random_value(v: &str) -> u32 {

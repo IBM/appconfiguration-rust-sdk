@@ -14,6 +14,7 @@
 
 use crate::Error;
 
+/// A wrapper on top of primitives types acepted by the library.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Value {
     Float64(f64),

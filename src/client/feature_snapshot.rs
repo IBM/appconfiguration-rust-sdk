@@ -114,6 +114,11 @@ impl Feature for FeatureSnapshot {
         let model_value = self.evaluate_feature_for_entity(entity)?;
         (self.feature.kind, model_value).try_into()
     }
+
+    fn get_value_t<T: TryFrom<Value, Error = crate::Error>>(&self, entity: &impl Entity) -> Result<T> {
+        let value = self.get_value(entity)?;
+        value.try_into()
+    }
 }
 
 #[cfg(test)]
@@ -456,5 +461,33 @@ pub mod tests {
         };
         let value = feature.get_value(&entity).unwrap();
         assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
+    }
+
+    // Tests the get_value_t ergonomics
+    #[test]
+    fn test_get_value_t() {
+        let inner_feature = crate::models::Feature {
+            name: "F1".to_string(),
+            feature_id: "f1".to_string(),
+            kind: ValueKind::Numeric,
+            format: None,
+            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
+            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
+            segment_rules: Vec::new(),
+            enabled: false,
+            rollout_percentage: 100,
+        };
+        let feature = FeatureSnapshot::new(inner_feature, HashMap::new());
+        let entity = crate::tests::TrivialEntity {};
+
+        // We fail to return it as f64
+        let value: Result<f64> = feature.get_value_t(&entity);
+        assert!(matches!(value.unwrap_err(), crate::Error::MismatchType));
+
+        // ...but we can return it as u64 and i64
+        let value: i64 = feature.get_value_t(&entity).unwrap();
+        assert_eq!(value, 2);
+        let value: u64 = feature.get_value_t(&entity).unwrap();
+        assert_eq!(value, 2);
     }
 }
