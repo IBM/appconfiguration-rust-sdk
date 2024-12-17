@@ -1,6 +1,6 @@
 [package]
 name = "appconfiguration"
-version = "0.1.0"
+version = "0.1.0-rc.0"
 edition = "2021"
 description = "The IBM Cloud App Configuration Rust SDK is used to perform feature flag and property evaluation based on the configuration on IBM Cloud App Configuration service."
 repository = "https://github.com/IBM/appconfiguration-rust-sdk"
