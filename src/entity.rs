@@ -14,6 +14,9 @@
 
 use std::collections::HashMap;
 
+use crate::Value;
+
+
 /// An object on which evaluate properties and features.
 pub trait Entity {
     /// Gets a unique identifier for the entity.
@@ -21,34 +24,7 @@ pub trait Entity {
 
     /// Gets a map of attributes names and values against which evaluate the
     /// entities belonging to segments.
-    fn get_attributes(&self) -> HashMap<String, AttrValue> {
+    fn get_attributes(&self) -> HashMap<String, Value> {
         HashMap::new()
-    }
-}
-
-/// An attribute value can be of one of three types: numerics, strings, or
-/// booleans.
-#[derive(Debug, Clone)]
-pub enum AttrValue {
-    Numeric(f64),
-    String(String),
-    Boolean(bool),
-}
-
-impl From<f64> for AttrValue {
-    fn from(value: f64) -> Self {
-        AttrValue::Numeric(value)
-    }
-}
-
-impl From<String> for AttrValue {
-    fn from(value: String) -> Self {
-        AttrValue::String(value)
-    }
-}
-
-impl From<bool> for AttrValue {
-    fn from(value: bool) -> Self {
-        AttrValue::Boolean(value)
     }
 }

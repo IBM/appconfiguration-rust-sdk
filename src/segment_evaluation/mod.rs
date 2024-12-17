@@ -16,10 +16,11 @@ pub(crate) mod errors;
 
 use std::collections::HashMap;
 
-use crate::entity::{AttrValue, Entity};
+use crate::entity::{Entity};
 use crate::errors::Result;
 use crate::models::Segment;
 use crate::models::TargetingRule;
+use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
 pub(crate) fn find_applicable_segment_rule_for_entity(
@@ -75,7 +76,7 @@ fn segment_applies_to_entity(
 
 fn belong_to_segment(
     segment: &Segment,
-    attrs: HashMap<String, AttrValue>,
+    attrs: HashMap<String, Value>,
 ) -> std::result::Result<bool, SegmentEvaluationError> {
     for rule in segment.rules.iter() {
         let operator = &rule.operator;
@@ -115,45 +116,55 @@ fn belong_to_segment(
 }
 
 fn check_operator(
-    attribute_value: &AttrValue,
+    attribute_value: &Value,
     operator: &str,
     reference_value: &str,
 ) -> std::result::Result<bool, CheckOperatorErrorDetail> {
     match operator {
         "is" => match attribute_value {
-            AttrValue::String(data) => Ok(*data == reference_value),
-            AttrValue::Boolean(data) => Ok(*data == reference_value.parse::<bool>()?),
-            AttrValue::Numeric(data) => Ok(*data == reference_value.parse::<f64>()?),
+            Value::String(data) => Ok(*data == reference_value),
+            Value::Boolean(data) => Ok(*data == reference_value.parse::<bool>()?),
+            Value::Float64(data) => Ok(*data == reference_value.parse::<f64>()?),
+            Value::UInt64(data) => Ok(*data == reference_value.parse::<u64>()?),
+            Value::Int64(data) => Ok(*data == reference_value.parse::<i64>()?),
         },
         "contains" => match attribute_value {
-            AttrValue::String(data) => Ok(data.contains(reference_value)),
+            Value::String(data) => Ok(data.contains(reference_value)),
             _ => Err(CheckOperatorErrorDetail::StringExpected),
         },
         "startsWith" => match attribute_value {
-            AttrValue::String(data) => Ok(data.starts_with(reference_value)),
+            Value::String(data) => Ok(data.starts_with(reference_value)),
             _ => Err(CheckOperatorErrorDetail::StringExpected),
         },
         "endsWith" => match attribute_value {
-            AttrValue::String(data) => Ok(data.ends_with(reference_value)),
+            Value::String(data) => Ok(data.ends_with(reference_value)),
             _ => Err(CheckOperatorErrorDetail::StringExpected),
         },
         "greaterThan" => match attribute_value {
             // TODO: Go implementation also compares strings (by parsing them as floats). Do we need this?
             //       https://github.com/IBM/appconfiguration-go-sdk/blob/master/lib/internal/models/Rule.go#L82
             // TODO: we could have numbers not representable as f64, maybe we should try to parse it to i64 and u64 too?
-            AttrValue::Numeric(data) => Ok(*data > reference_value.parse()?),
+            Value::Float64(data) => Ok(*data > reference_value.parse()?),
+            Value::UInt64(data) => Ok(*data > reference_value.parse()?),
+            Value::Int64(data) => Ok(*data > reference_value.parse()?),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         },
         "lesserThan" => match attribute_value {
-            AttrValue::Numeric(data) => Ok(*data < reference_value.parse()?),
+            Value::Float64(data) => Ok(*data < reference_value.parse()?),
+            Value::UInt64(data) => Ok(*data < reference_value.parse()?),
+            Value::Int64(data) => Ok(*data < reference_value.parse()?),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         },
         "greaterThanEquals" => match attribute_value {
-            AttrValue::Numeric(data) => Ok(*data >= reference_value.parse()?),
+            Value::Float64(data) => Ok(*data >= reference_value.parse()?),
+            Value::UInt64(data) => Ok(*data >= reference_value.parse()?),
+            Value::Int64(data) => Ok(*data >= reference_value.parse()?),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         },
         "lesserThanEquals" => match attribute_value {
-            AttrValue::Numeric(data) => Ok(*data <= reference_value.parse()?),
+            Value::Float64(data) => Ok(*data <= reference_value.parse()?),
+            Value::UInt64(data) => Ok(*data <= reference_value.parse()?),
+            Value::Int64(data) => Ok(*data <= reference_value.parse()?),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         },
         _ => Err(CheckOperatorErrorDetail::OperatorNotImplemented),
@@ -207,7 +218,7 @@ pub mod tests {
     ) {
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name2".into(), AttrValue::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
         };
         let rule =
             find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);
@@ -224,7 +235,7 @@ pub mod tests {
     fn test_invalid_segment_id(segments: HashMap<String, Segment>) {
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from(42.0))]),
+            attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
         let segment_rules = vec![TargetingRule {
             rules: vec![Segments {
@@ -257,7 +268,7 @@ pub mod tests {
     fn test_operator_failed(segments: HashMap<String, Segment>, segment_rules: Vec<TargetingRule>) {
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), AttrValue::from(42.0))]),
+            attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
         let rule =
             find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);

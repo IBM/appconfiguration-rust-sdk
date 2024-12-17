@@ -25,6 +25,9 @@ pub enum Error {
         property_id: String,
     },
 
+    #[error("Inner type cannot be converted to requested type")]
+    MismatchType,
+
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
 

@@ -22,7 +22,7 @@ mod segment_evaluation;
 mod value;
 
 pub use client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
-pub use entity::{AttrValue, Entity};
+pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
 pub use property::Property;

@@ -29,7 +29,7 @@ fn test_get_a_specific_feature(client_enterprise: AppConfigurationClientIBMCloud
 
     assert_eq!(name, "F1".to_string());
     assert!(is_enabled);
-    assert!(matches!(value, Value::Numeric(ref v) if v.as_i64() == Some(5)));
+    assert!(matches!(value, Value::Int64(ref v) if v == &5));
 }
 
 #[rstest]
@@ -40,5 +40,5 @@ fn test_get_a_specific_property(client_enterprise: AppConfigurationClientIBMClou
     let value = property.get_value(&TrivialEntity).unwrap();
 
     assert_eq!(name, "p1");
-    assert!(matches!(value, Value::Numeric(ref v) if v.as_i64() == Some(5)));
+    assert!(matches!(value, Value::Int64(ref v) if v == &5));
 }
