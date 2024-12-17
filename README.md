@@ -1,14 +1,9 @@
+[![Workflow Status](https://github.com/IBM/appconfiguration-rust-sdk/workflows/main/badge.svg)](https://github.com/IBM/appconfiguration-rust-sdk/actions?query=workflow%3A%22main%22)
+
 # IBM Cloud App Configuration Rust SDK
 
-The IBM Cloud App Configuration Rust SDK is used to perform feature flag and property evaluation
-based on the configuration on IBM Cloud App Configuration service.
-
-## Table of contents
-
- - [Overview](#overview)
- - [Usage](#usage)
- - [License](#license)
-
+The IBM Cloud App Configuration Rust SDK is used to perform feature flag and property
+evaluation based on the configuration on IBM Cloud App Configuration service.
 
 ## Overview
 
@@ -22,9 +17,38 @@ targeted to segments. Change feature flag states in the cloud to activate or dea
 in your application or environment, when required. You can also manage the properties for distributed
 applications centrally.
 
+## Pre-requisites
+
+You will need the `apikey`, `region` and `guid` for the AppConfiguration you want to connect to
+from your [IBMCloud account](https://cloud.ibm.com/).
+
 ## Usage
 
-This crate is still under development. First release coming soon.
+**Note.-** This crate is still under heavy development. Breaking changes are expected.
+
+Create your client with the context (environment and collection) you want to connect to
+
+```rust
+use appconfiguration_rust_sdk::{AppConfigurationClient, Entity, Result, Value, Feature};
+
+// Create the client connecting to the server
+let client = AppConfigurationClient::new(&apikey, &region, &guid, &environment_id, &collection_id)?;
+
+// Get the feature you want to evaluate for your entities
+let feature = client.get_feature("AB_testing_feature")?;
+
+// Evaluate feature value for each one of your entities
+let user = MyEntity; // Implements Entity
+
+let value_for_this_user = feature.get_value(&user)?.try_into()?;
+if value_for_this_user {
+    println!("Feature {} is active for user {}", feature.get_name()?, user.get_id());
+} else {
+    println!("User {} keeps using the legacy workflow", user.get_id());
+}
+
+```
+
 
 ## License
 
