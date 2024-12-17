@@ -29,10 +29,13 @@ from your [IBMCloud account](https://cloud.ibm.com/).
 Create your client with the context (environment and collection) you want to connect to
 
 ```rust
-use appconfiguration_rust_sdk::{AppConfigurationClient, Entity, Result, Value, Feature};
+use appconfiguration_rust_sdk::{
+    AppConfigurationClient, AppConfigurationClientIBMCloud,
+    Entity, Result, Value, Feature
+};
 
 // Create the client connecting to the server
-let client = AppConfigurationClient::new(&apikey, &region, &guid, &environment_id, &collection_id)?;
+let client = AppConfigurationClientIBMCloud::new(&apikey, &region, &guid, &environment_id, &collection_id)?;
 
 // Get the feature you want to evaluate for your entities
 let feature = client.get_feature("AB_testing_feature")?;
