@@ -72,7 +72,7 @@ impl Property for PropertySnapshot {
         (self.property.kind, model_value).try_into()
     }
 
-    fn get_value_t<T: TryFrom<Value, Error = crate::Error>>(
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
     ) -> Result<T> {

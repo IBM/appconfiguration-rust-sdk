@@ -50,8 +50,8 @@ impl<'a> Feature for FeatureProxy<'a> {
         self.client.get_feature(&self.feature_id)?.get_value(entity)
     }
 
-    fn get_value_t<T: TryFrom<Value, Error = crate::Error>>(&self, entity: &impl Entity) -> crate::errors::Result<T> {
-        self.client.get_feature(&self.feature_id)?.get_value_t(entity)
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(&self, entity: &impl Entity) -> crate::errors::Result<T> {
+        self.client.get_feature(&self.feature_id)?.get_value_into(entity)
     }
 }
 

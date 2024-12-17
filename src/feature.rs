@@ -55,17 +55,17 @@ pub trait Feature {
     ///
     /// ```
     /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Feature, Result, Entity};
-    /// # fn doctest_get_value_t(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
+    /// # fn doctest_get_value_into(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let feature = client.get_feature("my_f64_feature")?;
-    ///     let value: f64 = feature.get_value_t(entity)?;
+    ///     let value: f64 = feature.get_value_into(entity)?;
     /// 
     ///     // an f64 cannot be returned as u64
-    ///     let failed: Result<u64> = feature.get_value_t(entity);
+    ///     let failed: Result<u64> = feature.get_value_into(entity);
     ///     assert!(failed.is_err());
     /// #   Ok(())
     /// # }
     /// ```
-    fn get_value_t<T: TryFrom<Value, Error = crate::Error>>(
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
     ) -> Result<T>;

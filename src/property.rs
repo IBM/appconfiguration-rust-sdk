@@ -48,18 +48,18 @@ pub trait Property {
     ///
     /// ```
     /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity};
-    /// # fn doctest_get_value_t(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
+    /// # fn doctest_get_value_into(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_bool_feature")?;
-    ///     let value: bool = property.get_value_t(entity)?;
+    ///     let value: bool = property.get_value_into(entity)?;
     /// 
     ///     // an bool cannot be returned as something else
-    ///     assert!(property.get_value_t::<f64>(entity).is_err());
-    ///     assert!(property.get_value_t::<String>(entity).is_err());
-    ///     assert!(property.get_value_t::<i64>(entity).is_err());
+    ///     assert!(property.get_value_into::<f64>(entity).is_err());
+    ///     assert!(property.get_value_into::<String>(entity).is_err());
+    ///     assert!(property.get_value_into::<i64>(entity).is_err());
     /// #   Ok(())
     /// # }
     /// ```
-    fn get_value_t<T: TryFrom<Value, Error = crate::Error>>(
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
     ) -> Result<T>;
