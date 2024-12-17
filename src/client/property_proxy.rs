@@ -19,6 +19,7 @@ use super::AppConfigurationClient;
 use crate::value::Value;
 use crate::Entity;
 
+/// Provides live-updated data for a given [`Property`].
 pub struct PropertyProxy<'a> {
     client: &'a dyn AppConfigurationClient,
     property_id: String,
@@ -32,6 +33,7 @@ impl<'a> PropertyProxy<'a> {
         }
     }
 
+    /// Take a snapshot of this proxied property
     pub fn snapshot(&self) -> crate::errors::Result<PropertySnapshot> {
         self.client.get_property(&self.property_id)
     }

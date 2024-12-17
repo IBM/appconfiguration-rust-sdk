@@ -22,6 +22,7 @@ use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
 
 use crate::errors::Result;
 
+/// Provides a snapshot of a [`Feature`].
 #[derive(Debug)]
 pub struct FeatureSnapshot {
     feature: crate::models::Feature,

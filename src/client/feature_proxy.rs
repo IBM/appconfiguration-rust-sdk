@@ -22,6 +22,7 @@ use crate::{Feature, Value};
 use super::feature_snapshot::FeatureSnapshot;
 use super::AppConfigurationClient;
 
+/// Provides live-updated data for a given [`Feature`].
 pub struct FeatureProxy<'a> {
     client: &'a dyn AppConfigurationClient,
     feature_id: String,
@@ -32,6 +33,7 @@ impl<'a> FeatureProxy<'a> {
         Self { client, feature_id }
     }
 
+    /// Take a snapshot of this proxied property
     pub fn snapshot(&self) -> crate::errors::Result<FeatureSnapshot> {
         self.client.get_feature(&self.feature_id)
     }
@@ -55,7 +57,7 @@ impl<'a> Feature for FeatureProxy<'a> {
     }
 }
 
-pub fn random_value(v: &str) -> u32 {
+pub(crate) fn random_value(v: &str) -> u32 {
     let max_hash = u32::MAX;
     (f64::from(hash(v)) / f64::from(max_hash) * 100.0) as u32
 }

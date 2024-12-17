@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use crate::errors::Result;
 use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
 
+/// Provides a snapshot of a [`Property`].
 #[derive(Debug)]
 pub struct PropertySnapshot {
     property: crate::models::Property,
