@@ -47,4 +47,13 @@ impl<'a> Property for PropertyProxy<'a> {
             .get_property(&self.property_id)?
             .get_value(entity)
     }
+
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
+        &self,
+        entity: &impl Entity,
+    ) -> crate::errors::Result<T> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_value_into(entity)
+    }
 }

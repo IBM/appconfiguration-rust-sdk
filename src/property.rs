@@ -15,8 +15,52 @@
 use crate::errors::Result;
 use crate::{Entity, Value};
 
+/// Access to data and evaluation of IBM AppConfiguration properties
 pub trait Property {
+    /// Returns the full name of the property
     fn get_name(&self) -> Result<String>;
 
+    /// Returns the evaluated value as a [`Value`] instance
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity, Value};
+    /// # fn doctest_get_value(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
+    ///     let property = client.get_property("my_property")?;
+    ///     let value: Value = property.get_value(entity)?;
+    /// 
+    ///     match value {
+    ///         Value::Float64(v) => println!("f64 with value {v}"),
+    ///         Value::UInt64(v) => println!("u64 with value {v}"),
+    ///         Value::Int64(v) => println!("i64 with value {v}"),
+    ///         Value::String(v) => println!("String with value {v}"),
+    ///         Value::Boolean(v) => println!("bool with value {v}"),
+    ///     }
+    /// #   Ok(())
+    /// # }
+    /// ```
     fn get_value(&self, entity: &impl Entity) -> Result<Value>;
+
+    /// Returns the evaluated value as the given primitive type, if possible
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity};
+    /// # fn doctest_get_value_into(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
+    ///     let property = client.get_property("my_bool_feature")?;
+    ///     let value: bool = property.get_value_into(entity)?;
+    /// 
+    ///     // an bool cannot be returned as something else
+    ///     assert!(property.get_value_into::<f64>(entity).is_err());
+    ///     assert!(property.get_value_into::<String>(entity).is_err());
+    ///     assert!(property.get_value_into::<i64>(entity).is_err());
+    /// #   Ok(())
+    /// # }
+    /// ```
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<T>;
 }

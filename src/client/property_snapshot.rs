@@ -71,6 +71,14 @@ impl Property for PropertySnapshot {
         let model_value = self.evaluate_feature_for_entity(entity)?;
         (self.property.kind, model_value).try_into()
     }
+
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<T> {
+        let value = self.get_value(entity)?;
+        value.try_into()
+    }
 }
 
 #[cfg(test)]
