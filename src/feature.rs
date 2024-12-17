@@ -33,7 +33,7 @@ pub trait Feature {
     ///
     /// ```
     /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Feature, Result, Entity, Value};
-    /// # fn doctest_get_value(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
+    /// # fn doctest_get_value(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let feature = client.get_feature("my_feature")?;
     ///     let value: Value = feature.get_value(entity)?;
     /// 
@@ -55,7 +55,7 @@ pub trait Feature {
     ///
     /// ```
     /// # use appconfiguration_rust_sdk::{AppConfigurationClient, Feature, Result, Entity};
-    /// # fn doctest_get_value_into(client: AppConfigurationClient, entity: &impl Entity) -> Result<()> {
+    /// # fn doctest_get_value_into(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let feature = client.get_feature("my_f64_feature")?;
     ///     let value: f64 = feature.get_value_into(entity)?;
     /// 
