@@ -25,8 +25,8 @@ use crate::client::AppConfigurationClientIBMCloud;
 use crate::models::tests::example_configuration_enterprise;
 use crate::models::Configuration;
 use crate::Entity;
-use rstest::fixture;
 use crate::Value;
+use rstest::fixture;
 use std::sync::{Arc, Mutex};
 
 pub struct TrivialEntity;
@@ -57,7 +57,9 @@ impl Entity for GenericEntity {
 }
 
 #[fixture]
-fn client_enterprise(example_configuration_enterprise: Configuration) -> AppConfigurationClientIBMCloud {
+fn client_enterprise(
+    example_configuration_enterprise: Configuration,
+) -> AppConfigurationClientIBMCloud {
     let configuration_snapshot =
         ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
 

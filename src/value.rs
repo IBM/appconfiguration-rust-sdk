@@ -124,10 +124,22 @@ pub mod tests {
         let as_f64: f64 = value.clone().try_into().unwrap();
         assert_eq!(as_f64, 42f64);
 
-        assert!(matches!(TryInto::<u64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<i64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<String>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<bool>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+        assert!(matches!(
+            TryInto::<u64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<i64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<String>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<bool>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
     }
 
     #[test]
@@ -136,22 +148,34 @@ pub mod tests {
         {
             let value = Value::from(42u64);
             assert!(matches!(value, Value::UInt64(ref v) if v == &42u64));
-    
+
             let as_u64: u64 = value.clone().try_into().unwrap();
             assert_eq!(as_u64, 42u64);
 
             let as_i64: i64 = value.clone().try_into().unwrap();
             assert_eq!(as_i64, 42i64);
 
-            assert!(matches!(TryInto::<f64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-            assert!(matches!(TryInto::<String>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-            assert!(matches!(TryInto::<bool>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+            assert!(matches!(
+                TryInto::<f64>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
+            assert!(matches!(
+                TryInto::<String>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
+            assert!(matches!(
+                TryInto::<bool>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
         }
 
         // An u64 outside the range of i64
         {
             let value = Value::from(u64::MAX);
-            assert!(matches!(TryInto::<i64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+            assert!(matches!(
+                TryInto::<i64>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
         }
     }
 
@@ -161,25 +185,37 @@ pub mod tests {
         {
             let value = Value::from(42i64);
             assert!(matches!(value, Value::Int64(ref v) if v == &42i64));
-    
+
             let as_i64: i64 = value.clone().try_into().unwrap();
             assert_eq!(as_i64, 42i64);
 
             let as_u64: u64 = value.clone().try_into().unwrap();
             assert_eq!(as_u64, 42u64);
 
-            assert!(matches!(TryInto::<f64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-            assert!(matches!(TryInto::<String>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-            assert!(matches!(TryInto::<bool>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+            assert!(matches!(
+                TryInto::<f64>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
+            assert!(matches!(
+                TryInto::<String>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
+            assert!(matches!(
+                TryInto::<bool>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
         }
 
         // An i64 outside the range of u64
         {
             let value = Value::from(-2i64);
-            assert!(matches!(TryInto::<u64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+            assert!(matches!(
+                TryInto::<u64>::try_into(value.clone()).unwrap_err(),
+                Error::MismatchType
+            ));
         }
     }
-    
+
     #[test]
     fn test_string() {
         let value = Value::from("value".to_string());
@@ -188,10 +224,22 @@ pub mod tests {
         let as_string: String = value.clone().try_into().unwrap();
         assert_eq!(as_string, "value");
 
-        assert!(matches!(TryInto::<f64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<u64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<i64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<bool>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+        assert!(matches!(
+            TryInto::<f64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<u64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<i64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<bool>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
     }
 
     #[test]
@@ -203,9 +251,21 @@ pub mod tests {
         let as_boolean: bool = value.clone().try_into().unwrap();
         assert_eq!(as_boolean, false);
 
-        assert!(matches!(TryInto::<f64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<u64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<i64>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
-        assert!(matches!(TryInto::<String>::try_into(value.clone()).unwrap_err(), Error::MismatchType));
+        assert!(matches!(
+            TryInto::<f64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<u64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<i64>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
+        assert!(matches!(
+            TryInto::<String>::try_into(value.clone()).unwrap_err(),
+            Error::MismatchType
+        ));
     }
 }
