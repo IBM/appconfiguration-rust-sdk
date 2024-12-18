@@ -16,7 +16,7 @@ pub(crate) mod errors;
 
 use std::collections::HashMap;
 
-use crate::entity::{Entity};
+use crate::entity::Entity;
 use crate::errors::Result;
 use crate::models::Segment;
 use crate::models::TargetingRule;
