@@ -21,11 +21,11 @@ pub trait Property {
     fn get_name(&self) -> Result<String>;
 
     /// Evaluates a property for the given [`Entity`] and returns a [`Value`].
-    /// 
+    ///
     /// Use the methods available in [`Value`] to return the actual primitive value. If
     /// all you want is the primitive value, you can use the method
     /// [`get_value_into`](Property::get_value_into) instead.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -33,7 +33,7 @@ pub trait Property {
     /// # fn doctest_get_value(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_property")?;
     ///     let value: Value = property.get_value(entity)?;
-    /// 
+    ///
     ///     match value {
     ///         Value::Float64(v) => println!("f64 with value {v}"),
     ///         Value::UInt64(v) => println!("u64 with value {v}"),
@@ -48,7 +48,7 @@ pub trait Property {
 
     /// Evaluates a property for the given [`Entity`] and returns its value converted (if possible)
     /// to the given type.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -56,7 +56,7 @@ pub trait Property {
     /// # fn doctest_get_value_into(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_bool_feature")?;
     ///     let value: bool = property.get_value_into(entity)?;
-    /// 
+    ///
     ///     // an bool cannot be returned as something else
     ///     assert!(property.get_value_into::<f64>(entity).is_err());
     ///     assert!(property.get_value_into::<String>(entity).is_err());

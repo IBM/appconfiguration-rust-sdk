@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::{AppConfigurationClientIBMCloud, AppConfigurationClient};
+use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
 use crate::tests::TrivialEntity;
 use rstest::*;
 

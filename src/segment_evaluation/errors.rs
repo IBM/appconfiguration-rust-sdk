@@ -26,7 +26,13 @@ pub(crate) enum SegmentEvaluationError {
 }
 
 #[derive(Debug, Error)]
-#[error("Operation '{}' '{}' '{}' failed to evaluate: {}", segment_rule_attribute_name, segment_rule_operator,  value, source)]
+#[error(
+    "Operation '{}' '{}' '{}' failed to evaluate: {}",
+    segment_rule_attribute_name,
+    segment_rule_operator,
+    value,
+    source
+)]
 pub(crate) struct SegmentEvaluationErrorKind {
     pub(crate) segment_id: String,
     pub(crate) segment_rule_attribute_name: String,

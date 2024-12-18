@@ -16,7 +16,6 @@ use std::collections::HashMap;
 
 use crate::Value;
 
-
 /// An object on which evaluate properties and features.
 pub trait Entity {
     /// Gets a unique identifier for the entity.

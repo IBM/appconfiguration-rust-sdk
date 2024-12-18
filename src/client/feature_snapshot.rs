@@ -116,7 +116,10 @@ impl Feature for FeatureSnapshot {
         (self.feature.kind, model_value).try_into()
     }
 
-    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(&self, entity: &impl Entity) -> Result<T> {
+    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<T> {
         let value = self.get_value(entity)?;
         value.try_into()
     }
