@@ -1,7 +1,0 @@
-# We use [cargo-release](https://github.com/crate-ci/cargo-release/tree/master)
-# to execute the release process.
-consolidate-commits = false
-allow-branch = ["main"]
-sign-commit = true
-sign-tag = true
-push-remote = "git@github.com:IBM/appconfiguration-rust-sdk.git"
