@@ -40,6 +40,11 @@ jobs:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
     steps:
+      - name: Dump github context
+        run:   echo "$GITHUB_CONTEXT"
+        shell: bash
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -47,7 +52,7 @@ jobs:
       - name: Install Release-plz
         run: cargo install --locked release-plz
       - name: Create or update PR
-        run: release-plz release-pr
+        run: release-plz release-pr --git-token $GITHUB_TOKEN --repo-url "https://github.com/IBM/${{ github.event.repository.name }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # - name: Run release-plz
