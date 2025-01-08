@@ -46,6 +46,10 @@ jobs:
           fetch-depth: 0
       - name: Install Release-plz
         run: cargo install --locked release-plz
+      - name: Create or update PR
+        run: release-plz release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # - name: Run release-plz
       #   uses: release-plz/action@v0.5
       #   with:
