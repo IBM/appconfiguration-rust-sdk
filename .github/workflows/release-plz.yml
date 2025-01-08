@@ -8,29 +8,27 @@ on:
   push:
     branches:
       - main
-      # TODO: Remove, it's here just for testing
-      - ci/release-plz
 
 jobs:
 
   # Release unpublished packages.
-  # release-plz-release:
-  #   name: Release-plz release
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
-  #     - name: Install Rust toolchain
-  #       uses: dtolnay/rust-toolchain@stable
-  #     - name: Run release-plz
-  #       uses: release-plz/action@v0.5
-  #       with:
-  #         command: release
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  release-plz-release:
+    name: Release-plz release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Release-plz
+        run: |
+          cargo install --locked release-plz
+          cargo install --locked cargo-semver-checks
+      - name: Release crate
+        run: release-plz release --git-token $GITHUB_TOKEN --repo-url "https://github.com/IBM/${{ github.event.repository.name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   # Create a PR with the new versions and changelog, preparing the next release.
   release-plz-pr:
@@ -40,25 +38,15 @@ jobs:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - name: Dump github context
-        run:   echo "$GITHUB_CONTEXT"
-        shell: bash
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Install Release-plz
-        run: cargo install --locked release-plz
+        run: |
+          cargo install --locked release-plz
+          cargo install --locked cargo-semver-checks
       - name: Create or update PR
         run: release-plz release-pr --git-token $GITHUB_TOKEN --repo-url "https://github.com/IBM/${{ github.event.repository.name }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Run release-plz
-      #   uses: release-plz/action@v0.5
-      #   with:
-      #     command: release-pr
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
