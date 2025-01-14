@@ -83,6 +83,7 @@ mod tests {
     use crate::errors::Error;
     use crate::models::tests::example_configuration_enterprise;
     use crate::models::Configuration;
+
     use rstest::*;
 
     #[rstest]
