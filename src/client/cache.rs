@@ -54,12 +54,14 @@ impl ConfigurationSnapshot {
         // FIXME: why not filtering for collection here?
 
         let mut features = HashMap::new();
-        for feature in environment.features {
+        for mut feature in environment.features {
+            feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
             features.insert(feature.feature_id.clone(), feature);
         }
 
         let mut properties = HashMap::new();
-        for property in environment.properties {
+        for mut property in environment.properties {
+            property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
             properties.insert(property.property_id.clone(), property);
         }
 
