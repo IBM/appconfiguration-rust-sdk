@@ -195,16 +195,14 @@ pub mod tests {
 
     #[fixture]
     fn segment_rules() -> Vec<TargetingRule> {
-        let mut segment_rules = vec![TargetingRule {
+        vec![TargetingRule {
             rules: vec![Segments {
                 segments: vec!["some_segment_id_1".into()],
             }],
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-        }];
-        segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
-        segment_rules
+        }]
     }
 
     // SCENARIO - If the SDK user fail to pass the “attributes” for evaluation of featureflag which is segmented - we have considered that evaluation as “does not belong to any segment” and we serve the enabled_value.
