@@ -269,6 +269,7 @@ pub(crate) mod tests {
                 rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
             },
         ];
+        assert!(segment_rules[0].order > segment_rules[1].order);
 
         Configuration {
             environments: vec![Environment {
