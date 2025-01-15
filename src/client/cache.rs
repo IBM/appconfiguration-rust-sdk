@@ -74,6 +74,8 @@ impl ConfigurationSnapshot {
         })
     }
 
+    /// Returns a mapping of segment ID to `Segment` for all segments referenced
+    /// by the given `segment_rules`.
     pub(crate) fn get_segments_for_segment_rules(
         &self,
         segment_rules: &[TargetingRule],
