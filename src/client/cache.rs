@@ -80,7 +80,7 @@ impl ConfigurationSnapshot {
         &self,
         segment_rules: &[TargetingRule],
     ) -> HashMap<String, Segment> {
-        let all_segment_ids = segment_rules
+        let referenced_segment_ids = segment_rules
             .iter()
             .flat_map(|targeting_rule| {
                 targeting_rule
