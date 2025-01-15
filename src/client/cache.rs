@@ -93,7 +93,7 @@ impl ConfigurationSnapshot {
 
         self.segments
             .iter()
-            .filter(|&(key, _)| all_segment_ids.contains(key))
+            .filter(|&(key, _)| referenced_segment_ids.contains(key))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }
