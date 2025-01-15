@@ -23,16 +23,13 @@ use crate::models::TargetingRule;
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
-pub(crate) fn find_applicable_segment_rule_for_entity(
+pub(crate) fn find_applicable_segment_rule_for_entity<'a>(
     segments: &HashMap<String, Segment>,
-    segment_rules: impl Iterator<Item = TargetingRule>,
+    segment_rules: &'a [TargetingRule],
     entity: &impl Entity,
-) -> Result<Option<TargetingRule>> {
-    let mut targeting_rules = segment_rules.collect::<Vec<_>>();
-    targeting_rules.sort_by(|a, b| a.order.cmp(&b.order));
-
-    for targeting_rule in targeting_rules.into_iter() {
-        if targeting_rule_applies_to_entity(segments, &targeting_rule, entity)? {
+) -> Result<Option<&'a TargetingRule>> {
+    for targeting_rule in segment_rules.iter() {
+        if targeting_rule_applies_to_entity(segments, targeting_rule, entity)? {
             return Ok(Some(targeting_rule));
         }
     }
@@ -220,8 +217,7 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
         };
-        let rule =
-            find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);
+        let rule = find_applicable_segment_rule_for_entity(&segments, &segment_rules, &entity);
         // Segment evaluation should not fail:
         let rule = rule.unwrap();
         // But no segment should be found:
@@ -245,8 +241,7 @@ pub mod tests {
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
         }];
-        let rule =
-            find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);
+        let rule = find_applicable_segment_rule_for_entity(&segments, &segment_rules, &entity);
         // Error message should look something like this:
         //  Failed to evaluate entity: Failed to evaluate entity 'a2' against targeting rule '0'.
         //  Caused by: Segment 'non_existing_segment_id' not found.
@@ -270,8 +265,7 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
-        let rule =
-            find_applicable_segment_rule_for_entity(&segments, segment_rules.into_iter(), &entity);
+        let rule = find_applicable_segment_rule_for_entity(&segments, &segment_rules, &entity);
         let e = rule.unwrap_err();
         assert!(matches!(e, Error::EntityEvaluationError(_)));
         let Error::EntityEvaluationError(EntityEvaluationError(
