@@ -48,14 +48,14 @@ impl PropertySnapshot {
 
         match find_applicable_segment_rule_for_entity(
             &self.segments,
-            self.property.segment_rules.clone().into_iter(),
+            &self.property.segment_rules,
             entity,
         )? {
             Some(segment_rule) => {
                 if segment_rule.value.is_default() {
                     Ok(self.property.value.clone())
                 } else {
-                    Ok(segment_rule.value)
+                    Ok(segment_rule.value.clone())
                 }
             }
             None => Ok(self.property.value.clone()),
@@ -130,76 +130,5 @@ pub mod tests {
         };
         let value = property.get_value(&entity).unwrap();
         assert!(matches!(value, Value::Int64(ref v) if v == &(-42)));
-    }
-
-    #[test]
-    fn test_get_value_segment_rule_ordering() {
-        let inner_property = crate::models::Property {
-            name: "F1".to_string(),
-            property_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            value: ConfigValue(serde_json::Value::Number((-42).into())),
-            segment_rules: vec![
-                TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_1".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((-48).into())),
-                    order: 1,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                },
-                TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_2".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((-49).into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                },
-            ],
-            _tags: None,
-        };
-        let property = PropertySnapshot::new(
-            inner_property,
-            HashMap::from([
-                (
-                    "some_segment_id_1".into(),
-                    Segment {
-                        _name: "".into(),
-                        segment_id: "".into(),
-                        _description: "".into(),
-                        _tags: None,
-                        rules: vec![SegmentRule {
-                            attribute_name: "name".into(),
-                            operator: "is".into(),
-                            values: vec!["heinz".into()],
-                        }],
-                    },
-                ),
-                (
-                    "some_segment_id_2".into(),
-                    Segment {
-                        _name: "".into(),
-                        segment_id: "".into(),
-                        _description: "".into(),
-                        _tags: None,
-                        rules: vec![SegmentRule {
-                            attribute_name: "name".into(),
-                            operator: "is".into(),
-                            values: vec!["heinz".into()],
-                        }],
-                    },
-                ),
-            ]),
-        );
-
-        // Both segment rules match. Expect the one with smaller order to be used:
-        let entity = crate::tests::GenericEntity {
-            id: "a2".into(),
-            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
-        };
-        let value = property.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
     }
 }

@@ -27,7 +27,7 @@ pub(crate) struct Configuration {
 #[derive(Debug, Deserialize)]
 pub(crate) struct Environment {
     #[serde(rename = "name")]
-    _name: String,
+    pub(crate) _name: String,
     pub environment_id: String,
     pub features: Vec<Feature>,
     pub properties: Vec<Property>,
@@ -246,6 +246,80 @@ pub(crate) mod tests {
                 features: Vec::new(),
             }],
             segments: Vec::new(),
+        }
+    }
+
+    #[fixture]
+    pub(crate) fn configuration_unordered_segment_rules() -> Configuration {
+        let segment_rules = vec![
+            TargetingRule {
+                rules: vec![Segments {
+                    segments: vec!["some_segment_id_1".into()],
+                }],
+                value: ConfigValue(serde_json::Value::Number((-48).into())),
+                order: 1,
+                rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+            },
+            TargetingRule {
+                rules: vec![Segments {
+                    segments: vec!["some_segment_id_2".into()],
+                }],
+                value: ConfigValue(serde_json::Value::Number((-49).into())),
+                order: 0,
+                rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+            },
+        ];
+        assert!(segment_rules[0].order > segment_rules[1].order);
+
+        Configuration {
+            environments: vec![Environment {
+                _name: "name".to_string(),
+                environment_id: "environment_id".to_string(),
+                features: vec![Feature {
+                    name: "F1".to_string(),
+                    feature_id: "f1".to_string(),
+                    kind: ValueKind::Numeric,
+                    _format: None,
+                    enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
+                    disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
+                    segment_rules: segment_rules.clone(),
+                    enabled: true,
+                    rollout_percentage: 100,
+                }],
+                properties: vec![Property {
+                    name: "P1".to_string(),
+                    property_id: "f1".to_string(),
+                    kind: ValueKind::Numeric,
+                    _format: None,
+                    value: ConfigValue(serde_json::Value::Number((-42).into())),
+                    segment_rules,
+                    _tags: None,
+                }],
+            }],
+            segments: vec![
+                Segment {
+                    _name: "".into(),
+                    segment_id: "some_segment_id_1".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: vec![SegmentRule {
+                        attribute_name: "name".into(),
+                        operator: "is".into(),
+                        values: vec!["heinz".into()],
+                    }],
+                },
+                Segment {
+                    _name: "".into(),
+                    segment_id: "some_segment_id_2".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: vec![SegmentRule {
+                        attribute_name: "name".into(),
+                        operator: "is".into(),
+                        values: vec!["heinz".into()],
+                    }],
+                },
+            ],
         }
     }
 }
