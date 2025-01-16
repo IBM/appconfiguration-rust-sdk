@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
-use crate::tests::TrivialEntity;
+use crate::client::AppConfigurationClient;
+use crate::entity::tests::TrivialEntity;
 use rstest::*;
 
 use super::client_enterprise;
 use crate::{Feature, Property, Value};
 
 #[rstest]
-fn test_get_a_specific_feature(client_enterprise: AppConfigurationClientIBMCloud) {
+fn test_get_a_specific_feature(client_enterprise: Box<dyn AppConfigurationClient>) {
     let specific_feature = client_enterprise.get_feature_proxy("f1").unwrap();
 
     let name = specific_feature.get_name().unwrap();
@@ -33,7 +33,7 @@ fn test_get_a_specific_feature(client_enterprise: AppConfigurationClientIBMCloud
 }
 
 #[rstest]
-fn test_get_a_specific_property(client_enterprise: AppConfigurationClientIBMCloud) {
+fn test_get_a_specific_property(client_enterprise: Box<dyn AppConfigurationClient>) {
     let property = client_enterprise.get_property_proxy("p1").unwrap();
 
     let name = property.get_name().unwrap();
