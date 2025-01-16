@@ -22,7 +22,7 @@ use crate::models::Configuration;
 
 use super::AppConfigurationClient;
 
-/// AppConfiguration client using a local file with a snapshot
+/// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
 pub struct AppConfigurationOffline {
     pub(crate) config_snapshot: ConfigurationSnapshot,
@@ -34,10 +34,7 @@ impl AppConfigurationOffline {
     /// # Arguments
     ///
     /// * `filepath` - The file with the configuration.
-    /// * `region` - Region name where the App Configuration service instance is created
-    /// * `guid` - Instance ID of the App Configuration service. Obtain it from the service credentials section of the App Configuration dashboard
-    /// * `environment_id` - ID of the environment created in App Configuration service instance under the Environments section.
-    /// * `collection_id` - ID of the collection created in App Configuration service instance under the Collections section
+    /// * `environment_id` - ID of the environment to use from the configuration file.
     pub fn new(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
         let file = std::fs::File::open(filepath).map_err(|_| {
             Error::Other(format!(
