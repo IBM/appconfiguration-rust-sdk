@@ -27,3 +27,20 @@ pub trait Entity {
         HashMap::new()
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    pub struct TrivialEntity;
+
+    impl Entity for TrivialEntity {
+        fn get_id(&self) -> String {
+            "TrivialId".into()
+        }
+
+        fn get_attributes(&self) -> HashMap<String, Value> {
+            HashMap::new()
+        }
+    }
+}
