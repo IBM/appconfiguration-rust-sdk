@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
-use crate::models::{Configuration, Feature, Property, Segment};
+use crate::models::{Configuration, Feature, Property, Segment, TargetingRule};
 
 #[derive(Debug, Default)]
 pub(crate) struct ConfigurationSnapshot {
@@ -74,6 +74,30 @@ impl ConfigurationSnapshot {
             properties,
             segments,
         })
+    }
+
+    /// Returns a mapping of segment ID to `Segment` for all segments referenced
+    /// by the given `segment_rules`.
+    pub(crate) fn get_segments_for_segment_rules(
+        &self,
+        segment_rules: &[TargetingRule],
+    ) -> HashMap<String, Segment> {
+        let referenced_segment_ids = segment_rules
+            .iter()
+            .flat_map(|targeting_rule| {
+                targeting_rule
+                    .rules
+                    .iter()
+                    .flat_map(|segment| &segment.segments)
+            })
+            .cloned()
+            .collect::<HashSet<String>>();
+
+        self.segments
+            .iter()
+            .filter(|&(key, _)| referenced_segment_ids.contains(key))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 }
 
