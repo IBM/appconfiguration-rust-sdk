@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
-use crate::models::{Configuration, Feature, Property, Segment};
+use crate::models::{Configuration, Feature, Property, Segment, TargetingRule};
 
 #[derive(Debug, Default)]
 pub(crate) struct ConfigurationSnapshot {
@@ -54,12 +54,14 @@ impl ConfigurationSnapshot {
         // FIXME: why not filtering for collection here?
 
         let mut features = HashMap::new();
-        for feature in environment.features {
+        for mut feature in environment.features {
+            feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
             features.insert(feature.feature_id.clone(), feature);
         }
 
         let mut properties = HashMap::new();
-        for property in environment.properties {
+        for mut property in environment.properties {
+            property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
             properties.insert(property.property_id.clone(), property);
         }
 
@@ -73,6 +75,30 @@ impl ConfigurationSnapshot {
             segments,
         })
     }
+
+    /// Returns a mapping of segment ID to `Segment` for all segments referenced
+    /// by the given `segment_rules`.
+    pub(crate) fn get_segments_for_segment_rules(
+        &self,
+        segment_rules: &[TargetingRule],
+    ) -> HashMap<String, Segment> {
+        let referenced_segment_ids = segment_rules
+            .iter()
+            .flat_map(|targeting_rule| {
+                targeting_rule
+                    .rules
+                    .iter()
+                    .flat_map(|segment| &segment.segments)
+            })
+            .cloned()
+            .collect::<HashSet<String>>();
+
+        self.segments
+            .iter()
+            .filter(|&(key, _)| referenced_segment_ids.contains(key))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -81,6 +107,7 @@ mod tests {
     use crate::errors::Error;
     use crate::models::tests::example_configuration_enterprise;
     use crate::models::Configuration;
+
     use rstest::*;
 
     #[rstest]

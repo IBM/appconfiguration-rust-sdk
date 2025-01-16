@@ -52,12 +52,12 @@ impl FeatureSnapshot {
 
         match find_applicable_segment_rule_for_entity(
             &self.segments,
-            self.feature.segment_rules.clone().into_iter(),
+            &self.feature.segment_rules,
             entity,
         )? {
             Some(segment_rule) => {
                 // Get rollout percentage
-                let rollout_percentage = match segment_rule.rollout_percentage {
+                let rollout_percentage = match &segment_rule.rollout_percentage {
                     Some(value) => {
                         if value.is_default() {
                             self.feature.rollout_percentage
@@ -74,7 +74,7 @@ impl FeatureSnapshot {
                     if segment_rule.value.is_default() {
                         Ok(self.feature.enabled_value.clone())
                     } else {
-                        Ok(segment_rule.value)
+                        Ok(segment_rule.value.clone())
                     }
                 } else {
                     Ok(self.feature.disabled_value.clone())
@@ -392,78 +392,5 @@ pub mod tests {
 
         let value = feature.get_value(&entity).unwrap();
         assert!(matches!(value, Value::Int64(ref v) if v == &2));
-    }
-
-    #[test]
-    fn test_get_value_segment_rule_ordering() {
-        let inner_feature = crate::models::Feature {
-            name: "F1".to_string(),
-            feature_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules: vec![
-                TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_1".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((-48).into())),
-                    order: 1,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                },
-                TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_2".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((-49).into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                },
-            ],
-            enabled: true,
-            rollout_percentage: 100,
-        };
-        let feature = FeatureSnapshot::new(
-            inner_feature,
-            HashMap::from([
-                (
-                    "some_segment_id_1".into(),
-                    Segment {
-                        _name: "".into(),
-                        segment_id: "".into(),
-                        _description: "".into(),
-                        _tags: None,
-                        rules: vec![SegmentRule {
-                            attribute_name: "name".into(),
-                            operator: "is".into(),
-                            values: vec!["heinz".into()],
-                        }],
-                    },
-                ),
-                (
-                    "some_segment_id_2".into(),
-                    Segment {
-                        _name: "".into(),
-                        segment_id: "".into(),
-                        _description: "".into(),
-                        _tags: None,
-                        rules: vec![SegmentRule {
-                            attribute_name: "name".into(),
-                            operator: "is".into(),
-                            values: vec!["heinz".into()],
-                        }],
-                    },
-                ),
-            ]),
-        );
-
-        // Both segment rules match. Expect the one with smaller order to be used:
-        let entity = crate::tests::GenericEntity {
-            id: "a2".into(),
-            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
-        };
-        let value = feature.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
     }
 }

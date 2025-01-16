@@ -17,9 +17,8 @@ pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
-use crate::errors::{ConfigurationAccessError, DeserializationError, Error, Result};
-use crate::models::{Configuration, Segment};
-use std::collections::{HashMap, HashSet};
+use crate::errors::{DeserializationError, Error, Result};
+use crate::models::Configuration;
 
 use super::AppConfigurationClient;
 
@@ -73,36 +72,9 @@ impl AppConfigurationClient for AppConfigurationOffline {
         let feature = self.config_snapshot.get_feature(feature_id)?;
 
         // Get the segment rules that apply to this feature
-        let segments = {
-            let all_segment_ids = feature
-                .segment_rules
-                .iter()
-                .flat_map(|targeting_rule| {
-                    targeting_rule
-                        .rules
-                        .iter()
-                        .flat_map(|segment| &segment.segments)
-                })
-                .cloned()
-                .collect::<HashSet<String>>();
-            let segments: HashMap<String, Segment> = self
-                .config_snapshot
-                .segments
-                .iter()
-                .filter(|&(key, _)| all_segment_ids.contains(key))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-
-            // Integrity DB check: all segment_ids should be available in the snapshot
-            if all_segment_ids.len() != segments.len() {
-                return Err(ConfigurationAccessError::MissingSegments {
-                    resource_id: feature_id.to_string(),
-                }
-                .into());
-            }
-
-            segments
-        };
+        let segments = self
+            .config_snapshot
+            .get_segments_for_segment_rules(&feature.segment_rules);
 
         Ok(FeatureSnapshot::new(feature.clone(), segments))
     }
@@ -122,38 +94,10 @@ impl AppConfigurationClient for AppConfigurationOffline {
         // Get the property from the snapshot
         let property = self.config_snapshot.get_property(property_id)?;
 
-        // Get the segment rules that apply to this property
-        let segments = {
-            let all_segment_ids = property
-                .segment_rules
-                .iter()
-                .flat_map(|targeting_rule| {
-                    targeting_rule
-                        .rules
-                        .iter()
-                        .flat_map(|segment| &segment.segments)
-                })
-                .cloned()
-                .collect::<HashSet<String>>();
-            let segments: HashMap<String, Segment> = self
-                .config_snapshot
-                .segments
-                .iter()
-                .filter(|&(key, _)| all_segment_ids.contains(key))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-
-            // Integrity DB check: all segment_ids should be available in the snapshot
-            if all_segment_ids.len() != segments.len() {
-                // FIXME: Return some kind of DBIntegrity error
-                return Err(ConfigurationAccessError::MissingSegments {
-                    resource_id: property_id.to_string(),
-                }
-                .into());
-            }
-
-            segments
-        };
+        // Get the segment rules that apply to this feature
+        let segments = self
+            .config_snapshot
+            .get_segments_for_segment_rules(&property.segment_rules);
 
         Ok(PropertySnapshot::new(property.clone(), segments))
     }

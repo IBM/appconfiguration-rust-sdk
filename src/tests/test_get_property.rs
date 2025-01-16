@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
 use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
+use crate::Value;
 use rstest::*;
 
 use super::client_enterprise;
-use crate::models::tests::configuration_property1_enabled;
+use crate::models::tests::{
+    configuration_property1_enabled, configuration_unordered_segment_rules,
+};
 use crate::property::Property;
 
 #[rstest]
@@ -55,4 +61,30 @@ fn test_get_property_doesnt_exist(client_enterprise: AppConfigurationClientIBMCl
         property.unwrap_err().to_string(),
         "Property `non-existing` not found."
     );
+}
+
+#[rstest]
+fn test_get_property_ordered(configuration_unordered_segment_rules: Configuration) {
+    let configuration_snapshot =
+        ConfigurationSnapshot::new("environment_id", configuration_unordered_segment_rules)
+            .unwrap();
+
+    // Create the client
+    let (sender, _) = std::sync::mpsc::channel();
+
+    let client = AppConfigurationClientIBMCloud {
+        latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
+        _thread_terminator: sender,
+    };
+
+    let entity = crate::tests::GenericEntity {
+        id: "a2".into(),
+        attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
+    };
+    let value = client
+        .get_property("f1")
+        .unwrap()
+        .get_value(&entity)
+        .unwrap();
+    assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
 }

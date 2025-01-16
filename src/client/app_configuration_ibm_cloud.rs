@@ -19,8 +19,6 @@ use crate::client::http;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::{ConfigurationAccessError, Error, Result};
-use crate::models::Segment;
-use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -229,35 +227,15 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
         let feature = config_snapshot.get_feature(feature_id)?;
 
         // Get the segment rules that apply to this feature
-        let segments = {
-            let all_segment_ids = feature
-                .segment_rules
-                .iter()
-                .flat_map(|targeting_rule| {
-                    targeting_rule
-                        .rules
-                        .iter()
-                        .flat_map(|segment| &segment.segments)
-                })
-                .cloned()
-                .collect::<HashSet<String>>();
-            let segments: HashMap<String, Segment> = config_snapshot
-                .segments
-                .iter()
-                .filter(|&(key, _)| all_segment_ids.contains(key))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
+        let segments = config_snapshot.get_segments_for_segment_rules(&feature.segment_rules);
 
-            // Integrity DB check: all segment_ids should be available in the snapshot
-            if all_segment_ids.len() != segments.len() {
-                return Err(ConfigurationAccessError::MissingSegments {
-                    resource_id: feature_id.to_string(),
-                }
-                .into());
+        // Integrity DB check: all segment_ids should be available in the snapshot
+        if feature.segment_rules.len() != segments.len() {
+            return Err(ConfigurationAccessError::MissingSegments {
+                resource_id: feature_id.to_string(),
             }
-
-            segments
-        };
+            .into());
+        }
 
         Ok(FeatureSnapshot::new(feature.clone(), segments))
     }
@@ -287,36 +265,15 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
         let property = config_snapshot.get_property(property_id)?;
 
         // Get the segment rules that apply to this property
-        let segments = {
-            let all_segment_ids = property
-                .segment_rules
-                .iter()
-                .flat_map(|targeting_rule| {
-                    targeting_rule
-                        .rules
-                        .iter()
-                        .flat_map(|segment| &segment.segments)
-                })
-                .cloned()
-                .collect::<HashSet<String>>();
-            let segments: HashMap<String, Segment> = config_snapshot
-                .segments
-                .iter()
-                .filter(|&(key, _)| all_segment_ids.contains(key))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
+        let segments = config_snapshot.get_segments_for_segment_rules(&property.segment_rules);
 
-            // Integrity DB check: all segment_ids should be available in the snapshot
-            if all_segment_ids.len() != segments.len() {
-                // FIXME: Return some kind of DBIntegrity error
-                return Err(ConfigurationAccessError::MissingSegments {
-                    resource_id: property_id.to_string(),
-                }
-                .into());
+        // Integrity DB check: all segment_ids should be available in the snapshot
+        if property.segment_rules.len() != segments.len() {
+            return Err(ConfigurationAccessError::MissingSegments {
+                resource_id: property_id.to_string(),
             }
-
-            segments
-        };
+            .into());
+        }
 
         Ok(PropertySnapshot::new(property.clone(), segments))
     }
