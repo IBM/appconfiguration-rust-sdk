@@ -19,8 +19,6 @@ use crate::client::http;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::{ConfigurationAccessError, Error, Result};
-use crate::models::Segment;
-use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread;

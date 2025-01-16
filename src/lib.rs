@@ -89,7 +89,7 @@ mod property;
 mod segment_evaluation;
 mod value;
 
-pub use client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
+pub use client::{AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline};
 pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
