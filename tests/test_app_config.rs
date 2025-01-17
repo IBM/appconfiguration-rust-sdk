@@ -16,7 +16,8 @@ use dotenvy::dotenv;
 use rstest::*;
 
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientIBMCloud, Entity, Feature, Property, Value,
+    AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, Entity, Feature,
+    Property, Value,
 };
 use std::collections::HashMap;
 use std::env;
@@ -44,7 +45,9 @@ fn setup_client() -> AppConfigurationClientIBMCloud {
 
     //TODO: Our current pricing plan doesn't allow more than 1 collection, so we are using
     // car-rentals so far.
-    AppConfigurationClientIBMCloud::new(&apikey, &region, &guid, "testing", "car-rentals").unwrap()
+    let configuration =
+        ConfigurationId::new(guid, "testing".to_string(), "car-rentals".to_string());
+    AppConfigurationClientIBMCloud::new(&apikey, &region, configuration).unwrap()
 }
 
 #[rstest]
