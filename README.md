@@ -31,11 +31,12 @@ Create your client with the context (environment and collection) you want to con
 ```rust
 use appconfiguration::{
     AppConfigurationClient, AppConfigurationClientIBMCloud,
-    Entity, Result, Value, Feature
+    ConfigurationId, Entity, Result, Value, Feature
 };
 
 // Create the client connecting to the server
-let client = AppConfigurationClientIBMCloud::new(&apikey, &region, &guid, &environment_id, &collection_id)?;
+let configuration = ConfigurationId::new(guid, environment_id, collection_id);
+let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration)?;
 
 // Get the feature you want to evaluate for your entities
 let feature = client.get_feature("AB_testing_feature")?;
