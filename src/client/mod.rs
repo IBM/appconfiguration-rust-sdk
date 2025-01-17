@@ -17,7 +17,7 @@ mod app_configuration_http;
 mod app_configuration_ibm_cloud;
 mod app_configuration_offline;
 
-pub(crate) mod cache;
+pub(crate) mod configuration;
 pub(crate) mod feature_proxy;
 pub(crate) mod feature_snapshot;
 pub(crate) mod property_proxy;

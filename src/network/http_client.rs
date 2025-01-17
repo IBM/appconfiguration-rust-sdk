@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::TokenProvider;
-use crate::models::Configuration;
+use crate::models::ConfigurationJson;
 use crate::{ConfigurationId, Error, Result};
 use reqwest::blocking::Client;
 use std::cell::RefCell;
@@ -99,7 +99,7 @@ impl ServerClientImpl {
         })
     }
 
-    pub fn get_configuration(&self, collection: &ConfigurationId) -> Result<Configuration> {
+    pub fn get_configuration(&self, collection: &ConfigurationId) -> Result<ConfigurationJson> {
         let url = format!(
             "{}/feature/v1/instances/{}/config",
             self.service_address.base_url(ServiceAddressProtocol::Https),

@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::cache::ConfigurationSnapshot;
+use crate::client::configuration::Configuration;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::{DeserializationError, Error, Result};
-use crate::models::Configuration;
+use crate::models::ConfigurationJson;
 
 use super::AppConfigurationClient;
 
 /// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
 pub struct AppConfigurationOffline {
-    pub(crate) config_snapshot: ConfigurationSnapshot,
+    pub(crate) config_snapshot: Configuration,
 }
 
 impl AppConfigurationOffline {
@@ -44,7 +44,7 @@ impl AppConfigurationOffline {
         })?;
         let reader = std::io::BufReader::new(file);
 
-        let configuration: Configuration = serde_json::from_reader(reader).map_err(|e| {
+        let configuration: ConfigurationJson = serde_json::from_reader(reader).map_err(|e| {
             Error::DeserializationError(DeserializationError {
                 string: format!(
                     "Error deserializing Configuration from file '{}'",
@@ -53,7 +53,7 @@ impl AppConfigurationOffline {
                 source: e.into(),
             })
         })?;
-        let config_snapshot = ConfigurationSnapshot::new(environment_id, configuration)?;
+        let config_snapshot = Configuration::new(environment_id, configuration)?;
 
         Ok(Self { config_snapshot })
     }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::cache::ConfigurationSnapshot;
+use crate::client::configuration::Configuration;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
@@ -33,7 +33,7 @@ use super::{AppConfigurationClient, ConfigurationId};
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
 pub struct AppConfigurationClientHttp {
-    latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
+    latest_config_snapshot: Arc<Mutex<Configuration>>,
     _thread_terminator: std::sync::mpsc::Sender<()>,
 }
 
@@ -56,7 +56,7 @@ impl AppConfigurationClientHttp {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
 
         // Populate initial configuration
-        let latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>> = Arc::new(Mutex::new(
+        let latest_config_snapshot: Arc<Mutex<Configuration>> = Arc::new(Mutex::new(
             Self::get_configuration_snapshot(&server_client, &configuration_id)?,
         ));
 
@@ -78,16 +78,16 @@ impl AppConfigurationClientHttp {
     fn get_configuration_snapshot(
         server_client: &ServerClientImpl,
         configuration_id: &ConfigurationId,
-    ) -> Result<ConfigurationSnapshot> {
+    ) -> Result<Configuration> {
         let configuration = server_client.get_configuration(configuration_id)?;
-        ConfigurationSnapshot::new(&configuration_id.environment_id, configuration)
+        Configuration::new(&configuration_id.environment_id, configuration)
     }
 
     fn wait_for_configuration_update(
         socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
         server_client_impl: &ServerClientImpl,
         configuration_id: &ConfigurationId,
-    ) -> Result<ConfigurationSnapshot> {
+    ) -> Result<Configuration> {
         loop {
             // read() blocks until something happens.
             match socket.read()? {
@@ -110,7 +110,7 @@ impl AppConfigurationClientHttp {
 
     fn update_configuration_on_change(
         mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
-        latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
+        latest_config_snapshot: Arc<Mutex<Configuration>>,
         server_client_impl: ServerClientImpl,
         configuration_id: ConfigurationId,
     ) -> std::sync::mpsc::Sender<()> {
@@ -146,7 +146,7 @@ impl AppConfigurationClientHttp {
     }
 
     fn update_cache_in_background(
-        latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
+        latest_config_snapshot: Arc<Mutex<Configuration>>,
         server_client_impl: ServerClientImpl,
         configuration_id: ConfigurationId,
     ) -> Result<std::sync::mpsc::Sender<()>> {
@@ -245,17 +245,17 @@ mod tests {
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
     };
-    use crate::{models::Configuration, Feature, Property};
+    use crate::{models::ConfigurationJson, Feature, Property};
     use rstest::rstest;
 
     #[rstest]
     fn test_get_feature_persistence(
-        example_configuration_enterprise: Configuration,
-        configuration_feature1_enabled: Configuration,
+        example_configuration_enterprise: ConfigurationJson,
+        configuration_feature1_enabled: ConfigurationJson,
     ) {
         let client = {
             let configuration_snapshot =
-                ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
+                Configuration::new("dev", example_configuration_enterprise).unwrap();
 
             let (sender, _) = std::sync::mpsc::channel();
 
@@ -272,7 +272,7 @@ mod tests {
 
         // We simulate an update of the configuration:
         let configuration_snapshot =
-            ConfigurationSnapshot::new("environment_id", configuration_feature1_enabled).unwrap();
+            Configuration::new("environment_id", configuration_feature1_enabled).unwrap();
         *client.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
         // The feature value should not have changed (as we did not retrieve it again)
         let feature_value2 = feature.get_value(&entity).unwrap();
@@ -287,12 +287,12 @@ mod tests {
 
     #[rstest]
     fn test_get_property_persistence(
-        example_configuration_enterprise: Configuration,
-        configuration_property1_enabled: Configuration,
+        example_configuration_enterprise: ConfigurationJson,
+        configuration_property1_enabled: ConfigurationJson,
     ) {
         let client = {
             let configuration_snapshot =
-                ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
+                Configuration::new("dev", example_configuration_enterprise).unwrap();
 
             let (sender, _) = std::sync::mpsc::channel();
 
@@ -309,7 +309,7 @@ mod tests {
 
         // We simulate an update of the configuration:
         let configuration_snapshot =
-            ConfigurationSnapshot::new("environment_id", configuration_property1_enabled).unwrap();
+            Configuration::new("environment_id", configuration_property1_enabled).unwrap();
         *client.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
         // The property value should not have changed (as we did not retrieve it again)
         let property_value2 = property.get_value(&entity).unwrap();

@@ -15,16 +15,19 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
-use crate::models::{Configuration, Feature, Property, Segment, TargetingRule};
+use crate::models::{ConfigurationJson, Feature, Property, Segment, TargetingRule};
 
+/// Represents all the configuration data needed for the client to perform
+/// feature/propery evaluation.
+/// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default)]
-pub(crate) struct ConfigurationSnapshot {
+pub(crate) struct Configuration {
     pub(crate) features: HashMap<String, Feature>,
     pub(crate) properties: HashMap<String, Property>,
     pub(crate) segments: HashMap<String, Segment>,
 }
 
-impl ConfigurationSnapshot {
+impl Configuration {
     pub fn get_feature(&self, feature_id: &str) -> Result<&Feature> {
         self.features.get(feature_id).ok_or_else(|| {
             ConfigurationAccessError::FeatureNotFound {
@@ -43,7 +46,8 @@ impl ConfigurationSnapshot {
         })
     }
 
-    pub fn new(environment_id: &str, configuration: Configuration) -> Result<Self> {
+    /// Constructs the Configuration, by consuming and filtering data in exchange format
+    pub fn new(environment_id: &str, configuration: ConfigurationJson) -> Result<Self> {
         let environment = configuration
             .environments
             .into_iter()
@@ -69,7 +73,7 @@ impl ConfigurationSnapshot {
         for segment in configuration.segments {
             segments.insert(segment.segment_id.clone(), segment.clone());
         }
-        Ok(ConfigurationSnapshot {
+        Ok(Configuration {
             features,
             properties,
             segments,
@@ -106,14 +110,14 @@ mod tests {
     use super::*;
     use crate::errors::Error;
     use crate::models::tests::example_configuration_enterprise;
-    use crate::models::Configuration;
+    use crate::models::ConfigurationJson;
 
     use rstest::*;
 
     #[rstest]
-    fn test_filter_configurations(example_configuration_enterprise: Configuration) {
+    fn test_filter_configurations(example_configuration_enterprise: ConfigurationJson) {
         let result =
-            ConfigurationSnapshot::new("does_for_sure_not_exist", example_configuration_enterprise);
+            Configuration::new("does_for_sure_not_exist", example_configuration_enterprise);
         assert!(result.is_err());
 
         assert!(matches!(
