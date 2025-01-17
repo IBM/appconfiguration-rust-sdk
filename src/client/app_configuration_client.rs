@@ -19,6 +19,27 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 
+/// Identifies a configuration
+#[derive(Debug, Clone)]
+pub struct ConfigurationId {
+    /// Instance ID of the App Configuration service. Obtain it from the service credentials section of the App Configuration dashboard
+    pub guid: String,
+    /// ID of the environment created in App Configuration service instance under the Environments section.
+    pub environment_id: String,
+    /// ID of the collection created in App Configuration service instance under the Collections section
+    pub collection_id: String,
+}
+
+impl ConfigurationId {
+    pub fn new(guid: String, environment_id: String, collection_id: String) -> Self {
+        Self {
+            guid,
+            environment_id,
+            collection_id,
+        }
+    }
+}
+
 /// AppConfiguration client for browsing, and evaluating features and properties.
 pub trait AppConfigurationClient {
     /// Returns the list of features.

@@ -14,7 +14,7 @@
 
 use super::TokenProvider;
 use crate::models::Configuration;
-use crate::{Error, Result};
+use crate::{ConfigurationId, Error, Result};
 use reqwest::blocking::Client;
 use std::cell::RefCell;
 use tungstenite::stream::MaybeTlsStream;
@@ -99,23 +99,19 @@ impl ServerClientImpl {
         })
     }
 
-    pub fn get_configuration(
-        &self,
-        guid: &str,
-        collection_id: &str,
-        environment_id: &str,
-    ) -> Result<Configuration> {
+    pub fn get_configuration(&self, collection: &ConfigurationId) -> Result<Configuration> {
         let url = format!(
-            "{}/feature/v1/instances/{guid}/config",
-            self.service_address.base_url(ServiceAddressProtocol::Https)
+            "{}/feature/v1/instances/{}/config",
+            self.service_address.base_url(ServiceAddressProtocol::Https),
+            collection.guid
         );
         let client = Client::new();
         let r = client
             .get(url)
             .query(&[
                 ("action", "sdkConfig"),
-                ("collection_id", collection_id),
-                ("environment_id", environment_id),
+                ("environment_id", &collection.environment_id),
+                ("collection_id", &collection.collection_id),
             ])
             .header("Accept", "application/json")
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
@@ -137,9 +133,7 @@ impl ServerClientImpl {
 
     pub fn get_configuration_monitoring_websocket(
         &self,
-        guid: &str,
-        collection_id: &str,
-        environment_id: &str,
+        collection: &ConfigurationId,
     ) -> Result<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
         let ws_url = format!(
             "{}/wsfeature",
@@ -150,9 +144,9 @@ impl ServerClientImpl {
 
         ws_url
             .query_pairs_mut()
-            .append_pair("instance_id", guid)
-            .append_pair("collection_id", collection_id)
-            .append_pair("environment_id", environment_id);
+            .append_pair("instance_id", &collection.guid)
+            .append_pair("environment_id", &collection.environment_id)
+            .append_pair("collection_id", &collection.collection_id);
 
         let mut request = ws_url
             .as_str()

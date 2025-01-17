@@ -28,7 +28,7 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::Message;
 use tungstenite::WebSocket;
 
-use super::AppConfigurationClient;
+use super::{AppConfigurationClient, ConfigurationId};
 
 /// AppConfiguration client connection to IBM Cloud.
 #[derive(Debug)]
@@ -50,13 +50,7 @@ impl AppConfigurationClientIBMCloud {
     /// * `guid` - Instance ID of the App Configuration service. Obtain it from the service credentials section of the App Configuration dashboard
     /// * `environment_id` - ID of the environment created in App Configuration service instance under the Environments section.
     /// * `collection_id` - ID of the collection created in App Configuration service instance under the Collections section
-    pub fn new(
-        apikey: &str,
-        region: &str,
-        guid: &str,
-        environment_id: &str,
-        collection_id: &str,
-    ) -> Result<Self> {
+    pub fn new(apikey: &str, region: &str, collection: ConfigurationId) -> Result<Self> {
         let token_provider = Box::new(IBMCloudTokenProvider::new(apikey));
 
         let service_address = ServiceAddress::new(
@@ -65,36 +59,26 @@ impl AppConfigurationClientIBMCloud {
             Some("apprapp".to_string()),
         );
 
-        Self::new_new(
-            service_address,
-            token_provider,
-            guid,
-            environment_id,
-            collection_id,
-        )
+        Self::new_new(service_address, token_provider, collection)
     }
 
     pub fn new_new(
         service_address: ServiceAddress,
         token_provider: Box<dyn TokenProvider>,
-        guid: &str,
-        environment_id: &str,
-        collection_id: &str,
+        collection: ConfigurationId,
     ) -> Result<Self> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
 
         // Populate initial configuration
         let latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>> = Arc::new(Mutex::new(
-            Self::get_configuration_snapshot(&server_client, guid, environment_id, collection_id)?,
+            Self::get_configuration_snapshot(&server_client, &collection)?,
         ));
 
         // start monitoring configuration
         let terminator = Self::update_cache_in_background(
             latest_config_snapshot.clone(),
             server_client,
-            guid,
-            environment_id,
-            collection_id,
+            collection,
         )?;
 
         let client = AppConfigurationClientIBMCloud {
@@ -107,20 +91,16 @@ impl AppConfigurationClientIBMCloud {
 
     fn get_configuration_snapshot(
         server_client: &ServerClientImpl,
-        guid: &str,
-        environment_id: &str,
-        collection_id: &str,
+        collection: &ConfigurationId,
     ) -> Result<ConfigurationSnapshot> {
-        let configuration = server_client.get_configuration(guid, collection_id, environment_id)?;
-        ConfigurationSnapshot::new(environment_id, configuration)
+        let configuration = server_client.get_configuration(collection)?;
+        ConfigurationSnapshot::new(&collection.environment_id, configuration)
     }
 
     fn wait_for_configuration_update(
         socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
         server_client_impl: &ServerClientImpl,
-        guid: &str,
-        collection_id: &str,
-        environment_id: &str,
+        collection: &ConfigurationId,
     ) -> Result<ConfigurationSnapshot> {
         loop {
             // read() blocks until something happens.
@@ -128,12 +108,7 @@ impl AppConfigurationClientIBMCloud {
                 Message::Text(text) => match text.as_str() {
                     "test message" => {} // periodically sent by the server
                     _ => {
-                        return Self::get_configuration_snapshot(
-                            server_client_impl,
-                            guid,
-                            environment_id,
-                            collection_id,
-                        );
+                        return Self::get_configuration_snapshot(server_client_impl, collection);
                     }
                 },
                 Message::Close(_) => {
@@ -148,9 +123,7 @@ impl AppConfigurationClientIBMCloud {
         mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
         latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
         server_client_impl: ServerClientImpl,
-        guid: String,
-        collection_id: String,
-        environment_id: String,
+        collection: ConfigurationId,
     ) -> std::sync::mpsc::Sender<()> {
         let (sender, receiver) = std::sync::mpsc::channel();
 
@@ -166,9 +139,7 @@ impl AppConfigurationClientIBMCloud {
                 let config_snapshot = Self::wait_for_configuration_update(
                     &mut socket,
                     &server_client_impl,
-                    &guid,
-                    &collection_id,
-                    &environment_id,
+                    &collection,
                 );
 
                 match config_snapshot {
@@ -188,23 +159,16 @@ impl AppConfigurationClientIBMCloud {
     fn update_cache_in_background(
         latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
         server_client_impl: ServerClientImpl,
-        guid: &str,
-        environment_id: &str,
-        collection_id: &str,
+        collection: ConfigurationId,
     ) -> Result<std::sync::mpsc::Sender<()>> {
-        let (socket, _response) = server_client_impl.get_configuration_monitoring_websocket(
-            guid,
-            collection_id,
-            environment_id,
-        )?;
+        let (socket, _response) =
+            server_client_impl.get_configuration_monitoring_websocket(&collection)?;
 
         let sender = Self::update_configuration_on_change(
             socket,
             latest_config_snapshot,
             server_client_impl,
-            guid.to_string(),
-            collection_id.to_string(),
-            environment_id.to_string(),
+            collection,
         );
 
         Ok(sender)

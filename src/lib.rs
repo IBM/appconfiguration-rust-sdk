@@ -41,7 +41,7 @@
 //! ```
 //! use appconfiguration::{
 //!     AppConfigurationClient, AppConfigurationClientIBMCloud,
-//!     Entity, Result, Value, Feature
+//!     ConfigurationId, Entity, Result, Value, Feature
 //! };
 //! # use std::collections::HashMap;
 //! # pub struct MyEntity;
@@ -56,12 +56,13 @@
 //! # fn func() -> Result<()> {
 //! # let apikey: &str = "api_key";
 //! # let region: &str = "us-south";
-//! # let guid: &str = "12345678-1234-1234-1234-12345678abcd";
-//! # let environment_id: &str = "production";
-//! # let collection_id: &str = "ecommerce";
+//! # let guid: String = "12345678-1234-1234-1234-12345678abcd".to_string();
+//! # let environment_id: String = "production".to_string();
+//! # let collection_id: String = "ecommerce".to_string();
 //!
 //! // Create the client connecting to the server
-//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, &guid, &environment_id, &collection_id)?;
+//! let configuration = ConfigurationId::new(guid, environment_id, collection_id);
+//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration)?;
 //!
 //! // Get the feature you want to evaluate for your entities
 //! let feature = client.get_feature("AB_testing_feature")?;
@@ -90,7 +91,10 @@ mod property;
 mod segment_evaluation;
 mod value;
 
-pub use client::{AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline};
+pub use client::{
+    AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline,
+    ConfigurationId,
+};
 pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
