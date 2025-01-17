@@ -13,9 +13,9 @@
 // limitations under the License.
 
 mod app_configuration_client;
+mod app_configuration_http;
 mod app_configuration_ibm_cloud;
 mod app_configuration_offline;
-// mod app_configuration_http;
 
 pub(crate) mod cache;
 pub(crate) mod feature_proxy;
@@ -24,5 +24,6 @@ pub(crate) mod property_proxy;
 pub(crate) mod property_snapshot;
 
 pub use app_configuration_client::{AppConfigurationClient, ConfigurationId};
+pub(crate) use app_configuration_http::AppConfigurationClientHttp;
 pub use app_configuration_ibm_cloud::AppConfigurationClientIBMCloud;
 pub use app_configuration_offline::AppConfigurationOffline;

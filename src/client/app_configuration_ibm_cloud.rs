@@ -12,29 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::cache::ConfigurationSnapshot;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
-use crate::errors::{ConfigurationAccessError, Error, Result};
-use crate::{IBMCloudTokenProvider, TokenProvider};
-use crate::{ServerClientImpl, ServiceAddress};
-use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
-use std::thread;
+use crate::errors::Result;
+use crate::IBMCloudTokenProvider;
+use crate::ServiceAddress;
 
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::Message;
-use tungstenite::WebSocket;
-
+use super::AppConfigurationClientHttp;
 use super::{AppConfigurationClient, ConfigurationId};
 
 /// AppConfiguration client connection to IBM Cloud.
 #[derive(Debug)]
 pub struct AppConfigurationClientIBMCloud {
-    pub(crate) latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
-    pub(crate) _thread_terminator: std::sync::mpsc::Sender<()>,
+    client: AppConfigurationClientHttp,
 }
 
 impl AppConfigurationClientIBMCloud {
@@ -47,204 +39,70 @@ impl AppConfigurationClientIBMCloud {
     ///
     /// * `apikey` - The encrypted API key.
     /// * `region` - Region name where the App Configuration service instance is created
-    /// * `guid` - Instance ID of the App Configuration service. Obtain it from the service credentials section of the App Configuration dashboard
-    /// * `environment_id` - ID of the environment created in App Configuration service instance under the Environments section.
-    /// * `collection_id` - ID of the collection created in App Configuration service instance under the Collections section
-    pub fn new(apikey: &str, region: &str, collection: ConfigurationId) -> Result<Self> {
+    /// * `configuration_id` - Identifies the App Configuration configuration to use.
+    pub fn new(apikey: &str, region: &str, configuration_id: ConfigurationId) -> Result<Self> {
+        let service_address = Self::create_service_address(region);
         let token_provider = Box::new(IBMCloudTokenProvider::new(apikey));
+        Ok(Self {
+            client: AppConfigurationClientHttp::new(
+                service_address,
+                token_provider,
+                configuration_id,
+            )?,
+        })
+    }
 
-        let service_address = ServiceAddress::new(
+    fn create_service_address(region: &str) -> ServiceAddress {
+        ServiceAddress::new(
             format!("{region}.apprapp.cloud.ibm.com"),
             None,
             Some("apprapp".to_string()),
-        );
-
-        Self::new_new(service_address, token_provider, collection)
-    }
-
-    pub fn new_new(
-        service_address: ServiceAddress,
-        token_provider: Box<dyn TokenProvider>,
-        collection: ConfigurationId,
-    ) -> Result<Self> {
-        let server_client = ServerClientImpl::new(service_address, token_provider)?;
-
-        // Populate initial configuration
-        let latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>> = Arc::new(Mutex::new(
-            Self::get_configuration_snapshot(&server_client, &collection)?,
-        ));
-
-        // start monitoring configuration
-        let terminator = Self::update_cache_in_background(
-            latest_config_snapshot.clone(),
-            server_client,
-            collection,
-        )?;
-
-        let client = AppConfigurationClientIBMCloud {
-            latest_config_snapshot,
-            _thread_terminator: terminator,
-        };
-
-        Ok(client)
-    }
-
-    fn get_configuration_snapshot(
-        server_client: &ServerClientImpl,
-        collection: &ConfigurationId,
-    ) -> Result<ConfigurationSnapshot> {
-        let configuration = server_client.get_configuration(collection)?;
-        ConfigurationSnapshot::new(&collection.environment_id, configuration)
-    }
-
-    fn wait_for_configuration_update(
-        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-        server_client_impl: &ServerClientImpl,
-        collection: &ConfigurationId,
-    ) -> Result<ConfigurationSnapshot> {
-        loop {
-            // read() blocks until something happens.
-            match socket.read()? {
-                Message::Text(text) => match text.as_str() {
-                    "test message" => {} // periodically sent by the server
-                    _ => {
-                        return Self::get_configuration_snapshot(server_client_impl, collection);
-                    }
-                },
-                Message::Close(_) => {
-                    return Err(Error::Other("Connection closed by the server".into()));
-                }
-                _ => {}
-            }
-        }
-    }
-
-    fn update_configuration_on_change(
-        mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
-        latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
-        server_client_impl: ServerClientImpl,
-        collection: ConfigurationId,
-    ) -> std::sync::mpsc::Sender<()> {
-        let (sender, receiver) = std::sync::mpsc::channel();
-
-        thread::spawn(move || {
-            loop {
-                // If the sender has gone (AppConfiguration instance is dropped), then finish this thread
-                if let Err(e) = receiver.try_recv() {
-                    if e == std::sync::mpsc::TryRecvError::Disconnected {
-                        break;
-                    }
-                }
-
-                let config_snapshot = Self::wait_for_configuration_update(
-                    &mut socket,
-                    &server_client_impl,
-                    &collection,
-                );
-
-                match config_snapshot {
-                    Ok(config_snapshot) => *latest_config_snapshot.lock()? = config_snapshot,
-                    Err(e) => {
-                        println!("Waiting for configuration update failed. Stopping to monitor for changes.: {e}");
-                        break;
-                    }
-                }
-            }
-            Ok::<(), Error>(())
-        });
-
-        sender
-    }
-
-    fn update_cache_in_background(
-        latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
-        server_client_impl: ServerClientImpl,
-        collection: ConfigurationId,
-    ) -> Result<std::sync::mpsc::Sender<()>> {
-        let (socket, _response) =
-            server_client_impl.get_configuration_monitoring_websocket(&collection)?;
-
-        let sender = Self::update_configuration_on_change(
-            socket,
-            latest_config_snapshot,
-            server_client_impl,
-            collection,
-        );
-
-        Ok(sender)
+        )
     }
 }
 
 impl AppConfigurationClient for AppConfigurationClientIBMCloud {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .latest_config_snapshot
-            .lock()?
-            .features
-            .keys()
-            .cloned()
-            .collect())
+        self.client.get_feature_ids()
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        let config_snapshot = self.latest_config_snapshot.lock()?;
-
-        // Get the feature from the snapshot
-        let feature = config_snapshot.get_feature(feature_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = config_snapshot.get_segments_for_segment_rules(&feature.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if feature.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: feature_id.to_string(),
-            }
-            .into());
-        }
-
-        Ok(FeatureSnapshot::new(feature.clone(), segments))
+        self.client.get_feature(feature_id)
     }
 
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
+        self.client.get_feature_proxy(feature_id)
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .latest_config_snapshot
-            .lock()
-            .map_err(|_| ConfigurationAccessError::LockAcquisitionError)?
-            .properties
-            .keys()
-            .cloned()
-            .collect())
+        self.client.get_property_ids()
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        let config_snapshot = self.latest_config_snapshot.lock()?;
-
-        // Get the property from the snapshot
-        let property = config_snapshot.get_property(property_id)?;
-
-        // Get the segment rules that apply to this property
-        let segments = config_snapshot.get_segments_for_segment_rules(&property.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if property.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: property_id.to_string(),
-            }
-            .into());
-        }
-
-        Ok(PropertySnapshot::new(property.clone(), segments))
+        self.client.get_property(property_id)
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        Ok(PropertyProxy::new(self, property_id.to_string()))
+        self.client.get_property_proxy(property_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_ibm_service_address() {
+        let service_address = AppConfigurationClientIBMCloud::create_service_address("region");
+
+        assert_eq!(
+            service_address.base_url(crate::ServiceAddressProtocol::Https),
+            "https://region.apprapp.cloud.ibm.com/apprapp"
+        );
+        assert_eq!(
+            service_address.base_url(crate::ServiceAddressProtocol::Wss),
+            "wss://region.apprapp.cloud.ibm.com/apprapp"
+        );
     }
 }

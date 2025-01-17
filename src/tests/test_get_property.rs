@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
+use crate::client::{AppConfigurationClient, AppConfigurationClientHttp};
 use crate::Value;
 use rstest::*;
 
@@ -30,7 +30,7 @@ use crate::property::Property;
 
 #[rstest]
 fn test_get_property_persistence(
-    client_enterprise: AppConfigurationClientIBMCloud,
+    client_enterprise: AppConfigurationClientHttp,
     configuration_property1_enabled: Configuration,
 ) {
     let property = client_enterprise.get_property("p1").unwrap();
@@ -54,7 +54,7 @@ fn test_get_property_persistence(
 }
 
 #[rstest]
-fn test_get_property_doesnt_exist(client_enterprise: AppConfigurationClientIBMCloud) {
+fn test_get_property_doesnt_exist(client_enterprise: AppConfigurationClientHttp) {
     let property = client_enterprise.get_property("non-existing");
     assert!(property.is_err());
     assert_eq!(
@@ -72,7 +72,7 @@ fn test_get_property_ordered(configuration_unordered_segment_rules: Configuratio
     // Create the client
     let (sender, _) = std::sync::mpsc::channel();
 
-    let client = AppConfigurationClientIBMCloud {
+    let client = AppConfigurationClientHttp {
         latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
         _thread_terminator: sender,
     };

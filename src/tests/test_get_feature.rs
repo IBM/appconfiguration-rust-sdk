@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::{AppConfigurationClient, AppConfigurationClientIBMCloud};
+use crate::client::{AppConfigurationClient, AppConfigurationClientHttp};
 use crate::Value;
 use rstest::*;
 
@@ -28,7 +28,7 @@ use crate::models::tests::{configuration_feature1_enabled, configuration_unorder
 
 #[rstest]
 fn test_get_feature_persistence(
-    client_enterprise: AppConfigurationClientIBMCloud,
+    client_enterprise: AppConfigurationClientHttp,
     configuration_feature1_enabled: Configuration,
 ) {
     let feature = client_enterprise.get_feature("f1").unwrap();
@@ -52,7 +52,7 @@ fn test_get_feature_persistence(
 }
 
 #[rstest]
-fn test_get_feature_doesnt_exist(client_enterprise: AppConfigurationClientIBMCloud) {
+fn test_get_feature_doesnt_exist(client_enterprise: AppConfigurationClientHttp) {
     let feature = client_enterprise.get_feature("non-existing");
     assert!(feature.is_err());
     assert_eq!(
@@ -70,7 +70,7 @@ fn test_get_feature_ordered(configuration_unordered_segment_rules: Configuration
     // Create the client
     let (sender, _) = std::sync::mpsc::channel();
 
-    let client = AppConfigurationClientIBMCloud {
+    let client = AppConfigurationClientHttp {
         latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
         _thread_terminator: sender,
     };

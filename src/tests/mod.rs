@@ -21,7 +21,7 @@ mod test_get_property_ids;
 mod test_using_example_data;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::AppConfigurationClientIBMCloud;
+use crate::client::AppConfigurationClientHttp;
 use crate::models::tests::example_configuration_enterprise;
 use crate::models::Configuration;
 use crate::Entity;
@@ -59,14 +59,14 @@ impl Entity for GenericEntity {
 #[fixture]
 fn client_enterprise(
     example_configuration_enterprise: Configuration,
-) -> AppConfigurationClientIBMCloud {
+) -> AppConfigurationClientHttp {
     let configuration_snapshot =
         ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
 
     // Create the client
     let (sender, _) = std::sync::mpsc::channel();
 
-    AppConfigurationClientIBMCloud {
+    AppConfigurationClientHttp {
         latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
         _thread_terminator: sender,
     }
