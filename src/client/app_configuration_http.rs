@@ -33,8 +33,8 @@ use super::{AppConfigurationClient, ConfigurationId};
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
 pub struct AppConfigurationClientHttp {
-    pub(crate) latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
-    pub(crate) _thread_terminator: std::sync::mpsc::Sender<()>,
+    latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
+    _thread_terminator: std::sync::mpsc::Sender<()>,
 }
 
 impl AppConfigurationClientHttp {
@@ -235,5 +235,90 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
         Ok(PropertyProxy::new(self, property_id.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::tests::{
+        configuration_feature1_enabled, configuration_property1_enabled,
+        example_configuration_enterprise,
+    };
+    use crate::{models::Configuration, Feature, Property};
+    use rstest::rstest;
+
+    #[rstest]
+    fn test_get_feature_persistence(
+        example_configuration_enterprise: Configuration,
+        configuration_feature1_enabled: Configuration,
+    ) {
+        let client = {
+            let configuration_snapshot =
+                ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
+
+            let (sender, _) = std::sync::mpsc::channel();
+
+            AppConfigurationClientHttp {
+                latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
+                _thread_terminator: sender,
+            }
+        };
+
+        let feature = client.get_feature("f1").unwrap();
+
+        let entity = crate::entity::tests::TrivialEntity {};
+        let feature_value1 = feature.get_value(&entity).unwrap();
+
+        // We simulate an update of the configuration:
+        let configuration_snapshot =
+            ConfigurationSnapshot::new("environment_id", configuration_feature1_enabled).unwrap();
+        *client.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
+        // The feature value should not have changed (as we did not retrieve it again)
+        let feature_value2 = feature.get_value(&entity).unwrap();
+        assert_eq!(feature_value2, feature_value1);
+
+        // Now we retrieve the feature again:
+        let feature = client.get_feature("f1").unwrap();
+        // And expect the updated value
+        let feature_value3 = feature.get_value(&entity).unwrap();
+        assert_ne!(feature_value3, feature_value1);
+    }
+
+    #[rstest]
+    fn test_get_property_persistence(
+        example_configuration_enterprise: Configuration,
+        configuration_property1_enabled: Configuration,
+    ) {
+        let client = {
+            let configuration_snapshot =
+                ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
+
+            let (sender, _) = std::sync::mpsc::channel();
+
+            AppConfigurationClientHttp {
+                latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
+                _thread_terminator: sender,
+            }
+        };
+
+        let property = client.get_property("p1").unwrap();
+
+        let entity = crate::entity::tests::TrivialEntity {};
+        let property_value1 = property.get_value(&entity).unwrap();
+
+        // We simulate an update of the configuration:
+        let configuration_snapshot =
+            ConfigurationSnapshot::new("environment_id", configuration_property1_enabled).unwrap();
+        *client.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
+        // The property value should not have changed (as we did not retrieve it again)
+        let property_value2 = property.get_value(&entity).unwrap();
+        assert_eq!(property_value2, property_value1);
+
+        // Now we retrieve the property again:
+        let property = client.get_property("p1").unwrap();
+        // And expect the updated value
+        let property_value3 = property.get_value(&entity).unwrap();
+        assert_ne!(property_value3, property_value1);
     }
 }

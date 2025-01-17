@@ -13,46 +13,20 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 use crate::models::Configuration;
 
 use crate::client::cache::ConfigurationSnapshot;
-use crate::client::{AppConfigurationClient, AppConfigurationClientHttp};
-use crate::Value;
+use crate::client::AppConfigurationClient;
+use crate::{AppConfigurationOffline, Value};
 use rstest::*;
 
 use super::client_enterprise;
 use crate::feature::Feature;
-use crate::models::tests::{configuration_feature1_enabled, configuration_unordered_segment_rules};
+use crate::models::tests::configuration_unordered_segment_rules;
 
 #[rstest]
-fn test_get_feature_persistence(
-    client_enterprise: AppConfigurationClientHttp,
-    configuration_feature1_enabled: Configuration,
-) {
-    let feature = client_enterprise.get_feature("f1").unwrap();
-
-    let entity = super::TrivialEntity {};
-    let feature_value1 = feature.get_value(&entity).unwrap();
-
-    // We simulate an update of the configuration:
-    let configuration_snapshot =
-        ConfigurationSnapshot::new("environment_id", configuration_feature1_enabled).unwrap();
-    *client_enterprise.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
-    // The feature value should not have changed (as we did not retrieve it again)
-    let feature_value2 = feature.get_value(&entity).unwrap();
-    assert_eq!(feature_value2, feature_value1);
-
-    // Now we retrieve the feature again:
-    let feature = client_enterprise.get_feature("f1").unwrap();
-    // And expect the updated value
-    let feature_value3 = feature.get_value(&entity).unwrap();
-    assert_ne!(feature_value3, feature_value1);
-}
-
-#[rstest]
-fn test_get_feature_doesnt_exist(client_enterprise: AppConfigurationClientHttp) {
+fn test_get_feature_doesnt_exist(client_enterprise: Box<dyn AppConfigurationClient>) {
     let feature = client_enterprise.get_feature("non-existing");
     assert!(feature.is_err());
     assert_eq!(
@@ -63,17 +37,11 @@ fn test_get_feature_doesnt_exist(client_enterprise: AppConfigurationClientHttp) 
 
 #[rstest]
 fn test_get_feature_ordered(configuration_unordered_segment_rules: Configuration) {
-    let configuration_snapshot =
+    let config_snapshot =
         ConfigurationSnapshot::new("environment_id", configuration_unordered_segment_rules)
             .unwrap();
 
-    // Create the client
-    let (sender, _) = std::sync::mpsc::channel();
-
-    let client = AppConfigurationClientHttp {
-        latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
-        _thread_terminator: sender,
-    };
+    let client = AppConfigurationOffline { config_snapshot };
 
     let entity = crate::tests::GenericEntity {
         id: "a2".into(),

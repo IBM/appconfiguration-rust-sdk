@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 mod test_get_feature;
 mod test_get_feature_ids;
@@ -20,26 +21,12 @@ mod test_get_property;
 mod test_get_property_ids;
 mod test_using_example_data;
 
-use crate::client::cache::ConfigurationSnapshot;
-use crate::client::AppConfigurationClientHttp;
-use crate::models::tests::example_configuration_enterprise;
-use crate::models::Configuration;
+use crate::client::{AppConfigurationClient, AppConfigurationOffline};
+use crate::models::tests::example_configuration_enterprise_path;
+
 use crate::Entity;
 use crate::Value;
 use rstest::fixture;
-use std::sync::{Arc, Mutex};
-
-pub struct TrivialEntity;
-
-impl Entity for TrivialEntity {
-    fn get_id(&self) -> String {
-        "TrivialId".into()
-    }
-
-    fn get_attributes(&self) -> HashMap<String, Value> {
-        HashMap::new()
-    }
-}
 
 pub struct GenericEntity {
     pub id: String,
@@ -58,16 +45,7 @@ impl Entity for GenericEntity {
 
 #[fixture]
 fn client_enterprise(
-    example_configuration_enterprise: Configuration,
-) -> AppConfigurationClientHttp {
-    let configuration_snapshot =
-        ConfigurationSnapshot::new("dev", example_configuration_enterprise).unwrap();
-
-    // Create the client
-    let (sender, _) = std::sync::mpsc::channel();
-
-    AppConfigurationClientHttp {
-        latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
-        _thread_terminator: sender,
-    }
+    example_configuration_enterprise_path: PathBuf,
+) -> Box<dyn AppConfigurationClient> {
+    Box::new(AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev").unwrap())
 }

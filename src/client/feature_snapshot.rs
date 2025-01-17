@@ -221,7 +221,7 @@ pub mod tests {
         };
         let feature = FeatureSnapshot::new(inner_feature, HashMap::new());
 
-        let entity = crate::tests::TrivialEntity {};
+        let entity = crate::entity::tests::TrivialEntity {};
         let value = feature.get_value(&entity).unwrap();
         assert!(matches!(value, Value::Int64(ref v) if v == &2));
     }

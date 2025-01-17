@@ -193,13 +193,21 @@ pub(crate) mod tests {
     use std::{fs, path::PathBuf};
 
     #[fixture]
-    pub(crate) fn example_configuration_enterprise() -> Configuration {
+    // Provides the path to the configuration data file
+    pub(crate) fn example_configuration_enterprise_path() -> PathBuf {
         // Create a configuration object from the data files
-
         let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         mocked_data.push("data/data-dump-enterprise-plan-sdk-testing.json");
+        mocked_data
+    }
 
-        let content = fs::File::open(mocked_data).expect("file should open read only");
+    #[fixture]
+    // Create a [`Configuration`] object from the data files
+    pub(crate) fn example_configuration_enterprise(
+        example_configuration_enterprise_path: PathBuf,
+    ) -> Configuration {
+        let content = fs::File::open(example_configuration_enterprise_path)
+            .expect("file should open read only");
         let configuration: Configuration =
             serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
         configuration

@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use super::client_enterprise;
-use crate::client::{AppConfigurationClient, AppConfigurationClientHttp};
+use crate::client::AppConfigurationClient;
 use rstest::*;
 
 #[rstest]
-fn test_get_property_ids(client_enterprise: AppConfigurationClientHttp) {
+fn test_get_property_ids(client_enterprise: Box<dyn AppConfigurationClient>) {
     let mut properties = client_enterprise.get_property_ids().unwrap();
     properties.sort();
     assert_eq!(
