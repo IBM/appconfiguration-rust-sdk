@@ -15,12 +15,11 @@
 use crate::client::cache::ConfigurationSnapshot;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
-use crate::client::http;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::{ConfigurationAccessError, Error, Result};
-use crate::IBMCloudTokenProvider;
-use crate::ServerClientImpl;
+use crate::{IBMCloudTokenProvider, TokenProvider};
+use crate::{ServerClientImpl, ServiceAddress};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -59,24 +58,40 @@ impl AppConfigurationClientIBMCloud {
         collection_id: &str,
     ) -> Result<Self> {
         let token_provider = Box::new(IBMCloudTokenProvider::new(apikey));
-        let server_client = ServerClientImpl::new(token_provider)?;
+
+        let service_address = ServiceAddress::new(
+            format!("{region}.apprapp.cloud.ibm.com"),
+            None,
+            Some("apprapp".to_string()),
+        );
+
+        Self::new_new(
+            service_address,
+            token_provider,
+            guid,
+            environment_id,
+            collection_id,
+        )
+    }
+
+    pub fn new_new(
+        service_address: ServiceAddress,
+        token_provider: Box<dyn TokenProvider>,
+        guid: &str,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Result<Self> {
+        let server_client = ServerClientImpl::new(service_address, token_provider)?;
 
         // Populate initial configuration
-        let latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>> =
-            Arc::new(Mutex::new(Self::get_configuration_snapshot(
-                &server_client,
-                region,
-                guid,
-                environment_id,
-                collection_id,
-            )?));
+        let latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>> = Arc::new(Mutex::new(
+            Self::get_configuration_snapshot(&server_client, guid, environment_id, collection_id)?,
+        ));
 
         // start monitoring configuration
         let terminator = Self::update_cache_in_background(
             latest_config_snapshot.clone(),
-            // apikey,
             server_client,
-            region,
             guid,
             environment_id,
             collection_id,
@@ -85,32 +100,24 @@ impl AppConfigurationClientIBMCloud {
         let client = AppConfigurationClientIBMCloud {
             latest_config_snapshot,
             _thread_terminator: terminator,
-            // server_client,
         };
 
         Ok(client)
     }
 
-    fn get_base_url(region: &str, guid: &str) -> String {
-        format!("https://{region}.apprapp.cloud.ibm.com/apprapp/feature/v1/instances/{guid}/config")
-    }
-
     fn get_configuration_snapshot(
         server_client: &ServerClientImpl,
-        region: &str,
         guid: &str,
         environment_id: &str,
         collection_id: &str,
     ) -> Result<ConfigurationSnapshot> {
-        let url = &Self::get_base_url(region, guid);
-        let configuration = server_client.get_configuration(url, collection_id, environment_id)?;
+        let configuration = server_client.get_configuration(guid, collection_id, environment_id)?;
         ConfigurationSnapshot::new(environment_id, configuration)
     }
 
     fn wait_for_configuration_update(
         socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
         server_client_impl: &ServerClientImpl,
-        region: &str,
         guid: &str,
         collection_id: &str,
         environment_id: &str,
@@ -123,7 +130,6 @@ impl AppConfigurationClientIBMCloud {
                     _ => {
                         return Self::get_configuration_snapshot(
                             server_client_impl,
-                            region,
                             guid,
                             environment_id,
                             collection_id,
@@ -142,7 +148,6 @@ impl AppConfigurationClientIBMCloud {
         mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
         latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
         server_client_impl: ServerClientImpl,
-        region: String,
         guid: String,
         collection_id: String,
         environment_id: String,
@@ -161,7 +166,6 @@ impl AppConfigurationClientIBMCloud {
                 let config_snapshot = Self::wait_for_configuration_update(
                     &mut socket,
                     &server_client_impl,
-                    &region,
                     &guid,
                     &collection_id,
                     &environment_id,
@@ -184,14 +188,11 @@ impl AppConfigurationClientIBMCloud {
     fn update_cache_in_background(
         latest_config_snapshot: Arc<Mutex<ConfigurationSnapshot>>,
         server_client_impl: ServerClientImpl,
-        region: &str,
         guid: &str,
         environment_id: &str,
         collection_id: &str,
     ) -> Result<std::sync::mpsc::Sender<()>> {
-        let (socket, _response) = http::get_configuration_monitoring_websocket(
-            &server_client_impl.get_access_token(), // TODO: Implement method in ServerClientImpl
-            region,
+        let (socket, _response) = server_client_impl.get_configuration_monitoring_websocket(
             guid,
             collection_id,
             environment_id,
@@ -201,7 +202,6 @@ impl AppConfigurationClientIBMCloud {
             socket,
             latest_config_snapshot,
             server_client_impl,
-            region.to_string(),
             guid.to_string(),
             collection_id.to_string(),
             environment_id.to_string(),

@@ -20,7 +20,6 @@ mod app_configuration_offline;
 pub(crate) mod cache;
 pub(crate) mod feature_proxy;
 pub(crate) mod feature_snapshot;
-pub(crate) mod http;
 pub(crate) mod property_proxy;
 pub(crate) mod property_snapshot;
 

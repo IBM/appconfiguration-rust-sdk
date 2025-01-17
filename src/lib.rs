@@ -94,8 +94,8 @@ pub use client::{AppConfigurationClient, AppConfigurationClientIBMCloud, AppConf
 pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
-pub use network::TokenProvider;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
+pub use network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 pub use property::Property;
 pub use value::Value;
 
