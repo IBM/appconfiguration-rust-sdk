@@ -18,8 +18,13 @@ use serde::Deserialize;
 
 use crate::Value;
 
+/// Represents AppConfig data in a structure intended for data exchange
+/// (typically JSON encoded) used by
+/// - AppConfig Server REST API (/config endpoint)
+/// - AppConfig database dumps (via Web GUI)
+/// - Offline configuration files used in offline-mode
 #[derive(Debug, Deserialize)]
-pub(crate) struct Configuration {
+pub(crate) struct ConfigurationJson {
     pub environments: Vec<Environment>,
     pub segments: Vec<Segment>,
 }
@@ -55,6 +60,8 @@ pub(crate) struct Feature {
     pub _format: Option<String>,
     pub enabled_value: ConfigValue,
     pub disabled_value: ConfigValue,
+    // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
+    // This causes quite som ambiguity with SegmentRule vs TargetingRule.
     pub segment_rules: Vec<TargetingRule>,
     pub enabled: bool,
     pub rollout_percentage: u32,
@@ -71,6 +78,8 @@ pub(crate) struct Property {
     #[serde(rename = "format")]
     pub _format: Option<String>,
     pub value: ConfigValue,
+    // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
+    // This causes quite som ambiguity with SegmentRule vs TargetingRule.
     pub segment_rules: Vec<TargetingRule>,
 }
 
@@ -165,6 +174,10 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
     }
 }
 
+/// Represents a Rule of a Segment.
+/// Those are the rules to check if an entity belongs to a segment.
+/// NOTE: This is easily confused with `TargetingRule`, which is
+/// sometimes also called "SegmentRule".
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct SegmentRule {
     pub attribute_name: String,
@@ -172,8 +185,15 @@ pub(crate) struct SegmentRule {
     pub values: Vec<String>,
 }
 
+/// Associates a Feature/Property to one or more Segments
+/// NOTE: This is easily confused with `SegmentRule`, as the field name in
+/// Features containing TargetingRules is called `segment_rules`
 #[derive(Debug, Deserialize, Clone)]
 pub(crate) struct TargetingRule {
+    /// The list of targeted segments
+    /// NOTE: no rules by itself, but the rules are found in the segments
+    /// NOTE: why list of lists?
+    /// NOTE: why is this field called "rules"?
     pub rules: Vec<Segments>,
     pub value: ConfigValue,
     pub order: u32,
@@ -205,17 +225,17 @@ pub(crate) mod tests {
     // Create a [`Configuration`] object from the data files
     pub(crate) fn example_configuration_enterprise(
         example_configuration_enterprise_path: PathBuf,
-    ) -> Configuration {
+    ) -> ConfigurationJson {
         let content = fs::File::open(example_configuration_enterprise_path)
             .expect("file should open read only");
-        let configuration: Configuration =
+        let configuration: ConfigurationJson =
             serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
         configuration
     }
 
     #[fixture]
-    pub(crate) fn configuration_feature1_enabled() -> Configuration {
-        Configuration {
+    pub(crate) fn configuration_feature1_enabled() -> ConfigurationJson {
+        ConfigurationJson {
             environments: vec![Environment {
                 _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
@@ -237,8 +257,8 @@ pub(crate) mod tests {
     }
 
     #[fixture]
-    pub(crate) fn configuration_property1_enabled() -> Configuration {
-        Configuration {
+    pub(crate) fn configuration_property1_enabled() -> ConfigurationJson {
+        ConfigurationJson {
             environments: vec![Environment {
                 _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
@@ -258,7 +278,7 @@ pub(crate) mod tests {
     }
 
     #[fixture]
-    pub(crate) fn configuration_unordered_segment_rules() -> Configuration {
+    pub(crate) fn configuration_unordered_segment_rules() -> ConfigurationJson {
         let segment_rules = vec![
             TargetingRule {
                 rules: vec![Segments {
@@ -279,7 +299,7 @@ pub(crate) mod tests {
         ];
         assert!(segment_rules[0].order > segment_rules[1].order);
 
-        Configuration {
+        ConfigurationJson {
             environments: vec![Environment {
                 _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
