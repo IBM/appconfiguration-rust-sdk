@@ -18,13 +18,14 @@ use crate::Property;
 use std::collections::HashMap;
 
 use crate::errors::Result;
-use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
+use crate::segment_evaluation::SegmentRules;
 
 /// Provides a snapshot of a [`Property`].
 #[derive(Debug)]
 pub struct PropertySnapshot {
-    property: crate::models::Property,
-    segments: HashMap<String, crate::models::Segment>,
+    value: Value,
+    segment_rules: SegmentRules,
+    name: String,
 }
 
 impl PropertySnapshot {
@@ -32,45 +33,41 @@ impl PropertySnapshot {
         property: crate::models::Property,
         segments: HashMap<String, crate::models::Segment>,
     ) -> Self {
-        Self { property, segments }
+        let segment_rules = SegmentRules::new(segments, property.segment_rules, property.kind);
+        Self {
+            value: (property.kind, property.value)
+                .try_into()
+                .expect("TODO: Handle error here"),
+            segment_rules,
+            name: property.name,
+        }
     }
 
-    fn evaluate_feature_for_entity(
-        &self,
-        entity: &impl Entity,
-    ) -> Result<crate::models::ConfigValue> {
-        if self.property.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+    fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+        if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
             // TODO: this makes only sense if there can be a rule which matches
             //       even on empty attributes
             // No match possible. Do not consider segment rules:
-            return Ok(self.property.value.clone());
+            return Ok(self.value.clone());
         }
 
-        match find_applicable_segment_rule_for_entity(
-            &self.segments,
-            &self.property.segment_rules,
-            entity,
-        )? {
-            Some(segment_rule) => {
-                if segment_rule.value.is_default() {
-                    Ok(self.property.value.clone())
-                } else {
-                    Ok(segment_rule.value.clone())
-                }
-            }
-            None => Ok(self.property.value.clone()),
+        match self
+            .segment_rules
+            .find_applicable_segment_rule_for_entity(entity)?
+        {
+            Some(segment_rule) => segment_rule.value(&self.value),
+            None => Ok(self.value.clone()),
         }
     }
 }
 
 impl Property for PropertySnapshot {
     fn get_name(&self) -> Result<String> {
-        Ok(self.property.name.clone())
+        Ok(self.name.clone())
     }
 
     fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        let model_value = self.evaluate_feature_for_entity(entity)?;
-        (self.property.kind, model_value).try_into()
+        self.evaluate_feature_for_entity(entity)
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
