@@ -97,11 +97,11 @@ mod tests {
         let service_address = AppConfigurationClientIBMCloud::create_service_address("region");
 
         assert_eq!(
-            service_address.base_url(crate::ServiceAddressProtocol::Https),
+            service_address.base_url(crate::ServiceAddressProtocol::Http),
             "https://region.apprapp.cloud.ibm.com/apprapp"
         );
         assert_eq!(
-            service_address.base_url(crate::ServiceAddressProtocol::Wss),
+            service_address.base_url(crate::ServiceAddressProtocol::Ws),
             "wss://region.apprapp.cloud.ibm.com/apprapp"
         );
     }
