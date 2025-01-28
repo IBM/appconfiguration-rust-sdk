@@ -91,7 +91,7 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
 mod tests {
 
     use super::*;
-    use crate::network::ServiceAddressProtocol;
+    use crate::network::http_client::ServiceAddressProtocol;
 
     #[test]
     fn test_ibm_service_address() {

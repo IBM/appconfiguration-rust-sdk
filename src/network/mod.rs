@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod http_client;
+pub(crate) mod http_client;
 mod token_provider;
 
 pub(crate) use http_client::ServerClientImpl;
