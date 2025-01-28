@@ -99,9 +99,12 @@ pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
-pub use network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 pub use property::Property;
 pub use value::Value;
 
+#[cfg(feature = "http_client")]
+pub use client::AppConfigurationClientHttp;
+#[cfg(feature = "http_client")]
+pub use network::{ServiceAddress, TokenProvider};
 #[cfg(test)]
 mod tests;

@@ -69,7 +69,7 @@ impl ServiceAddress {
         }
     }
 
-    pub fn base_url(&self, protocol: ServiceAddressProtocol) -> String {
+    pub(crate) fn base_url(&self, protocol: ServiceAddressProtocol) -> String {
         let port = if let Some(port) = self.port {
             format!(":{port}")
         } else {
