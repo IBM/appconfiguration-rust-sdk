@@ -18,6 +18,9 @@ exclude = [
     "README.tpl",
 ]
 
+[features]
+http_client = []
+
 [dependencies]
 reqwest = { version = "0.12.9", features = ["json", "blocking"] }
 serde = { version = "1.0.216", features = ["derive"] }
@@ -28,6 +31,7 @@ url = "2.5.4"
 thiserror = "2.0.7"
 
 [dev-dependencies]
+appconfiguration = {path = ".", features = ["http_client"]}
 dotenvy = "0.15.7"
 rstest = "0.23.0"
 
