@@ -114,7 +114,6 @@ impl TokenProvider for MockTokenProvider {
 fn main() {
     let server = server_thread();
 
-    sleep(Duration::from_secs(1));
     let address = ServiceAddress::new_without_ssl(
         "127.0.0.1".to_string(),
         Some(server.port),
