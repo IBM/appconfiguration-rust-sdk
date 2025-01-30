@@ -1,18 +1,14 @@
-use std::{
-    io::{BufRead, Write},
-    net::{TcpListener, TcpStream},
-    thread::{sleep, spawn},
-    time::Duration,
-};
-
 use appconfiguration::{
     AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, ServiceAddress,
     TokenProvider,
 };
 
-use std::io::BufReader;
+use std::io::{BufRead, BufReader, Write};
+use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
-use std::{fs, path::PathBuf};
+use std::thread::{sleep, spawn};
+use std::time::Duration;
 use tungstenite::WebSocket;
 
 fn handle_config_request_trivial_config(server: &TcpListener) {
@@ -33,7 +29,7 @@ fn handle_config_request_trivial_config(server: &TcpListener) {
 fn handle_config_request_enterprise_example(server: &TcpListener) {
     let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     mocked_data.push("data/data-dump-enterprise-plan-sdk-testing.json");
-    let json_payload = fs::read_to_string(mocked_data).unwrap();
+    let json_payload = std::fs::read_to_string(mocked_data).unwrap();
 
     handle_config_request(server, json_payload);
 }
@@ -114,7 +110,6 @@ impl TokenProvider for MockTokenProvider {
 fn main() {
     let server = server_thread();
 
-    sleep(Duration::from_secs(1));
     let address = ServiceAddress::new_without_ssl(
         "127.0.0.1".to_string(),
         Some(server.port),

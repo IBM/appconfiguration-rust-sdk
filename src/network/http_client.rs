@@ -42,7 +42,7 @@ impl std::fmt::Display for ServiceAddressProtocol {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServiceAddress {
     host: String,
     port: Option<u16>,
@@ -130,7 +130,9 @@ impl ServerClientImpl {
             .send();
 
         match r {
-            Ok(response) => response.json().map_err(Error::ReqwestError),
+            Ok(response) => response.json().map_err(|_| {
+                Error::ProtocolError("Failed to deserialize JSON from server response".to_string())
+            }),
             Err(e) => {
                 // TODO: Identify if token expired, get new one and retry
                 if false {
