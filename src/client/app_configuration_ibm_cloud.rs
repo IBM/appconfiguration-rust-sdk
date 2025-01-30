@@ -17,8 +17,8 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
+use crate::network::ServiceAddress;
 use crate::IBMCloudTokenProvider;
-use crate::ServiceAddress;
 
 use super::AppConfigurationClientHttp;
 use super::{AppConfigurationClient, ConfigurationId};
@@ -91,17 +91,18 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
 mod tests {
 
     use super::*;
+    use crate::network::http_client::ServiceAddressProtocol;
 
     #[test]
     fn test_ibm_service_address() {
         let service_address = AppConfigurationClientIBMCloud::create_service_address("region");
 
         assert_eq!(
-            service_address.base_url(crate::ServiceAddressProtocol::Https),
+            service_address.base_url(ServiceAddressProtocol::Http),
             "https://region.apprapp.cloud.ibm.com/apprapp"
         );
         assert_eq!(
-            service_address.base_url(crate::ServiceAddressProtocol::Wss),
+            service_address.base_url(ServiceAddressProtocol::Ws),
             "wss://region.apprapp.cloud.ibm.com/apprapp"
         );
     }

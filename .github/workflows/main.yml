@@ -20,7 +20,7 @@ jobs:
       run: cargo build --verbose --workspace
     # Tests: we only run library and documentation tests (integration tests are using the remote server!)
     - name: Run tests (unittests)
-      run: cargo test --lib --verbose --workspace
+      run: cargo test --verbose --workspace
     - name: Run tests (documentation tests)
       run: cargo test --doc --verbose --workspace
 

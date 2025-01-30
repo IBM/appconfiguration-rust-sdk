@@ -29,24 +29,25 @@ use tungstenite::connect;
 use url::Url;
 
 pub enum ServiceAddressProtocol {
-    Https,
-    Wss,
+    Http,
+    Ws,
 }
 
 impl std::fmt::Display for ServiceAddressProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ServiceAddressProtocol::Https => write!(f, "https://"),
-            ServiceAddressProtocol::Wss => write!(f, "wss://"),
+            ServiceAddressProtocol::Http => write!(f, "http"),
+            ServiceAddressProtocol::Ws => write!(f, "ws"),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServiceAddress {
     host: String,
     port: Option<u16>,
     endpoint: Option<String>,
+    use_ssl: bool,
 }
 
 impl ServiceAddress {
@@ -55,10 +56,20 @@ impl ServiceAddress {
             host,
             port,
             endpoint,
+            use_ssl: true,
         }
     }
 
-    pub fn base_url(&self, protocol: ServiceAddressProtocol) -> String {
+    pub fn new_without_ssl(host: String, port: Option<u16>, endpoint: Option<String>) -> Self {
+        Self {
+            host,
+            port,
+            endpoint,
+            use_ssl: false,
+        }
+    }
+
+    pub(crate) fn base_url(&self, protocol: ServiceAddressProtocol) -> String {
         let port = if let Some(port) = self.port {
             format!(":{port}")
         } else {
@@ -70,8 +81,8 @@ impl ServiceAddress {
         } else {
             "".to_string()
         };
-
-        format!("{protocol}{}{port}{endpoint}", self.host)
+        let ssl_suffix = if self.use_ssl { "s" } else { "" };
+        format!("{protocol}{ssl_suffix}://{}{port}{endpoint}", self.host)
     }
 }
 
@@ -102,7 +113,7 @@ impl ServerClientImpl {
     pub fn get_configuration(&self, collection: &ConfigurationId) -> Result<ConfigurationJson> {
         let url = format!(
             "{}/feature/v1/instances/{}/config",
-            self.service_address.base_url(ServiceAddressProtocol::Https),
+            self.service_address.base_url(ServiceAddressProtocol::Http),
             collection.guid
         );
         let client = Client::new();
@@ -119,7 +130,9 @@ impl ServerClientImpl {
             .send();
 
         match r {
-            Ok(response) => response.json().map_err(Error::ReqwestError),
+            Ok(response) => response.json().map_err(|_| {
+                Error::ProtocolError("Failed to deserialize JSON from server response".to_string())
+            }),
             Err(e) => {
                 // TODO: Identify if token expired, get new one and retry
                 if false {
@@ -137,7 +150,7 @@ impl ServerClientImpl {
     ) -> Result<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
         let ws_url = format!(
             "{}/wsfeature",
-            self.service_address.base_url(ServiceAddressProtocol::Wss)
+            self.service_address.base_url(ServiceAddressProtocol::Ws)
         );
         let mut ws_url = Url::parse(&ws_url)
             .map_err(|e| Error::Other(format!("Cannot parse '{}' as URL: {}", ws_url, e)))?;
@@ -169,5 +182,54 @@ impl ServerClientImpl {
         );
 
         Ok(connect(request)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_non_ssl_base_url() {
+        let address = ServiceAddress::new_without_ssl(
+            "ibm.com".to_string(),
+            None,
+            Some("endpoint".to_string()),
+        );
+        assert_eq!(
+            address.base_url(ServiceAddressProtocol::Http),
+            "http://ibm.com/endpoint"
+        );
+        assert_eq!(
+            address.base_url(ServiceAddressProtocol::Ws),
+            "ws://ibm.com/endpoint"
+        );
+    }
+
+    #[test]
+    fn test_ssl_base_url() {
+        let address =
+            ServiceAddress::new("ibm.com".to_string(), None, Some("endpoint".to_string()));
+        assert_eq!(
+            address.base_url(ServiceAddressProtocol::Http),
+            "https://ibm.com/endpoint"
+        );
+        assert_eq!(
+            address.base_url(ServiceAddressProtocol::Ws),
+            "wss://ibm.com/endpoint"
+        );
+    }
+
+    #[test]
+    fn test_url_with_port() {
+        let address = ServiceAddress::new_without_ssl("ibm.com".to_string(), Some(12345), None);
+        assert_eq!(
+            address.base_url(ServiceAddressProtocol::Http),
+            "http://ibm.com:12345"
+        );
+        assert_eq!(
+            address.base_url(ServiceAddressProtocol::Ws),
+            "ws://ibm.com:12345"
+        );
     }
 }
