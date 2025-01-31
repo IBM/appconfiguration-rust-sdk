@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod configuration_http;
+pub mod errors;
 pub(crate) mod http_client;
 mod token_provider;
 
+pub use errors::NetworkError;
 pub(crate) use http_client::ServerClientImpl;
 pub use http_client::ServiceAddress;
 pub(crate) use token_provider::IBMCloudTokenProvider;
 pub use token_provider::TokenProvider;
+
+pub type NetworkResult<T> = std::result::Result<T, NetworkError>;

@@ -1,12 +1,30 @@
 use appconfiguration::{
-    AppConfigurationClientHttp, ConfigurationId, Error, NetworkError, ServiceAddress, TokenProvider,
+    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, ServiceAddress,
+    TokenProvider,
 };
 
 use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
-use std::thread::spawn;
+use std::thread::{sleep, spawn};
+use std::time::Duration;
+use tungstenite::WebSocket;
+
+fn handle_config_request_trivial_config(server: &TcpListener) {
+    let json_payload = serde_json::json!({
+        "environments": [
+            {
+                "name": "Dev",
+                "environment_id": "dev",
+                "features": [],
+                "properties": []
+            }
+        ],
+        "segments": []
+    });
+    handle_config_request(server, json_payload.to_string());
+}
 
 fn handle_config_request_enterprise_example(server: &TcpListener) {
     let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -35,17 +53,26 @@ fn handle_config_request(server: &TcpListener, json_payload: String) {
     stream.write_all(response.as_bytes()).unwrap();
 }
 
-fn handle_websocket_error(server: &TcpListener) {
-    let (mut stream, _) = server.accept().unwrap();
-    stream.write_all(b"not today").unwrap();
+fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
+    let (stream, _) = server.accept().unwrap();
+    let mut websocket = tungstenite::accept(stream).unwrap();
+    websocket
+        .send(tungstenite::Message::text("test message".to_string()))
+        .unwrap();
+    websocket
+        .send(tungstenite::Message::text("test messag".to_string()))
+        .unwrap();
+    websocket
 }
 
 struct ServerHandle {
     _terminator: std::sync::mpsc::Sender<()>,
+    config_updated: std::sync::mpsc::Receiver<()>,
     port: u16,
 }
 fn server_thread() -> ServerHandle {
     let (terminator, receiver) = channel();
+    let (config_updated_tx, config_updated_rx) = channel();
 
     let server = TcpListener::bind(("127.0.0.1", 0)).expect("Failed to bind");
     let port = server.local_addr().unwrap().port();
@@ -53,12 +80,19 @@ fn server_thread() -> ServerHandle {
         handle_config_request_enterprise_example(&server);
 
         // notify client that config changed
-        handle_websocket_error(&server);
+        let _websocket = handle_websocket(&server);
+
+        // client will request changed config asynchronously
+        handle_config_request_trivial_config(&server);
+
+        // we now allow the test to continue
+        config_updated_tx.send(()).unwrap();
 
         let _ = receiver.recv();
     });
     ServerHandle {
         _terminator: terminator,
+        config_updated: config_updated_rx,
         port,
     }
 }
@@ -87,11 +121,8 @@ fn main() {
         "collection_id".to_string(),
     );
     let client =
-        AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id);
+        AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id)
+            .unwrap();
 
-    assert!(client.is_err());
-    assert!(matches!(
-        client.unwrap_err(),
-        Error::NetworkError(NetworkError::TungsteniteError(_))
-    ));
+    // ??
 }

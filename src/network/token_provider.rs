@@ -14,12 +14,13 @@
 
 use std::collections::HashMap;
 
-use crate::{Error, Result};
 use reqwest::blocking::Client;
 use serde::Deserialize;
 
+use super::{NetworkError, NetworkResult};
+
 pub trait TokenProvider: std::fmt::Debug + Send + Sync {
-    fn get_access_token(&self) -> Result<String>;
+    fn get_access_token(&self) -> NetworkResult<String>;
 }
 
 #[derive(Debug)]
@@ -41,7 +42,7 @@ struct AccessTokenResponse {
 }
 
 impl TokenProvider for IBMCloudTokenProvider {
-    fn get_access_token(&self) -> Result<String> {
+    fn get_access_token(&self) -> NetworkResult<String> {
         let mut form_data = HashMap::new();
         form_data.insert("reponse_type".to_string(), "cloud_iam".to_string());
         form_data.insert(
@@ -56,9 +57,9 @@ impl TokenProvider for IBMCloudTokenProvider {
             .header("Accept", "application/json")
             .form(&form_data)
             .send()
-            .map_err(Error::ReqwestError)?
+            .map_err(NetworkError::ReqwestError)?
             .json::<AccessTokenResponse>()
-            .map_err(Error::ReqwestError)? // FIXME: This is a deserialization error (extract it from Reqwest)
+            .map_err(NetworkError::ReqwestError)? // FIXME: This is a deserialization error (extract it from Reqwest)
             .access_token)
     }
 }
