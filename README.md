@@ -1,0 +1,1 @@
+appconfiguration-rust-sdk
