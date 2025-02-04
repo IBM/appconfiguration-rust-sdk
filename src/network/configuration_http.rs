@@ -8,7 +8,7 @@ use crate::{
     ServerClientImpl,
 };
 
-use super::{NetworkError, NetworkResult};
+use super::{http_client::{ServerClient, WebsocketReader}, NetworkError, NetworkResult};
 
 const SERVER_HEARTBEAT: &str = "test message";
 
@@ -44,8 +44,29 @@ pub enum ThreadStatus {
 }
 
 impl LiveConfiguration {
-    pub fn get_configuration(&self) -> Result<&Configuration> {
-        todo!();
+    pub fn get_configuration(&self) -> Result<Configuration> {
+        match &*self.current_mode.lock()?{
+            CurrentMode::Online => {
+                match &*self.configuration.lock()?{
+                    None => Err(Error::NetworkError(NetworkError::ContactToServerLost)),
+                    // TODO: we do not want to clone here
+                    Some(configuration) => Ok(configuration.clone())
+                }
+            },
+            CurrentMode::Offline(current_mode_offline_reason) => {
+                match &self.offline_mode{
+                    OfflineMode::Fail => Err(Error::NetworkError(NetworkError::ContactToServerLost)),
+                    OfflineMode::Cache => {
+                        match &*self.configuration.lock()?{
+                            None => Err(Error::NetworkError(NetworkError::ContactToServerLost)),
+                            // TODO: we do not want to clone here
+                            Some(configuration) => Ok(configuration.clone())
+                        }
+                    },
+                    OfflineMode::FallbackData(configuration) => Ok(configuration.clone()),
+                }
+            },
+        }
     }
 
     pub fn get_thread_status(&mut self) -> ThreadStatus {
@@ -89,9 +110,9 @@ impl LiveConfiguration {
         todo!("asdf")
     }
 
-    pub fn new(
+    pub fn new<T: ServerClient>(
         offline_mode: OfflineMode,
-        server_client: ServerClientImpl,
+        server_client: T,
         configuration_id: ConfigurationId,
     ) -> Self {
         let configuration = Arc::new(Mutex::new(None));
@@ -121,6 +142,7 @@ impl LiveConfiguration {
             NetworkError::ReqwestError(_) => Ok(()),
             NetworkError::TungsteniteError(_) => Ok(()),
             NetworkError::ProtocolError => Ok(()),
+            NetworkError::ContactToServerLost => Ok(()),
             // Make the match exhaustive, we need to pay attention to this classification
             NetworkError::UrlParseError(e) => Err(NetworkError::UrlParseError(e)),
             NetworkError::InvalidHeaderValue(e) => Err(NetworkError::InvalidHeaderValue(e)),
@@ -128,8 +150,8 @@ impl LiveConfiguration {
         }
     }
 
-    fn get_configuration_from_server(
-        server_client: &ServerClientImpl,
+    fn get_configuration_from_server<T: ServerClient>(
+        server_client: &T,
         configuration_id: &ConfigurationId,
         configuration: Arc<Mutex<Option<Configuration>>>,
         current_mode: &CurrentMode,
@@ -157,8 +179,8 @@ impl LiveConfiguration {
             })
     }
 
-    fn start_update_thread(
-        server_client: ServerClientImpl,
+    fn start_update_thread<T: ServerClient>(
+        server_client: T,
         configuration_id: ConfigurationId,
         configuration: Arc<Mutex<Option<Configuration>>>,
         current_mode: Arc<Mutex<CurrentMode>>,
@@ -201,7 +223,7 @@ impl LiveConfiguration {
 
                     // Receive something from the websocket
                     // BUG: If the WS doens't receive data, we are blocked here forever (until the parent process kills this thread).
-                    match socket.read() {
+                    match socket.read_msg() {
                         Ok(msg) => match msg {
                             tungstenite::Message::Text(utf8_bytes) => match utf8_bytes.as_str() {
                                 SERVER_HEARTBEAT => {
@@ -247,4 +269,10 @@ impl LiveConfiguration {
 
         (tx, t)
     }
+}
+
+#[cfg(test)]
+mod tests{
+    // TODO: many tests
+
 }

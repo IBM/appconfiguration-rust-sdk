@@ -21,6 +21,9 @@ pub enum NetworkError {
 
     #[error("Cannot acquire lock")]
     CannotAcquireLock,
+
+    #[error("Contact to server lost")]
+    ContactToServerLost,
 }
 
 impl<T> From<PoisonError<T>> for NetworkError {

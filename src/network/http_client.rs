@@ -86,6 +86,27 @@ impl ServiceAddress {
         format!("{protocol}{ssl_suffix}://{}{port}{endpoint}", self.host)
     }
 }
+pub(crate) trait WebsocketReader : Send + Sync + 'static{
+    fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message>;
+}
+
+impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader for tungstenite::WebSocket<T>{
+    fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
+        self.read()
+    }
+}
+
+pub(crate) trait ServerClient: Send + Sync + 'static{
+    fn get_configuration(
+        &self,
+        configuration_id: &ConfigurationId,
+    ) -> NetworkResult<ConfigurationJson>;
+
+    fn get_configuration_monitoring_websocket(
+        &self,
+        collection: &ConfigurationId,
+    ) -> NetworkResult<(impl WebsocketReader, Response)>;
+}
 
 #[derive(Debug)]
 pub(crate) struct ServerClientImpl {
@@ -110,8 +131,10 @@ impl ServerClientImpl {
             access_token,
         })
     }
+}
 
-    pub fn get_configuration(
+impl ServerClient for ServerClientImpl{
+    fn get_configuration(
         &self,
         configuration_id: &ConfigurationId,
     ) -> NetworkResult<ConfigurationJson> {
@@ -147,11 +170,11 @@ impl ServerClientImpl {
             }
         }
     }
-
-    pub fn get_configuration_monitoring_websocket(
+    // impl<Stream: Read + Write> WebSocket<Stream>
+    fn get_configuration_monitoring_websocket(
         &self,
         collection: &ConfigurationId,
-    ) -> NetworkResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
+    ) -> NetworkResult<(impl WebsocketReader, Response)> {
         let ws_url = format!(
             "{}/wsfeature",
             self.service_address.base_url(ServiceAddressProtocol::Ws)

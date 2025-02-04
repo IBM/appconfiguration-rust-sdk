@@ -18,6 +18,7 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::{ConfigurationAccessError, Error, Result};
+use crate::network::http_client::{ServerClient, WebsocketReader};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::ServerClientImpl;
 use std::net::TcpStream;
@@ -83,14 +84,14 @@ impl AppConfigurationClientHttp {
         Configuration::new(&configuration_id.environment_id, configuration)
     }
 
-    fn wait_for_configuration_update(
-        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    fn wait_for_configuration_update<T : WebsocketReader>(
+        socket: &mut T,
         server_client_impl: &ServerClientImpl,
         configuration_id: &ConfigurationId,
     ) -> Result<Configuration> {
         loop {
             // read() blocks until something happens.
-            match socket.read()? {
+            match socket.read_msg()? {
                 Message::Text(text) => match text.as_str() {
                     "test message" => {} // periodically sent by the server
                     _ => {
@@ -108,8 +109,8 @@ impl AppConfigurationClientHttp {
         }
     }
 
-    fn update_configuration_on_change(
-        mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
+    fn update_configuration_on_change<T: WebsocketReader>(
+        mut socket: T,
         latest_config_snapshot: Arc<Mutex<Configuration>>,
         server_client_impl: ServerClientImpl,
         configuration_id: ConfigurationId,
