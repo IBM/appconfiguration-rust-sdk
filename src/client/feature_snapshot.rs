@@ -18,15 +18,20 @@ use crate::Feature;
 use std::collections::HashMap;
 
 use super::feature_proxy::random_value;
-use crate::segment_evaluation::find_applicable_segment_rule_for_entity;
+use crate::segment_evaluation::SegmentRules;
 
 use crate::errors::Result;
 
 /// Provides a snapshot of a [`Feature`].
 #[derive(Debug)]
 pub struct FeatureSnapshot {
-    feature: crate::models::Feature,
-    segments: HashMap<String, crate::models::Segment>,
+    enabled: bool,
+    enabled_value: Value,
+    disabled_value: Value,
+    rollout_percentage: u32,
+    name: String,
+    feature_id: String,
+    segment_rules: SegmentRules,
 }
 
 impl FeatureSnapshot {
@@ -34,50 +39,46 @@ impl FeatureSnapshot {
         feature: crate::models::Feature,
         segments: HashMap<String, crate::models::Segment>,
     ) -> Self {
-        Self { feature, segments }
+        let segment_rules = SegmentRules::new(segments, feature.segment_rules, feature.kind);
+        Self {
+            enabled: feature.enabled, // TODO: Based on this enabled value we can create two different implementations, as the disabled one is much more simpler.
+            enabled_value: (feature.kind, feature.enabled_value)
+                .try_into()
+                .expect("TODO: Handle this error"),
+            disabled_value: (feature.kind, feature.disabled_value)
+                .try_into()
+                .expect("TODO: Handle this error"),
+            rollout_percentage: feature.rollout_percentage,
+            segment_rules,
+            name: feature.name,
+            feature_id: feature.feature_id,
+        }
     }
 
-    fn evaluate_feature_for_entity(
-        &self,
-        entity: &impl Entity,
-    ) -> Result<crate::models::ConfigValue> {
-        if !self.feature.enabled {
-            return Ok(self.feature.disabled_value.clone());
+    fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+        if !self.enabled {
+            return Ok(self.disabled_value.clone());
         }
 
-        if self.feature.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+        if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
             // No match possible. Do not consider segment rules:
             return self.use_rollout_percentage_to_get_value_from_feature_directly(entity);
         }
 
-        match find_applicable_segment_rule_for_entity(
-            &self.segments,
-            &self.feature.segment_rules,
-            entity,
-        )? {
+        match self
+            .segment_rules
+            .find_applicable_segment_rule_for_entity(entity)?
+        {
             Some(segment_rule) => {
                 // Get rollout percentage
-                let rollout_percentage = match &segment_rule.rollout_percentage {
-                    Some(value) => {
-                        if value.is_default() {
-                            self.feature.rollout_percentage
-                        } else {
-                            u32::try_from(value.as_u64().expect("Rollout value is not u64."))
-                                .expect("Invalid rollout value. Could not convert to u32.")
-                        }
-                    }
-                    None => panic!("Rollout value is missing."),
-                };
+                let rollout_percentage =
+                    segment_rule.rollout_percentage(self.rollout_percentage)?;
 
                 // Should rollout?
-                if Self::should_rollout(rollout_percentage, entity, &self.feature.feature_id) {
-                    if segment_rule.value.is_default() {
-                        Ok(self.feature.enabled_value.clone())
-                    } else {
-                        Ok(segment_rule.value.clone())
-                    }
+                if Self::should_rollout(rollout_percentage, entity, &self.feature_id) {
+                    segment_rule.value(&self.enabled_value)
                 } else {
-                    Ok(self.feature.disabled_value.clone())
+                    Ok(self.disabled_value.clone())
                 }
             }
             None => self.use_rollout_percentage_to_get_value_from_feature_directly(entity),
@@ -92,28 +93,27 @@ impl FeatureSnapshot {
     fn use_rollout_percentage_to_get_value_from_feature_directly(
         &self,
         entity: &impl Entity,
-    ) -> Result<crate::models::ConfigValue> {
-        let rollout_percentage = self.feature.rollout_percentage;
-        if Self::should_rollout(rollout_percentage, entity, &self.feature.feature_id) {
-            Ok(self.feature.enabled_value.clone())
+    ) -> Result<Value> {
+        let rollout_percentage = self.rollout_percentage;
+        if Self::should_rollout(rollout_percentage, entity, &self.feature_id) {
+            Ok(self.enabled_value.clone())
         } else {
-            Ok(self.feature.disabled_value.clone())
+            Ok(self.disabled_value.clone())
         }
     }
 }
 
 impl Feature for FeatureSnapshot {
     fn get_name(&self) -> Result<String> {
-        Ok(self.feature.name.clone())
+        Ok(self.name.clone())
     }
 
     fn is_enabled(&self) -> Result<bool> {
-        Ok(self.feature.enabled)
+        Ok(self.enabled)
     }
 
     fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        let model_value = self.evaluate_feature_for_entity(entity)?;
-        (self.feature.kind, model_value).try_into()
+        self.evaluate_feature_for_entity(entity)
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
@@ -186,7 +186,7 @@ pub mod tests {
             attributes: entity_attributes.clone(),
         };
         assert_eq!(
-            random_value(format!("{}:{}", entity.id, feature.feature.feature_id).as_str()),
+            random_value(format!("{}:{}", entity.id, feature.feature_id).as_str()),
             68
         );
         let value = feature.get_value(&entity).unwrap();
@@ -198,7 +198,7 @@ pub mod tests {
             attributes: entity_attributes,
         };
         assert_eq!(
-            random_value(format!("{}:{}", entity.id, feature.feature.feature_id).as_str()),
+            random_value(format!("{}:{}", entity.id, feature.feature_id).as_str()),
             29
         );
         let value = feature.get_value(&entity).unwrap();
