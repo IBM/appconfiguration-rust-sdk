@@ -8,7 +8,10 @@ use crate::{
     ServerClientImpl,
 };
 
-use super::{http_client::{ServerClient, WebsocketReader}, NetworkError, NetworkResult};
+use super::{
+    http_client::{ServerClient, WebsocketReader},
+    NetworkError, NetworkResult,
+};
 
 const SERVER_HEARTBEAT: &str = "test message";
 
@@ -32,7 +35,7 @@ pub(crate) struct LiveConfiguration {
     offline_mode: OfflineMode,
     current_mode: Arc<Mutex<CurrentMode>>,
 
-    thread_terminator: std::sync::mpsc::Sender<()>,
+    thread_termination_sender: std::sync::mpsc::Sender<()>,
     thread_handle: Option<JoinHandle<ThreadResult>>,
 }
 
@@ -45,27 +48,29 @@ pub enum ThreadStatus {
 
 impl LiveConfiguration {
     pub fn get_configuration(&self) -> Result<Configuration> {
-        match &*self.current_mode.lock()?{
+        match &*self.current_mode.lock()? {
             CurrentMode::Online => {
-                match &*self.configuration.lock()?{
+                match &*self.configuration.lock()? {
                     None => Err(Error::NetworkError(NetworkError::ContactToServerLost)),
                     // TODO: we do not want to clone here
-                    Some(configuration) => Ok(configuration.clone())
+                    Some(configuration) => Ok(configuration.clone()),
                 }
-            },
+            }
             CurrentMode::Offline(current_mode_offline_reason) => {
-                match &self.offline_mode{
-                    OfflineMode::Fail => Err(Error::NetworkError(NetworkError::ContactToServerLost)),
+                match &self.offline_mode {
+                    OfflineMode::Fail => {
+                        Err(Error::NetworkError(NetworkError::ContactToServerLost))
+                    }
                     OfflineMode::Cache => {
-                        match &*self.configuration.lock()?{
+                        match &*self.configuration.lock()? {
                             None => Err(Error::NetworkError(NetworkError::ContactToServerLost)),
                             // TODO: we do not want to clone here
-                            Some(configuration) => Ok(configuration.clone())
+                            Some(configuration) => Ok(configuration.clone()),
                         }
-                    },
+                    }
                     OfflineMode::FallbackData(configuration) => Ok(configuration.clone()),
                 }
-            },
+            }
         }
     }
 
@@ -119,7 +124,7 @@ impl LiveConfiguration {
         let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
             CurrentModeOfflineReason::Initializing,
         )));
-        let (thread_terminator, thread_handle) = Self::start_update_thread(
+        let (thread_termination_sender, thread_handle) = Self::start_update_thread(
             server_client,
             configuration_id,
             configuration.clone(),
@@ -129,7 +134,7 @@ impl LiveConfiguration {
         Self {
             configuration,
             offline_mode,
-            thread_terminator,
+            thread_termination_sender,
             current_mode,
             thread_handle: Some(thread_handle),
         }
@@ -179,13 +184,42 @@ impl LiveConfiguration {
             })
     }
 
+    fn handle_websocket_payload<T: ServerClient>(
+        utf8_bytes: tungstenite::Utf8Bytes,
+        configuration: Arc<Mutex<Option<Configuration>>>,
+        configuration_id: &ConfigurationId,
+        server_client: &T,
+        current_mode: &CurrentMode,
+    ) -> std::result::Result<CurrentMode, NetworkError> {
+        match utf8_bytes.as_str() {
+            SERVER_HEARTBEAT => {
+                if let CurrentMode::Offline(_) = current_mode {
+                    Self::get_configuration_from_server(
+                        server_client,
+                        configuration_id,
+                        configuration.clone(),
+                        current_mode,
+                    )
+                } else {
+                    Ok(current_mode.clone())
+                }
+            }
+            _ => Self::get_configuration_from_server(
+                server_client,
+                configuration_id,
+                configuration.clone(),
+                current_mode,
+            ),
+        }
+    }
+
     fn start_update_thread<T: ServerClient>(
         server_client: T,
         configuration_id: ConfigurationId,
         configuration: Arc<Mutex<Option<Configuration>>>,
         current_mode: Arc<Mutex<CurrentMode>>,
     ) -> (std::sync::mpsc::Sender<()>, JoinHandle<ThreadResult>) {
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (thread_termination_sender, thread_termination_receiver) = std::sync::mpsc::channel();
 
         let t: JoinHandle<ThreadResult> = std::thread::spawn(move || {
             'outer: loop {
@@ -214,7 +248,7 @@ impl LiveConfiguration {
 
                 'inner: loop {
                     // If the client is gone, we want to exit the loop so the socket is closed on our side, the thread will be terminanted
-                    match rx.try_recv() {
+                    match thread_termination_receiver.try_recv() {
                         Err(std::sync::mpsc::TryRecvError::Empty) => {}
                         _ => {
                             break 'outer;
@@ -225,27 +259,15 @@ impl LiveConfiguration {
                     // BUG: If the WS doens't receive data, we are blocked here forever (until the parent process kills this thread).
                     match socket.read_msg() {
                         Ok(msg) => match msg {
-                            tungstenite::Message::Text(utf8_bytes) => match utf8_bytes.as_str() {
-                                SERVER_HEARTBEAT => {
-                                    let current_mode_cloned = { current_mode.lock()?.clone() };
-                                    if let CurrentMode::Offline(_) = current_mode_cloned {
-                                        *current_mode.lock()? = Self::get_configuration_from_server(
-                                            &server_client,
-                                            &configuration_id,
-                                            configuration.clone(),
-                                            &current_mode_cloned,
-                                        )?
-                                    }
-                                }
-                                _ => {
-                                    *current_mode.lock()? = Self::get_configuration_from_server(
-                                        &server_client,
-                                        &configuration_id,
-                                        configuration.clone(),
-                                        &current_mode.lock()?.clone(),
-                                    )?
-                                }
-                            },
+                            tungstenite::Message::Text(utf8_bytes) => {
+                                *current_mode.lock()? = Self::handle_websocket_payload(
+                                    utf8_bytes,
+                                    configuration.clone(),
+                                    &configuration_id,
+                                    &server_client,
+                                    &*current_mode.lock()?,
+                                )?;
+                            }
                             tungstenite::Message::Close(close_frame) => {
                                 *current_mode.lock()? =
                                     CurrentMode::Offline(CurrentModeOfflineReason::WebsocketClosed);
@@ -267,12 +289,11 @@ impl LiveConfiguration {
             Ok(())
         });
 
-        (tx, t)
+        (thread_termination_sender, t)
     }
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     // TODO: many tests
-
 }
