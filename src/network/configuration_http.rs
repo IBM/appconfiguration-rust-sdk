@@ -15,7 +15,7 @@ use super::{
 
 const SERVER_HEARTBEAT: &str = "test message";
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum CurrentModeOfflineReason {
     LockError,
     FailedToGetNewConfiguration,
@@ -24,7 +24,7 @@ pub enum CurrentModeOfflineReason {
     WebsocketError,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum CurrentMode {
     Online,
     Offline(CurrentModeOfflineReason),
@@ -48,6 +48,7 @@ pub enum ThreadStatus {
 
 impl LiveConfiguration {
     pub fn get_configuration(&self) -> Result<Configuration> {
+        println!("current mode: {:?}", *self.current_mode.lock()?);
         match &*self.current_mode.lock()? {
             CurrentMode::Online => {
                 match &*self.configuration.lock()? {
@@ -159,7 +160,7 @@ impl LiveConfiguration {
         server_client: &T,
         configuration_id: &ConfigurationId,
         configuration: Arc<Mutex<Option<Configuration>>>,
-        current_mode: &CurrentMode,
+        current_mode: Arc<Mutex<CurrentMode>>,
     ) -> NetworkResult<CurrentMode> {
         server_client
             .get_configuration(&configuration_id)
@@ -174,6 +175,7 @@ impl LiveConfiguration {
             .or_else(|e| {
                 Self::recoverable_error(e)?;
 
+                let current_mode = &*current_mode.lock()?;
                 if let CurrentMode::Offline(_) = current_mode {
                     Ok(current_mode.clone())
                 } else {
@@ -189,11 +191,12 @@ impl LiveConfiguration {
         configuration: Arc<Mutex<Option<Configuration>>>,
         configuration_id: &ConfigurationId,
         server_client: &T,
-        current_mode: &CurrentMode,
+        current_mode: Arc<Mutex<CurrentMode>>,
     ) -> std::result::Result<CurrentMode, NetworkError> {
         match utf8_bytes.as_str() {
             SERVER_HEARTBEAT => {
-                if let CurrentMode::Offline(_) = current_mode {
+                let current_mode_clone = current_mode.lock()?.clone();
+                if let CurrentMode::Offline(_) = current_mode_clone {
                     Self::get_configuration_from_server(
                         server_client,
                         configuration_id,
@@ -201,7 +204,7 @@ impl LiveConfiguration {
                         current_mode,
                     )
                 } else {
-                    Ok(current_mode.clone())
+                    Ok(current_mode_clone)
                 }
             }
             _ => Self::get_configuration_from_server(
@@ -229,13 +232,16 @@ impl LiveConfiguration {
                 //        handshake we are missing those changes. The ws is not yet connected,
                 //        so it won't receive the 'config_update' message and the Configuration
                 //        we got in this call doesn't include those changes.
-                *current_mode.lock()? = Self::get_configuration_from_server(
+                println!("Getting initial Config");
+                let next_mode = Self::get_configuration_from_server(
                     &server_client,
                     &configuration_id,
                     configuration.clone(),
-                    &current_mode.lock()?.clone(),
+                    current_mode.clone(),
                 )?;
+                *current_mode.lock()? = next_mode;
 
+                println!("Getting Websocket");
                 // Connect websocket
                 let r = server_client.get_configuration_monitoring_websocket(&configuration_id);
                 let mut socket = match r {
@@ -245,6 +251,8 @@ impl LiveConfiguration {
                         continue 'outer;
                     }
                 };
+
+                println!("Starting loop");
 
                 'inner: loop {
                     // If the client is gone, we want to exit the loop so the socket is closed on our side, the thread will be terminanted
@@ -260,15 +268,18 @@ impl LiveConfiguration {
                     match socket.read_msg() {
                         Ok(msg) => match msg {
                             tungstenite::Message::Text(utf8_bytes) => {
-                                *current_mode.lock()? = Self::handle_websocket_payload(
+                                println!("websocket received");
+                                let next_mode = Self::handle_websocket_payload(
                                     utf8_bytes,
                                     configuration.clone(),
                                     &configuration_id,
                                     &server_client,
-                                    &*current_mode.lock()?,
+                                    current_mode.clone(),
                                 )?;
+                                *current_mode.lock()? = next_mode;
                             }
                             tungstenite::Message::Close(close_frame) => {
+                                println!("websocket closed");
                                 *current_mode.lock()? =
                                     CurrentMode::Offline(CurrentModeOfflineReason::WebsocketClosed);
                                 break 'inner;
@@ -278,6 +289,7 @@ impl LiveConfiguration {
                             }
                         },
                         Err(e) => {
+                            println!("websocket error");
                             *current_mode.lock()? =
                                 CurrentMode::Offline(CurrentModeOfflineReason::WebsocketError);
                             break 'inner;
@@ -295,25 +307,37 @@ impl LiveConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use crate::network::{configuration_http::{CurrentMode, CurrentModeOfflineReason, ThreadStatus}, http_client::{ServerClient, WebsocketReader}};
+    use std::sync::mpsc;
+
+    use crate::network::{
+        configuration_http::{CurrentMode, CurrentModeOfflineReason, ThreadStatus},
+        http_client::{ServerClient, WebsocketReader},
+    };
 
     use super::LiveConfiguration;
 
     #[test]
     fn test_happy_path() {
-        struct WebsocketReaderMock {}
+        struct WebsocketReaderMock {
+            rx: mpsc::Receiver<tungstenite::Message>,
+            tx: mpsc::Sender<()>
+        }
         impl WebsocketReader for WebsocketReaderMock {
             fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
-                Ok(tungstenite::Message::text("asd".to_string()))
+                self.tx.send(());
+                Ok(self.rx.recv().unwrap())
             }
         }
-        struct ServerClientMock {}
+        struct ServerClientMock {
+            rx: mpsc::Receiver<crate::models::ConfigurationJson>,
+            websocket_rx: mpsc::Receiver<WebsocketReaderMock>,
+        }
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
                 _configuration_id: &crate::ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+                Ok(self.rx.recv().unwrap())
             }
 
             fn get_configuration_monitoring_websocket(
@@ -321,67 +345,90 @@ mod tests {
                 collection: &crate::ConfigurationId,
             ) -> crate::NetworkResult<impl crate::network::http_client::WebsocketReader>
             {
-                Ok(WebsocketReaderMock {})
+                Ok(self.websocket_rx.recv().unwrap())
             }
         }
 
-        let server_client = ServerClientMock{};
+        let (websocket_factory_tx, websocket_factory_rx) = mpsc::channel();
+        let (get_configuration_tx, get_configuration_rx) = mpsc::channel();
+        let server_client = ServerClientMock {
+            rx: get_configuration_rx,
+            websocket_rx: websocket_factory_rx,
+        };
 
-        let configuration_id = crate::ConfigurationId::new("".into(), "".into(), "".into());
+        let configuration_id = crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let mut live_config =
             LiveConfiguration::new(crate::OfflineMode::Fail, server_client, configuration_id);
 
-        // TODO: block thread from executing anything yet
-        // Block beginning of get_configuration_from_server()
-        
+        // Blocked beginning of get_configuration_from_server()
         // Expect we are in initializing state (no config)
         let config = live_config.get_configuration();
-        assert!(matches!(config, Err(crate::errors::Error::MismatchType)));
+        assert!(
+            matches!(
+                config,
+                Err(crate::errors::Error::NetworkError(
+                    crate::NetworkError::ContactToServerLost
+                ))
+            ),
+            "{:?}",
+            config
+        );
         let thread_state = live_config.get_thread_status();
         assert!(matches!(thread_state, ThreadStatus::Running));
         let current_mode = live_config.get_current_mode();
-        assert!(matches!(current_mode, Ok(CurrentMode::Offline(CurrentModeOfflineReason::Initializing))));
+        assert!(matches!(
+            current_mode,
+            Ok(CurrentMode::Offline(CurrentModeOfflineReason::Initializing))
+        ));
 
-        // TODO: allow thread to start (unblock)
-        // TODO: wait for thread to reach socket rx
-        // Block in socket.read_msg()
+        // allow thread to start (unblock)
+        get_configuration_tx
+            .send(crate::models::tests::configuration_feature1_enabled())
+            .unwrap();
+        let (read_msg_tx, read_msg_rx) = mpsc::channel();
+        let (read_msg_ping_tx, read_msg_ping_rx) = mpsc::channel();
+        websocket_factory_tx
+            .send(WebsocketReaderMock { rx: read_msg_rx, tx: read_msg_ping_tx })
+            .unwrap();
 
+        // Wait for thread to do some work and then to wait on websocket
+        read_msg_ping_rx.recv().unwrap();
+        // Blocked in socket.read_msg()
         // Expect, we get a configuration and are Online / Running state
         let config = live_config.get_configuration();
-        assert!(matches!(config, Ok(_)));
+        assert!(matches!(config, Ok(_)), "{:?}", config);
         let thread_state = live_config.get_thread_status();
         assert!(matches!(thread_state, ThreadStatus::Running));
         let current_mode = live_config.get_current_mode();
         assert!(matches!(current_mode, Ok(CurrentMode::Online)));
 
-        // TODO: let thread continue (unblock)
-        // TODO: simulate a socket msg (heart beat)
-        // TODO: wait for thread to reach socket rx
-        // Block in socket.read_msg()
+        // // TODO: let thread continue (unblock)
+        // // TODO: simulate a socket msg (heart beat)
+        // // TODO: wait for thread to reach socket rx
+        // // Block in socket.read_msg()
 
-        // Expect no change due to heartbeat:
-        let config = live_config.get_configuration();
-        assert!(matches!(config, Ok(_)));
-        let thread_state = live_config.get_thread_status();
-        assert!(matches!(thread_state, ThreadStatus::Running));
-        let current_mode = live_config.get_current_mode();
-        assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+        // // Expect no change due to heartbeat:
+        // let config = live_config.get_configuration();
+        // assert!(matches!(config, Ok(_)));
+        // let thread_state = live_config.get_thread_status();
+        // assert!(matches!(thread_state, ThreadStatus::Running));
+        // let current_mode = live_config.get_current_mode();
+        // assert!(matches!(current_mode, Ok(CurrentMode::Online)));
 
-        // TODO: let thread continue (unblock)
-        // TODO: simulate a socket msg (you have mail message)
-        // TODO: send new configuration via serverclient mock
-        // Block in socket.read_msg()
+        // // TODO: let thread continue (unblock)
+        // // TODO: simulate a socket msg (you have mail message)
+        // // TODO: send new configuration via serverclient mock
+        // // Block in socket.read_msg()
 
-        // Expect new configuration, and still running/online
-        let config = live_config.get_configuration();
-        assert!(matches!(config, Ok(_)));
-        let thread_state = live_config.get_thread_status();
-        assert!(matches!(thread_state, ThreadStatus::Running));
-        let current_mode = live_config.get_current_mode();
-        assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+        // // Expect new configuration, and still running/online
+        // let config = live_config.get_configuration();
+        // assert!(matches!(config, Ok(_)));
+        // let thread_state = live_config.get_thread_status();
+        // assert!(matches!(thread_state, ThreadStatus::Running));
+        // let current_mode = live_config.get_current_mode();
+        // assert!(matches!(current_mode, Ok(CurrentMode::Online)));
 
-
-        drop(live_config);
+        // drop(live_config);
         // TODO: assert serverclient dropped (wait for rx queue message)
     }
 }

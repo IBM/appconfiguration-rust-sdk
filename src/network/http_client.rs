@@ -86,7 +86,7 @@ impl ServiceAddress {
         format!("{protocol}{ssl_suffix}://{}{port}{endpoint}", self.host)
     }
 }
-pub(crate) trait WebsocketReader : Send + Sync + 'static{
+pub(crate) trait WebsocketReader : Send + 'static{
     fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message>;
 }
 
