@@ -239,7 +239,7 @@ impl LiveConfiguration {
                 // Connect websocket
                 let r = server_client.get_configuration_monitoring_websocket(&configuration_id);
                 let mut socket = match r {
-                    Ok((socket, _response)) => socket,
+                    Ok(socket) => socket,
                     Err(e) => {
                         Self::recoverable_error(e)?;
                         continue 'outer;
@@ -295,5 +295,93 @@ impl LiveConfiguration {
 
 #[cfg(test)]
 mod tests {
-    // TODO: many tests
+    use crate::network::{configuration_http::{CurrentMode, CurrentModeOfflineReason, ThreadStatus}, http_client::{ServerClient, WebsocketReader}};
+
+    use super::LiveConfiguration;
+
+    #[test]
+    fn test_happy_path() {
+        struct WebsocketReaderMock {}
+        impl WebsocketReader for WebsocketReaderMock {
+            fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
+                Ok(tungstenite::Message::text("asd".to_string()))
+            }
+        }
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                collection: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<impl crate::network::http_client::WebsocketReader>
+            {
+                Ok(WebsocketReaderMock {})
+            }
+        }
+
+        let server_client = ServerClientMock{};
+
+        let configuration_id = crate::ConfigurationId::new("".into(), "".into(), "".into());
+        let mut live_config =
+            LiveConfiguration::new(crate::OfflineMode::Fail, server_client, configuration_id);
+
+        // TODO: block thread from executing anything yet
+        // Block beginning of get_configuration_from_server()
+        
+        // Expect we are in initializing state (no config)
+        let config = live_config.get_configuration();
+        assert!(matches!(config, Err(crate::errors::Error::MismatchType)));
+        let thread_state = live_config.get_thread_status();
+        assert!(matches!(thread_state, ThreadStatus::Running));
+        let current_mode = live_config.get_current_mode();
+        assert!(matches!(current_mode, Ok(CurrentMode::Offline(CurrentModeOfflineReason::Initializing))));
+
+        // TODO: allow thread to start (unblock)
+        // TODO: wait for thread to reach socket rx
+        // Block in socket.read_msg()
+
+        // Expect, we get a configuration and are Online / Running state
+        let config = live_config.get_configuration();
+        assert!(matches!(config, Ok(_)));
+        let thread_state = live_config.get_thread_status();
+        assert!(matches!(thread_state, ThreadStatus::Running));
+        let current_mode = live_config.get_current_mode();
+        assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+
+        // TODO: let thread continue (unblock)
+        // TODO: simulate a socket msg (heart beat)
+        // TODO: wait for thread to reach socket rx
+        // Block in socket.read_msg()
+
+        // Expect no change due to heartbeat:
+        let config = live_config.get_configuration();
+        assert!(matches!(config, Ok(_)));
+        let thread_state = live_config.get_thread_status();
+        assert!(matches!(thread_state, ThreadStatus::Running));
+        let current_mode = live_config.get_current_mode();
+        assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+
+        // TODO: let thread continue (unblock)
+        // TODO: simulate a socket msg (you have mail message)
+        // TODO: send new configuration via serverclient mock
+        // Block in socket.read_msg()
+
+        // Expect new configuration, and still running/online
+        let config = live_config.get_configuration();
+        assert!(matches!(config, Ok(_)));
+        let thread_state = live_config.get_thread_status();
+        assert!(matches!(thread_state, ThreadStatus::Running));
+        let current_mode = live_config.get_current_mode();
+        assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+
+
+        drop(live_config);
+        // TODO: assert serverclient dropped (wait for rx queue message)
+    }
 }

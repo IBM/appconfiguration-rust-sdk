@@ -105,7 +105,7 @@ pub(crate) trait ServerClient: Send + 'static{
     fn get_configuration_monitoring_websocket(
         &self,
         collection: &ConfigurationId,
-    ) -> NetworkResult<(impl WebsocketReader, Response)>;
+    ) -> NetworkResult<impl WebsocketReader>;
 }
 
 #[derive(Debug)]
@@ -174,7 +174,7 @@ impl ServerClient for ServerClientImpl{
     fn get_configuration_monitoring_websocket(
         &self,
         collection: &ConfigurationId,
-    ) -> NetworkResult<(impl WebsocketReader, Response)> {
+    ) -> NetworkResult<impl WebsocketReader> {
         let ws_url = format!(
             "{}/wsfeature",
             self.service_address.base_url(ServiceAddressProtocol::Ws)
@@ -205,7 +205,8 @@ impl ServerClient for ServerClientImpl{
                 .map_err(|_| NetworkError::InvalidHeaderValue("Authorization".to_string()))?,
         );
 
-        Ok(connect(request)?)
+        let (websocket, _) = connect(request)?;
+        Ok(websocket)
     }
 }
 

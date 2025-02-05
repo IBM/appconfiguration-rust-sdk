@@ -151,7 +151,7 @@ impl AppConfigurationClientHttp {
         server_client_impl: ServerClientImpl,
         configuration_id: ConfigurationId,
     ) -> Result<std::sync::mpsc::Sender<()>> {
-        let (socket, _response) =
+        let socket =
             server_client_impl.get_configuration_monitoring_websocket(&configuration_id)?;
 
         let sender = Self::update_configuration_on_change(
