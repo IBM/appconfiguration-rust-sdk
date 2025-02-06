@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod configuration_http;
+pub(crate) mod configuration_sync;
 pub mod errors;
 pub(crate) mod http_client;
 mod token_provider;

@@ -13,26 +13,3 @@ pub enum OfflineMode {
     /// Use the provided configuration.
     FallbackData(Configuration),
 }
-
-#[derive(Debug)]
-pub(crate) struct OperationMode {
-    connected: bool,
-    offline_mode: OfflineMode,
-}
-
-impl OperationMode {
-    pub fn new(offline_mode: OfflineMode, connected: bool) -> Self {
-        Self {
-            connected,
-            offline_mode,
-        }
-    }
-
-    pub fn i_managed_to_connect(&mut self) {
-        self.connected = true;
-    }
-
-    pub fn i_lost_connection(&mut self) {
-        self.connected = false;
-    }
-}

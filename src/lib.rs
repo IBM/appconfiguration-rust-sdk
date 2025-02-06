@@ -87,7 +87,6 @@ mod errors;
 mod feature;
 mod models;
 mod network;
-mod offline;
 mod property;
 mod segment_evaluation;
 mod value;
@@ -99,9 +98,8 @@ pub use client::{
 pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
+pub use network::configuration_sync::OfflineMode;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
-pub use offline::OfflineMode;
-pub(crate) use offline::OperationMode;
 pub use property::Property;
 pub use value::Value;
 

@@ -84,7 +84,7 @@ impl AppConfigurationClientHttp {
         Configuration::new(&configuration_id.environment_id, configuration)
     }
 
-    fn wait_for_configuration_update<T : WebsocketReader>(
+    fn wait_for_configuration_update<T: WebsocketReader>(
         socket: &mut T,
         server_client_impl: &ServerClientImpl,
         configuration_id: &ConfigurationId,

@@ -20,7 +20,7 @@ use crate::models::{ConfigurationJson, Feature, Property, Segment, TargetingRule
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.
 /// It contains a subset of models::ConfigurationJson, adding indexing.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct Configuration {
     pub(crate) features: HashMap<String, Feature>,
     pub(crate) properties: HashMap<String, Property>,

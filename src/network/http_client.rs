@@ -86,17 +86,19 @@ impl ServiceAddress {
         format!("{protocol}{ssl_suffix}://{}{port}{endpoint}", self.host)
     }
 }
-pub(crate) trait WebsocketReader : Send + 'static{
+pub(crate) trait WebsocketReader: Send + 'static {
     fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message>;
 }
 
-impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader for tungstenite::WebSocket<T>{
+impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader
+    for tungstenite::WebSocket<T>
+{
     fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
         self.read()
     }
 }
 
-pub(crate) trait ServerClient: Send + 'static{
+pub(crate) trait ServerClient: Send + 'static {
     fn get_configuration(
         &self,
         configuration_id: &ConfigurationId,
@@ -133,7 +135,7 @@ impl ServerClientImpl {
     }
 }
 
-impl ServerClient for ServerClientImpl{
+impl ServerClient for ServerClientImpl {
     fn get_configuration(
         &self,
         configuration_id: &ConfigurationId,
