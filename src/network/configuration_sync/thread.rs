@@ -53,6 +53,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
             //        handshake we are missing those changes. The ws is not yet connected,
             //        so it won't receive the 'config_update' message and the Configuration
             //        we got in this call doesn't include those changes.
+            println!("here1");
             self.update_configuration_from_server_and_current_mode()?;
 
             // Connect websocket
@@ -78,6 +79,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
 
                 // Receive something from the websocket
                 // BUG: If the WS doens't receive data, we are blocked here forever (until the parent process kills this thread).
+                println!(" here2");
                 match self.handle_websocket_message(socket)? {
                     Some(ws) => socket = ws,
                     None => break 'inner, // Go and create another socket
@@ -603,5 +605,101 @@ mod tests {
             *current_mode.lock().unwrap(),
             CurrentMode::Defunct(Err(super::Error::UnrecoverableError("".into())))
         );
+    }
+
+    #[test]
+    fn test_run_thread_terminated() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                Ok(WebsocketMockReader {
+                    message: Some(Err(tungstenite::Error::AttackAttempt)),
+                })
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+        let (tx, rx) = std::sync::mpsc::channel();
+        drop(tx);
+        let r = worker.run(rx);
+        assert_eq!(r.unwrap(), ());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
+    }
+
+    #[test]
+    fn test_run_websocket_rx_fail() {
+        struct ServerClientMock {
+            rx: std::sync::mpsc::Receiver<crate::NetworkResult<crate::models::ConfigurationJson>>,
+            tx: std::sync::mpsc::Sender<()>,
+        }
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                self.tx.send(()).unwrap();
+                self.rx.recv().unwrap()
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                Ok(WebsocketMockReader {
+                    message: Some(Err(tungstenite::Error::AttackAttempt)),
+                })
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let (get_config_tx, get_config_rx) = std::sync::mpsc::channel();
+        let (get_config_check_tx, get_config_check_rx) = std::sync::mpsc::channel();
+
+        let server_client = ServerClientMock {
+            rx: get_config_rx,
+            tx: get_config_check_tx,
+        };
+        // For first loop iteration
+        get_config_tx.send(Ok(crate::models::tests::configuration_feature1_enabled()));
+        // we will break at second loop iteration
+        get_config_tx.send(Err(NetworkError::CannotAcquireLock));
+        let worker = UpdateThreadWorker::new(
+            server_client,
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+        let (_, terminate_rx) = std::sync::mpsc::channel();
+        let r = worker.run(terminate_rx);
+        assert_eq!(r.unwrap(), ());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
+        // we expect to have called get_config 2 times
+        get_config_check_rx.recv().unwrap();
+        get_config_check_rx.recv().unwrap();
+        // not 3 or more times:
+        assert_eq!(
+            get_config_check_rx.try_recv().unwrap_err(),
+            std::sync::mpsc::TryRecvError::Empty
+        )
     }
 }
