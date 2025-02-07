@@ -36,21 +36,25 @@ impl ThreadHandle {
         match t {
             Some(t) => {
                 if t.is_finished() {
-                    let thread_finished_status = match t.join() {
-                        Ok(r) => ThreadStatus::Finished(r),
-                        Err(e) => {
-                            if let Ok(panic_msg) = e.downcast::<String>() {
-                                ThreadStatus::Finished(Err(Error::ThreadInternalError(format!(
-                                    "Thread panicked: {}",
-                                    panic_msg
-                                ))))
-                            } else {
-                                ThreadStatus::Finished(Err(Error::ThreadInternalError(
-                                    "Thread panicked".to_string(),
-                                )))
+                    let thread_finished_status =
+                        match t.join() {
+                            Ok(r) => ThreadStatus::Finished(r),
+                            Err(e) => {
+                                if let Some(panic_msg) = e.downcast_ref::<String>() {
+                                    ThreadStatus::Finished(Err(Error::ThreadInternalError(
+                                        format!("Thread panicked: {}", panic_msg),
+                                    )))
+                                } else if let Some(panic_msg) = e.downcast_ref::<&str>() {
+                                    ThreadStatus::Finished(Err(Error::ThreadInternalError(
+                                        format!("Thread panicked: {}", panic_msg),
+                                    )))
+                                } else {
+                                    ThreadStatus::Finished(Err(Error::ThreadInternalError(
+                                        "Thread panicked".to_string(),
+                                    )))
+                                }
                             }
-                        }
-                    };
+                        };
                     self.finished_thread_status_cached = Some(thread_finished_status.clone());
                     thread_finished_status
                 } else {
@@ -68,11 +72,12 @@ impl ThreadHandle {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::RecvError;
+    use std::sync::mpsc::{RecvError, Sender};
 
     use crate::network::configuration_sync::thread_handle::ThreadStatus;
 
     use super::ThreadHandle;
+    use crate::network::configuration_sync::Error::ThreadInternalError;
 
     #[test]
     fn neverending_thread() {
@@ -84,8 +89,43 @@ mod tests {
         });
 
         assert_eq!(handle.get_thread_status(), ThreadStatus::Running);
+        assert_eq!(handle.get_thread_status(), ThreadStatus::Running);
 
         drop(handle);
         assert_eq!(rx.recv().unwrap_err(), RecvError);
+    }
+
+    #[test]
+    fn finishing_thread() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut handle = ThreadHandle::new(move |terminator| {
+            tx.send(());
+            Ok(())
+        });
+        rx.recv().unwrap();
+        assert_eq!(rx.recv().unwrap_err(), RecvError);
+        // NOTE: might need to sleep here if test becomes flaky
+        assert_eq!(handle.get_thread_status(), ThreadStatus::Finished(Ok(())));
+        assert_eq!(handle.get_thread_status(), ThreadStatus::Finished(Ok(())));
+    }
+
+    #[test]
+    fn panicking_thread() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut handle = ThreadHandle::new(move |terminator| {
+            tx.send(());
+            panic!("panic for test");
+        });
+        rx.recv().unwrap();
+        assert_eq!(rx.recv().unwrap_err(), RecvError);
+        // NOTE: might need to sleep here if test becomes flaky
+        assert_eq!(
+            handle.get_thread_status(),
+            ThreadStatus::Finished(Err(ThreadInternalError("Thread panicked: panic for test".to_string())))
+        );
+        assert_eq!(
+            handle.get_thread_status(),
+            ThreadStatus::Finished(Err(ThreadInternalError("Thread panicked: panic for test".to_string())))
+        );
     }
 }
