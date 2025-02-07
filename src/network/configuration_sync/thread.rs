@@ -1,14 +1,12 @@
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 
-use super::current_mode::{self, CurrentMode, CurrentModeOfflineReason};
+use super::current_mode::{CurrentMode, CurrentModeOfflineReason};
 use super::{Error, Result};
+use crate::client::configuration::Configuration;
+use crate::network::http_client::{ServerClient, WebsocketReader};
 use crate::network::NetworkError;
-use crate::{
-    client::configuration::Configuration,
-    network::http_client::{ServerClient, WebsocketReader},
-    ConfigurationId,
-};
+use crate::ConfigurationId;
 
 pub(crate) const SERVER_HEARTBEAT: &str = "test message";
 
@@ -163,19 +161,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::{channel, Receiver};
-    use std::sync::Mutex;
-
-    use crate::network::configuration_sync::thread::SERVER_HEARTBEAT;
-    use crate::network::http_client::ServerClient;
-    use crate::{
-        client::configuration::Configuration,
-        network::configuration_sync::current_mode::{self, CurrentMode, CurrentModeOfflineReason},
-    };
-    use std::sync::Arc;
-
-    use super::UpdateThreadWorker;
-    use crate::network::http_client::WebsocketReader;
+    use super::*;
 
     struct WebsocketMockReader {
         message: Option<tungstenite::error::Result<tungstenite::Message>>,
@@ -196,11 +182,12 @@ mod tests {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id =
@@ -235,15 +222,16 @@ mod tests {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id =
-            crate::ConfigurationId::new("".into(), "non_existing_environment_id".into(), "".into());
+            ConfigurationId::new("".into(), "non_existing_environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
             CurrentModeOfflineReason::Initializing,
@@ -277,15 +265,15 @@ mod tests {
                 Err(crate::NetworkError::ProtocolError)
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
-        let configuration_id =
-            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
 
@@ -329,11 +317,12 @@ mod tests {
                 Err(crate::NetworkError::CannotAcquireLock)
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id =
@@ -366,15 +355,15 @@ mod tests {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
-        let configuration_id =
-            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
             CurrentModeOfflineReason::Initializing,
@@ -438,20 +427,20 @@ mod tests {
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
-                _configuration_id: &crate::ConfigurationId,
+                _configuration_id: &ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
                 Err(crate::NetworkError::UrlParseError("".to_string()))
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
-        let configuration_id =
-            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
             CurrentModeOfflineReason::Initializing,
@@ -492,20 +481,20 @@ mod tests {
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
-                _configuration_id: &crate::ConfigurationId,
+                _configuration_id: &ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
                 unreachable!()
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
-        let configuration_id =
-            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
 
@@ -533,20 +522,20 @@ mod tests {
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
-                _configuration_id: &crate::ConfigurationId,
+                _configuration_id: &ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
                 Err(crate::NetworkError::UrlParseError("".to_string()))
             }
 
+            #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                unreachable!()
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
         }
-        let configuration_id =
-            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
 
@@ -556,13 +545,13 @@ mod tests {
             configuration.clone(),
             current_mode.clone(),
         );
-        let (tx, rx) = channel();
+        let (_, rx) = std::sync::mpsc::channel();
 
         let r = worker.run(rx);
         assert!(r.is_err());
         assert_eq!(
             *current_mode.lock().unwrap(),
-            CurrentMode::Defunct(Err(crate::network::configuration_sync::Error::UnrecoverableError("".into())))
+            CurrentMode::Defunct(Err(super::Error::UnrecoverableError("".into())))
         );
     }
 
@@ -572,16 +561,16 @@ mod tests {
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
-                _configuration_id: &crate::ConfigurationId,
+                _configuration_id: &ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
                 &self,
-                _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<WebsocketMockReader> {
-                Err(crate::NetworkError::InvalidHeaderValue("".into()))
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                Err::<WebsocketMockReader, _>(crate::NetworkError::InvalidHeaderValue("".into()))
             }
         }
         let configuration_id =
@@ -595,13 +584,13 @@ mod tests {
             configuration.clone(),
             current_mode.clone(),
         );
-        let (tx, rx) = channel();
+        let (_, rx) = std::sync::mpsc::channel();
 
         let r = worker.run(rx);
         assert!(r.is_err());
         assert_eq!(
             *current_mode.lock().unwrap(),
-            CurrentMode::Defunct(Err(crate::network::configuration_sync::Error::UnrecoverableError("".into())))
+            CurrentMode::Defunct(Err(super::Error::UnrecoverableError("".into())))
         );
     }
 }

@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::PoisonError};
+use std::sync::PoisonError;
 
 use thiserror::Error;
 

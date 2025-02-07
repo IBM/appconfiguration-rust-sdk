@@ -21,13 +21,10 @@ use crate::errors::{ConfigurationAccessError, Error, Result};
 use crate::network::http_client::{ServerClient, WebsocketReader};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::ServerClientImpl;
-use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use tungstenite::stream::MaybeTlsStream;
 use tungstenite::Message;
-use tungstenite::WebSocket;
 
 use super::{AppConfigurationClient, ConfigurationId};
 

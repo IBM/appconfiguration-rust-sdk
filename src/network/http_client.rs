@@ -18,13 +18,8 @@ use crate::models::ConfigurationJson;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::WebSocket;
-
-use std::net::TcpStream;
 
 use tungstenite::client::IntoClientRequest;
-use tungstenite::handshake::client::Response;
 
 use tungstenite::connect;
 use url::Url;

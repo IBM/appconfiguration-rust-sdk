@@ -11,5 +11,5 @@ pub enum OfflineMode {
     Cache,
 
     /// Use the provided configuration.
-    FallbackData(Configuration),
+    FallbackData(Configuration), // FIXME: The public type "should" be ConfigurationJSON, or the user should just provide a JSON file (same input as the Offline client)
 }

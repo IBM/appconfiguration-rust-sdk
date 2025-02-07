@@ -1,4 +1,5 @@
-use std::{sync::mpsc::Receiver, thread::JoinHandle};
+use std::sync::mpsc::Receiver;
+use std::thread::JoinHandle;
 
 use super::{Error, Result};
 
@@ -72,12 +73,9 @@ impl ThreadHandle {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc::{RecvError, Sender}, thread::sleep, time::Duration};
+    use std::sync::mpsc::RecvError;
 
-    use crate::network::configuration_sync::thread_handle::ThreadStatus;
-
-    use super::ThreadHandle;
-    use crate::network::configuration_sync::Error::ThreadInternalError;
+    use super::*;
 
     #[test]
     fn neverending_thread() {
@@ -97,27 +95,29 @@ mod tests {
 
     #[test]
     fn finishing_thread() {
-        let mut handle = ThreadHandle::new(move |terminator| {
-            Ok(())
-        });
-        sleep(Duration::from_millis(5));
+        let mut handle = ThreadHandle::new(move |_terminator| Ok(()));
+        std::thread::sleep(std::time::Duration::from_millis(5));
         assert_eq!(handle.get_thread_status(), ThreadStatus::Finished(Ok(())));
         assert_eq!(handle.get_thread_status(), ThreadStatus::Finished(Ok(())));
     }
 
     #[test]
     fn panicking_thread() {
-        let mut handle = ThreadHandle::new(move |terminator| {
+        let mut handle = ThreadHandle::new(move |_terminator| {
             panic!("panic for test");
         });
-        sleep(Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(5));
         assert_eq!(
             handle.get_thread_status(),
-            ThreadStatus::Finished(Err(ThreadInternalError("Thread panicked: panic for test".to_string())))
+            ThreadStatus::Finished(Err(Error::ThreadInternalError(
+                "Thread panicked: panic for test".to_string()
+            )))
         );
         assert_eq!(
             handle.get_thread_status(),
-            ThreadStatus::Finished(Err(ThreadInternalError("Thread panicked: panic for test".to_string())))
+            ThreadStatus::Finished(Err(Error::ThreadInternalError(
+                "Thread panicked: panic for test".to_string()
+            )))
         );
     }
 }

@@ -28,7 +28,7 @@ impl LiveConfiguration {
             CurrentModeOfflineReason::Initializing,
         )));
 
-        let mut worker = UpdateThreadWorker::new(
+        let worker = UpdateThreadWorker::new(
             server_client,
             configuration_id,
             configuration.clone(),
@@ -100,12 +100,11 @@ impl LiveConfiguration {
 #[cfg(test)]
 mod tests {
 
-    use std::sync::mpsc;
+    use std::sync::mpsc::{self, RecvError};
 
-    use crate::{
-        models::tests::configuration_property1_enabled,
-        network::{configuration_sync::thread::SERVER_HEARTBEAT, http_client::WebsocketReader},
-    };
+    use crate::models::tests::configuration_property1_enabled;
+    use crate::network::configuration_sync::SERVER_HEARTBEAT;
+    use crate::network::http_client::WebsocketReader;
 
     use super::*;
 
@@ -117,7 +116,7 @@ mod tests {
         }
         impl WebsocketReader for WebsocketReaderMock {
             fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
-                self.tx.send(());
+                self.tx.send(()).unwrap();
                 Ok(self.rx.recv().unwrap())
             }
         }
@@ -136,8 +135,7 @@ mod tests {
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &crate::ConfigurationId,
-            ) -> crate::NetworkResult<impl crate::network::http_client::WebsocketReader>
-            {
+            ) -> crate::NetworkResult<impl WebsocketReader> {
                 Ok(self.websocket_rx.recv().unwrap())
             }
         }
@@ -247,7 +245,7 @@ mod tests {
                 .unwrap();
 
             let r = read_msg_ping_rx.recv();
-            assert!(matches!(r, Err(RecvError)), "{:?}", r)
+            assert!(matches!(r, Err(RecvError { .. })), "{:?}", r)
         }
     }
 
