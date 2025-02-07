@@ -95,7 +95,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
             }
             Err(e) => {
                 Self::recoverable_error(e)?;
-                let current_mode = &*self.current_mode.lock()?;
+                let current_mode = self.current_mode.lock()?.clone();
                 if let CurrentMode::Offline(_) = current_mode {
                 } else {
                     *self.current_mode.lock()? =
@@ -152,5 +152,189 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
             NetworkError::InvalidHeaderValue(e) => Err(Error::UnrecoverableError(e)),
             NetworkError::CannotAcquireLock => Err(Error::CannotAcquireLock),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use crate::network::http_client::ServerClient;
+    use crate::{
+        client::configuration::Configuration,
+        network::configuration_sync::current_mode::{self, CurrentMode, CurrentModeOfflineReason},
+    };
+    use std::sync::Arc;
+
+    use super::UpdateThreadWorker;
+    use crate::network::http_client::WebsocketReader;
+
+    struct WebsocketMockReader {}
+    impl WebsocketReader for WebsocketMockReader {
+        fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
+            unreachable!()
+        }
+    }
+    #[test]
+    fn test_update_configuration_happy() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<WebsocketMockReader> {
+                unreachable!()
+            }
+        }
+        let configuration_id =
+            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
+            CurrentModeOfflineReason::Initializing,
+        )));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_some());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+    }
+
+    #[test]
+    fn test_update_configuration_invalid_configuration() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<WebsocketMockReader> {
+                unreachable!()
+            }
+        }
+        let configuration_id =
+            crate::ConfigurationId::new("".into(), "non_existing_environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
+            CurrentModeOfflineReason::Initializing,
+        )));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Offline(CurrentModeOfflineReason::ConfigurationDataInvalid)
+        );
+    }
+
+    #[test]
+    fn test_update_configuration_network_error_recoverable() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Err(crate::NetworkError::ProtocolError)
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<WebsocketMockReader> {
+                unreachable!()
+            }
+        }
+        let configuration_id =
+            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        // check if we transition from online to offline:
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration));
+
+        // Test if offline mode is preserved:
+        *current_mode.lock().unwrap() = CurrentMode::Offline(CurrentModeOfflineReason::Initializing);
+        let r = worker.update_configuration_from_server_and_current_mode();
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
+    }
+
+    #[test]
+    fn test_update_configuration_network_error_non_recoverable() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Err(crate::NetworkError::CannotAcquireLock)
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &crate::ConfigurationId,
+            ) -> crate::NetworkResult<WebsocketMockReader> {
+                unreachable!()
+            }
+        }
+        let configuration_id =
+            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        // check if we transition from online to offline:
+        assert!(r.is_err());
+        // If error is returned, we do not guarantee anything on configuration and current_mode.
     }
 }

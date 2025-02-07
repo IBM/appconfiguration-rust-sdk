@@ -244,4 +244,9 @@ mod tests {
     fn test_wait_for_initial_configuration() {
         // TODO (or not): A way to create a LiveConfiguration object and wait until the first Configuration is available
     }
+
+    #[test]
+    fn test_when_thread_stopped_we_need_to_be_offline() {
+        // TODO
+    }
 }

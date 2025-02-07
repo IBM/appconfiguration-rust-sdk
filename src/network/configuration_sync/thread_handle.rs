@@ -72,7 +72,7 @@ impl ThreadHandle {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::{RecvError, Sender};
+    use std::{sync::mpsc::{RecvError, Sender}, thread::sleep, time::Duration};
 
     use crate::network::configuration_sync::thread_handle::ThreadStatus;
 
@@ -97,28 +97,20 @@ mod tests {
 
     #[test]
     fn finishing_thread() {
-        let (tx, rx) = std::sync::mpsc::channel();
         let mut handle = ThreadHandle::new(move |terminator| {
-            tx.send(());
             Ok(())
         });
-        rx.recv().unwrap();
-        assert_eq!(rx.recv().unwrap_err(), RecvError);
-        // NOTE: might need to sleep here if test becomes flaky
+        sleep(Duration::from_millis(5));
         assert_eq!(handle.get_thread_status(), ThreadStatus::Finished(Ok(())));
         assert_eq!(handle.get_thread_status(), ThreadStatus::Finished(Ok(())));
     }
 
     #[test]
     fn panicking_thread() {
-        let (tx, rx) = std::sync::mpsc::channel();
         let mut handle = ThreadHandle::new(move |terminator| {
-            tx.send(());
             panic!("panic for test");
         });
-        rx.recv().unwrap();
-        assert_eq!(rx.recv().unwrap_err(), RecvError);
-        // NOTE: might need to sleep here if test becomes flaky
+        sleep(Duration::from_millis(5));
         assert_eq!(
             handle.get_thread_status(),
             ThreadStatus::Finished(Err(ThreadInternalError("Thread panicked: panic for test".to_string())))

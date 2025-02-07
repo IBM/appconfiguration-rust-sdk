@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CurrentMode {
     Online,
     Offline(CurrentModeOfflineReason),
