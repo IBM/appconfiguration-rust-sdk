@@ -1,7 +1,10 @@
+use crate::network::configuration_sync::Result;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CurrentMode {
     Online,
     Offline(CurrentModeOfflineReason),
+    Defunct(Result<()>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

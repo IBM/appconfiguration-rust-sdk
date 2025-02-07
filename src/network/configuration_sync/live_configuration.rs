@@ -69,6 +69,22 @@ impl LiveConfiguration {
                     OfflineMode::FallbackData(configuration) => Ok(configuration.clone()),
                 }
             }
+            CurrentMode::Defunct(result) => {
+                match &self.offline_mode {
+                    OfflineMode::Fail => Err(Error::ThreadInternalError(format!(
+                        "Thread finished with status: {:?}",
+                        result
+                    ))),
+                    OfflineMode::Cache => {
+                        match &*self.configuration.lock()? {
+                            None => Err(Error::ConfigurationNotYetAvailable),
+                            // TODO: we do not want to clone here
+                            Some(configuration) => Ok(configuration.clone()),
+                        }
+                    }
+                    OfflineMode::FallbackData(configuration) => Ok(configuration.clone()),
+                }
+            }
         }
     }
 
