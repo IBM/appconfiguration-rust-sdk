@@ -53,7 +53,6 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
             //        handshake we are missing those changes. The ws is not yet connected,
             //        so it won't receive the 'config_update' message and the Configuration
             //        we got in this call doesn't include those changes.
-            println!("here1");
             self.update_configuration_from_server_and_current_mode()?;
 
             // Connect websocket
@@ -79,7 +78,6 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
 
                 // Receive something from the websocket
                 // BUG: If the WS doens't receive data, we are blocked here forever (until the parent process kills this thread).
-                println!(" here2");
                 match self.handle_websocket_message(socket)? {
                     Some(ws) => socket = ws,
                     None => break 'inner, // Go and create another socket
@@ -359,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_websocket_msg_good() {
+    fn test_handle_websocket_wgen_get_configuration_succeeds() {
         struct ServerClientMock {}
         impl ServerClient for ServerClientMock {
             fn get_configuration(
@@ -436,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_websocket_update_config_fail() {
+    fn test_handle_websocket_update_when_get_configuration_fails() {
         struct ServerClientMock {}
         impl ServerClient for ServerClientMock {
             fn get_configuration(
@@ -481,7 +479,7 @@ mod tests {
         });
         assert!(r.is_err());
 
-        // additionally we check that a heartbeat when online is a noop
+        // Additionally we check that a heartbeat when online is a noop
         *current_mode.lock().unwrap() = CurrentMode::Online;
         let r = worker.handle_websocket_message(WebsocketMockReader {
             message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
@@ -519,11 +517,17 @@ mod tests {
             current_mode.clone(),
         );
 
-        // Errors on websocket lead to websocket being closed / consumed:
         let r = worker.handle_websocket_message(WebsocketMockReader {
             message: Some(Err(tungstenite::Error::AttackAttempt)),
         });
+
+        // Websocket read errors are recoverable -> Ok(_) is returned
+        assert!(r.is_ok());
+
+        // websocket read error causes websocket to not be given back (consumed)
         assert!(r.unwrap().is_none());
+
+        // websocket read error changes current_mode to Offline
         assert_eq!(
             *current_mode.lock().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::WebsocketError)
@@ -644,6 +648,7 @@ mod tests {
         assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
     }
 
+    /// 
     #[test]
     fn test_run_websocket_rx_fail() {
         struct ServerClientMock {
@@ -679,9 +684,10 @@ mod tests {
             rx: get_config_rx,
             tx: get_config_check_tx,
         };
-        // For first loop iteration
+        // For first loop iteration (in this loop we get initial config + then fail in websocket)
         get_config_tx.send(Ok(crate::models::tests::configuration_feature1_enabled()));
-        // we will break at second loop iteration
+        // To get the test to finish we need to have the loop break. We do this by injecting a
+        // non-recoverable error:
         get_config_tx.send(Err(NetworkError::CannotAcquireLock));
         let worker = UpdateThreadWorker::new(
             server_client,
@@ -689,10 +695,10 @@ mod tests {
             configuration.clone(),
             current_mode.clone(),
         );
-        let (_, terminate_rx) = std::sync::mpsc::channel();
+        let (terminate_tx, terminate_rx) = std::sync::mpsc::channel();
         let r = worker.run(terminate_rx);
-        assert_eq!(r.unwrap(), ());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
+        assert_eq!(r.unwrap_err(), Error::CannotAcquireLock);
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Err(Error::CannotAcquireLock)));
         // we expect to have called get_config 2 times
         get_config_check_rx.recv().unwrap();
         get_config_check_rx.recv().unwrap();
