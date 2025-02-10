@@ -2,7 +2,7 @@ use std::sync::PoisonError;
 
 use thiserror::Error;
 
-use crate::segment_evaluation::errors::SegmentEvaluationError;
+use crate::{network::errors::NetworkError, segment_evaluation::errors::SegmentEvaluationError};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -28,12 +28,14 @@ pub enum Error {
     #[error("Inner type cannot be converted to requested type")]
     MismatchType,
 
-    #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
+    // #[error(transparent)]
+    // ReqwestError(#[from] reqwest::Error),
 
+    // FIXME: Remove, already in NetworkError enum
     #[error(transparent)]
     TungsteniteError(#[from] tungstenite::Error),
 
+    // FIXME: Remove???, already in NetworkError enum -- maybe it requires the refactor to isolate all http stuff from the client library
     #[error("Protocol error. Unexpected data received from server")]
     ProtocolError(String),
 
@@ -48,6 +50,9 @@ pub enum Error {
 
     #[error("Failed to evaluate entity: {0}")]
     EntityEvaluationError(EntityEvaluationError),
+
+    #[error(transparent)]
+    NetworkError(#[from] NetworkError),
 
     #[error("{0}")]
     Other(String),

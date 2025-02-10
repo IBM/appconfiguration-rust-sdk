@@ -98,6 +98,7 @@ pub use client::{
 pub use entity::Entity;
 pub use errors::{Error, Result};
 pub use feature::Feature;
+pub use network::configuration_sync::OfflineMode;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
 pub use property::Property;
 pub use value::Value;
@@ -105,6 +106,6 @@ pub use value::Value;
 #[cfg(feature = "http_client")]
 pub use client::AppConfigurationClientHttp;
 #[cfg(feature = "http_client")]
-pub use network::{ServiceAddress, TokenProvider};
+pub use network::{NetworkError, NetworkResult, ServiceAddress, TokenProvider};
 #[cfg(test)]
 mod tests;

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(crate) mod configuration_sync;
-pub mod errors;
-pub(crate) mod http_client;
-mod token_provider;
+mod current_mode;
+mod errors;
+mod live_configuration;
+mod offline;
+mod thread;
+mod thread_handle;
 
-pub use errors::NetworkError;
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
+pub(crate) use errors::{Error, Result};
 
-pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
+pub(crate) use live_configuration::LiveConfiguration;
+pub use offline::OfflineMode;
+pub(crate) use thread::SERVER_HEARTBEAT;
