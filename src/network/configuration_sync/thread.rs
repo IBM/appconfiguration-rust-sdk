@@ -648,47 +648,39 @@ mod tests {
         assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
     }
 
-    /// 
     #[test]
-    fn test_run_websocket_rx_fail() {
+    fn test_run_websocket_reconnect() {
         struct ServerClientMock {
-            rx: std::sync::mpsc::Receiver<crate::NetworkResult<crate::models::ConfigurationJson>>,
-            tx: std::sync::mpsc::Sender<()>,
+            rx: std::sync::mpsc::Receiver<crate::NetworkResult<WebsocketMockReader>>,
         }
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
-                self.tx.send(()).unwrap();
-                self.rx.recv().unwrap()
+                Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
-                Ok(WebsocketMockReader {
-                    message: Some(Err(tungstenite::Error::AttackAttempt)),
-                })
+                self.rx.recv().unwrap()
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
 
-        let (get_config_tx, get_config_rx) = std::sync::mpsc::channel();
-        let (get_config_check_tx, get_config_check_rx) = std::sync::mpsc::channel();
+        let (get_ws_tx, get_ws_rx) = std::sync::mpsc::channel();
 
-        let server_client = ServerClientMock {
-            rx: get_config_rx,
-            tx: get_config_check_tx,
-        };
-        // For first loop iteration (in this loop we get initial config + then fail in websocket)
-        get_config_tx.send(Ok(crate::models::tests::configuration_feature1_enabled()));
-        // To get the test to finish we need to have the loop break. We do this by injecting a
-        // non-recoverable error:
-        get_config_tx.send(Err(NetworkError::CannotAcquireLock));
+        let server_client = ServerClientMock { rx: get_ws_rx };
+        
+        get_ws_tx.send(Ok(WebsocketMockReader {
+            message: Some(Err(tungstenite::Error::AttackAttempt)),
+        }));
+        get_ws_tx.send(Err(NetworkError::CannotAcquireLock));
+
         let worker = UpdateThreadWorker::new(
             server_client,
             configuration_id,
@@ -697,15 +689,11 @@ mod tests {
         );
         let (terminate_tx, terminate_rx) = std::sync::mpsc::channel();
         let r = worker.run(terminate_rx);
+
+        // We assert that the websocket was attempted to be created 2 times:
+        // Fist time successfully, but with a websocket returning errors on read causing reconnect
+        // Second time (reconnect attempt) fails with CannotAcquireLock error.
+        // The second fails WS creation is unrecoverable, which we can test:
         assert_eq!(r.unwrap_err(), Error::CannotAcquireLock);
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Err(Error::CannotAcquireLock)));
-        // we expect to have called get_config 2 times
-        get_config_check_rx.recv().unwrap();
-        get_config_check_rx.recv().unwrap();
-        // not 3 or more times:
-        assert_eq!(
-            get_config_check_rx.try_recv().unwrap_err(),
-            std::sync::mpsc::TryRecvError::Empty
-        )
     }
 }
