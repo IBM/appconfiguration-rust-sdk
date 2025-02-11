@@ -39,7 +39,7 @@ impl<'a> PropertyProxy<'a> {
     }
 }
 
-impl<'a> Property for PropertyProxy<'a> {
+impl Property for PropertyProxy<'_> {
     fn get_name(&self) -> crate::errors::Result<String> {
         self.client.get_property(&self.property_id)?.get_name()
     }

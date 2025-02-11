@@ -39,7 +39,7 @@ impl<'a> FeatureProxy<'a> {
     }
 }
 
-impl<'a> Feature for FeatureProxy<'a> {
+impl Feature for FeatureProxy<'_> {
     fn get_name(&self) -> crate::errors::Result<String> {
         self.client.get_feature(&self.feature_id)?.get_name()
     }
