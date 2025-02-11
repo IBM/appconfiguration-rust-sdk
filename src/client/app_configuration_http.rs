@@ -176,23 +176,7 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        let config_snapshot = self.latest_config_snapshot.lock()?;
-
-        // Get the feature from the snapshot
-        let feature = config_snapshot.get_feature(feature_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = config_snapshot.get_segments_for_segment_rules(&feature.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if feature.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: feature_id.to_string(),
-            }
-            .into());
-        }
-
-        Ok(FeatureSnapshot::new(feature.clone(), segments))
+        self.latest_config_snapshot.lock()?.get_feature(feature_id)
     }
 
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
@@ -214,23 +198,9 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        let config_snapshot = self.latest_config_snapshot.lock()?;
-
-        // Get the property from the snapshot
-        let property = config_snapshot.get_property(property_id)?;
-
-        // Get the segment rules that apply to this property
-        let segments = config_snapshot.get_segments_for_segment_rules(&property.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if property.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: property_id.to_string(),
-            }
-            .into());
-        }
-
-        Ok(PropertySnapshot::new(property.clone(), segments))
+        self.latest_config_snapshot
+            .lock()?
+            .get_property(property_id)
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {

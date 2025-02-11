@@ -16,6 +16,11 @@ use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
 use crate::models::{ConfigurationJson, Feature, Property, Segment, TargetingRule};
+use crate::segment_evaluation::SegmentRules;
+use crate::Error;
+
+use super::feature_snapshot::FeatureSnapshot;
+use super::property_snapshot::PropertySnapshot;
 
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.
@@ -28,22 +33,63 @@ pub(crate) struct Configuration {
 }
 
 impl Configuration {
-    pub fn get_feature(&self, feature_id: &str) -> Result<&Feature> {
-        self.features.get(feature_id).ok_or_else(|| {
-            ConfigurationAccessError::FeatureNotFound {
+    pub fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
+        // Get the feature from the snapshot
+        let feature = self.features.get(feature_id).ok_or_else(|| {
+            Error::ConfigurationAccessError(ConfigurationAccessError::FeatureNotFound {
                 feature_id: feature_id.to_string(),
+            })
+        })?;
+
+        // Get the segment rules that apply to this feature
+        let segments = self.get_segments_for_segment_rules(&feature.segment_rules);
+
+        // Integrity DB check: all segment_ids should be available in the snapshot
+        if feature.segment_rules.len() != segments.len() {
+            return Err(ConfigurationAccessError::MissingSegments {
+                resource_id: feature_id.to_string(),
             }
-            .into()
-        })
+            .into());
+        }
+
+        let segment_rules =
+            SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
+        let enabled_value = (feature.kind, feature.enabled_value.clone()).try_into()?;
+        let disabled_value = (feature.kind, feature.disabled_value.clone()).try_into()?;
+        Ok(FeatureSnapshot::new(
+            feature.enabled,
+            enabled_value,
+            disabled_value,
+            feature.rollout_percentage,
+            &feature.name,
+            feature_id,
+            segment_rules,
+        ))
     }
 
-    pub fn get_property(&self, property_id: &str) -> Result<&Property> {
-        self.properties.get(property_id).ok_or_else(|| {
-            ConfigurationAccessError::PropertyNotFound {
+    pub fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
+        // Get the property from the snapshot
+        let property = self.properties.get(property_id).ok_or_else(|| {
+            Error::ConfigurationAccessError(ConfigurationAccessError::PropertyNotFound {
                 property_id: property_id.to_string(),
+            })
+        })?;
+
+        // Get the segment rules that apply to this property
+        let segments = self.get_segments_for_segment_rules(&property.segment_rules);
+
+        // Integrity DB check: all segment_ids should be available in the snapshot
+        if property.segment_rules.len() != segments.len() {
+            return Err(ConfigurationAccessError::MissingSegments {
+                resource_id: property_id.to_string(),
             }
-            .into()
-        })
+            .into());
+        }
+
+        let value = (property.kind, property.value.clone()).try_into()?;
+        let segment_rules =
+            SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
+        Ok(PropertySnapshot::new(value, segment_rules, &property.name))
     }
 
     /// Constructs the Configuration, by consuming and filtering data in exchange format
