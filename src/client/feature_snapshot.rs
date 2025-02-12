@@ -15,7 +15,6 @@
 use crate::entity::Entity;
 use crate::value::Value;
 use crate::Feature;
-use std::collections::HashMap;
 
 use super::feature_proxy::random_value;
 use crate::segment_evaluation::SegmentRules;
@@ -36,22 +35,22 @@ pub struct FeatureSnapshot {
 
 impl FeatureSnapshot {
     pub(crate) fn new(
-        feature: crate::models::Feature,
-        segments: HashMap<String, crate::models::Segment>,
+        enabled: bool,
+        enabled_value: Value,
+        disabled_value: Value,
+        rollout_percentage: u32,
+        name: &str,
+        feature_id: &str,
+        segment_rules: SegmentRules,
     ) -> Self {
-        let segment_rules = SegmentRules::new(segments, feature.segment_rules, feature.kind);
         Self {
-            enabled: feature.enabled, // TODO: Based on this enabled value we can create two different implementations, as the disabled one is much more simpler.
-            enabled_value: (feature.kind, feature.enabled_value)
-                .try_into()
-                .expect("TODO: Handle this error"),
-            disabled_value: (feature.kind, feature.disabled_value)
-                .try_into()
-                .expect("TODO: Handle this error"),
-            rollout_percentage: feature.rollout_percentage,
+            enabled,
+            enabled_value,
+            disabled_value,
+            rollout_percentage,
+            name: name.to_string(),
+            feature_id: feature_id.to_string(),
             segment_rules,
-            name: feature.name,
-            feature_id: feature.feature_id,
         }
     }
 
@@ -131,6 +130,7 @@ pub mod tests {
     use super::*;
     use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind};
     use rstest::rstest;
+    use std::collections::HashMap;
 
     #[rstest]
     #[case("a1", false)]
@@ -167,18 +167,19 @@ pub mod tests {
         #[case] segment_rules: Vec<TargetingRule>,
         #[case] entity_attributes: HashMap<String, Value>,
     ) {
-        let inner_feature = crate::models::Feature {
-            name: "F1".to_string(),
-            feature_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules,
-            enabled: true,
-            rollout_percentage: 50,
+        let feature = {
+            let segment_rules =
+                SegmentRules::new(HashMap::new(), segment_rules, ValueKind::Numeric);
+            FeatureSnapshot::new(
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                50,
+                "F1",
+                "f1",
+                segment_rules,
+            )
         };
-        let feature = FeatureSnapshot::new(inner_feature, HashMap::new());
 
         // One entity and feature combination which leads to no rollout:
         let entity = crate::tests::GenericEntity {
@@ -208,18 +209,18 @@ pub mod tests {
     // If the feature is disabled, always the disabled value should be returned.
     #[test]
     fn test_get_value_disabled_feature() {
-        let inner_feature = crate::models::Feature {
-            name: "F1".to_string(),
-            feature_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules: Vec::new(),
-            enabled: false,
-            rollout_percentage: 100,
+        let feature = {
+            let segment_rules = SegmentRules::new(HashMap::new(), Vec::new(), ValueKind::Numeric);
+            FeatureSnapshot::new(
+                false,
+                Value::Int64(-42),
+                Value::Int64(2),
+                100,
+                "F1",
+                "f1",
+                segment_rules,
+            )
         };
-        let feature = FeatureSnapshot::new(inner_feature, HashMap::new());
 
         let entity = crate::entity::tests::TrivialEntity {};
         let value = feature.get_value(&entity).unwrap();
@@ -230,27 +231,8 @@ pub mod tests {
     // Uses rollout percentage to also test no rollout even if matched
     #[test]
     fn test_get_value_matching_a_rule() {
-        let inner_feature = crate::models::Feature {
-            name: "F1".to_string(),
-            feature_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules: vec![TargetingRule {
-                rules: vec![Segments {
-                    segments: vec!["some_segment_id".into()],
-                }],
-                value: ConfigValue(serde_json::Value::Number((-48).into())),
-                order: 0,
-                rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
-            }],
-            enabled: true,
-            rollout_percentage: 50,
-        };
-        let feature = FeatureSnapshot::new(
-            inner_feature,
-            HashMap::from([(
+        let feature = {
+            let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
                     _name: "".into(),
@@ -263,8 +245,29 @@ pub mod tests {
                         values: vec!["heinz".into()],
                     }],
                 },
-            )]),
-        );
+            )]);
+            let segment_rules = SegmentRules::new(
+                segments,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::Number((-48).into())),
+                    order: 0,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
+                }],
+                ValueKind::Numeric,
+            );
+            FeatureSnapshot::new(
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                50,
+                "F1",
+                "f1",
+                segment_rules,
+            )
+        };
 
         // matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {
@@ -298,27 +301,8 @@ pub mod tests {
     // In this case, the feature's enabled value should be used whenever the rule matches.
     #[test]
     fn test_get_value_matching_yielding_default_value() {
-        let inner_feature = crate::models::Feature {
-            name: "F1".to_string(),
-            feature_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules: vec![TargetingRule {
-                rules: vec![Segments {
-                    segments: vec!["some_segment_id".into()],
-                }],
-                value: ConfigValue(serde_json::Value::String("$default".into())),
-                order: 0,
-                rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
-            }],
-            enabled: true,
-            rollout_percentage: 50,
-        };
-        let feature = FeatureSnapshot::new(
-            inner_feature,
-            HashMap::from([(
+        let feature = {
+            let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
                     _name: "".into(),
@@ -331,8 +315,29 @@ pub mod tests {
                         values: vec!["heinz".into()],
                     }],
                 },
-            )]),
-        );
+            )]);
+            let segment_rules = SegmentRules::new(
+                segments,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::String("$default".into())),
+                    order: 0,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
+                }],
+                ValueKind::Numeric,
+            );
+            FeatureSnapshot::new(
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                50,
+                "F1",
+                "f1",
+                segment_rules,
+            )
+        };
 
         // matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {
@@ -348,27 +353,8 @@ pub mod tests {
     // In this case, the feature's rollout percentage should be used whenever the rule matches.
     #[test]
     fn test_get_value_matching_segment_rollout_default_value() {
-        let inner_feature = crate::models::Feature {
-            name: "F1".to_string(),
-            feature_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-            disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-            segment_rules: vec![TargetingRule {
-                rules: vec![Segments {
-                    segments: vec!["some_segment_id".into()],
-                }],
-                value: ConfigValue(serde_json::Value::Number((48).into())),
-                order: 0,
-                rollout_percentage: Some(ConfigValue(serde_json::Value::String("$default".into()))),
-            }],
-            enabled: true,
-            rollout_percentage: 0,
-        };
-        let feature = FeatureSnapshot::new(
-            inner_feature,
-            HashMap::from([(
+        let feature = {
+            let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
                     _name: "".into(),
@@ -381,8 +367,31 @@ pub mod tests {
                         values: vec!["heinz".into()],
                     }],
                 },
-            )]),
-        );
+            )]);
+            let segment_rules = SegmentRules::new(
+                segments,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::Number((48).into())),
+                    order: 0,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::String(
+                        "$default".into(),
+                    ))),
+                }],
+                ValueKind::Numeric,
+            );
+            FeatureSnapshot::new(
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                0,
+                "F1",
+                "f1",
+                segment_rules,
+            )
+        };
 
         // matching the segment + rollout allowed
         let entity = crate::tests::GenericEntity {

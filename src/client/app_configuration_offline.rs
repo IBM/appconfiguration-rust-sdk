@@ -65,15 +65,7 @@ impl AppConfigurationClient for AppConfigurationOffline {
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        // Get the feature from the snapshot
-        let feature = self.config_snapshot.get_feature(feature_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = self
-            .config_snapshot
-            .get_segments_for_segment_rules(&feature.segment_rules);
-
-        Ok(FeatureSnapshot::new(feature.clone(), segments))
+        self.config_snapshot.get_feature(feature_id)
     }
 
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
@@ -88,15 +80,7 @@ impl AppConfigurationClient for AppConfigurationOffline {
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        // Get the property from the snapshot
-        let property = self.config_snapshot.get_property(property_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = self
-            .config_snapshot
-            .get_segments_for_segment_rules(&property.segment_rules);
-
-        Ok(PropertySnapshot::new(property.clone(), segments))
+        self.config_snapshot.get_property(property_id)
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
