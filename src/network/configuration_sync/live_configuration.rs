@@ -20,8 +20,8 @@ use std::sync::{Arc, Mutex};
 
 use super::current_mode::{CurrentMode, CurrentModeOfflineReason};
 use super::offline::OfflineMode;
-use super::thread::UpdateThreadWorker;
 use super::thread_handle::{ThreadHandle, ThreadStatus};
+use super::update_thread_worker::UpdateThreadWorker;
 
 pub(crate) struct LiveConfiguration {
     configuration: Arc<Mutex<Option<Configuration>>>,

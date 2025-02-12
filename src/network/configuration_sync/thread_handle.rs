@@ -23,6 +23,10 @@ pub enum ThreadStatus {
     Finished(Result<()>),
 }
 
+/// Wrapper around a thread that offers the following capabilities:
+/// * The thread is terminated when the object goes out of scope
+/// * A `get_thread_status` method to check if thread is running or
+///   finished with a specific result
 pub(crate) struct ThreadHandle {
     _thread_termination_sender: std::sync::mpsc::Sender<()>,
     thread_handle: Option<JoinHandle<Result<()>>>,

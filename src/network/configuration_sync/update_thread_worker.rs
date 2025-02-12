@@ -569,7 +569,7 @@ mod tests {
         assert!(r.is_err());
         assert_eq!(
             *current_mode.lock().unwrap(),
-            CurrentMode::Defunct(Err(super::Error::UnrecoverableError("".into())))
+            CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
         );
     }
 
@@ -607,7 +607,7 @@ mod tests {
         assert!(r.is_err());
         assert_eq!(
             *current_mode.lock().unwrap(),
-            CurrentMode::Defunct(Err(super::Error::UnrecoverableError("".into())))
+            CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
         );
     }
 
@@ -675,11 +675,15 @@ mod tests {
         let (get_ws_tx, get_ws_rx) = std::sync::mpsc::channel();
 
         let server_client = ServerClientMock { rx: get_ws_rx };
-        
-        get_ws_tx.send(Ok(WebsocketMockReader {
-            message: Some(Err(tungstenite::Error::AttackAttempt)),
-        }));
-        get_ws_tx.send(Err(NetworkError::CannotAcquireLock));
+
+        get_ws_tx
+            .send(Ok(WebsocketMockReader {
+                message: Some(Err(tungstenite::Error::AttackAttempt)),
+            }))
+            .unwrap();
+        get_ws_tx
+            .send(Err(NetworkError::CannotAcquireLock))
+            .unwrap();
 
         let worker = UpdateThreadWorker::new(
             server_client,
