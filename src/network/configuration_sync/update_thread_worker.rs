@@ -661,7 +661,7 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel();
         drop(tx);
         let r = worker.run(rx);
-        assert_eq!(r.unwrap(), ());
+        assert!(r.is_ok());
         assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
     }
 
@@ -708,7 +708,7 @@ mod tests {
             configuration.clone(),
             current_mode.clone(),
         );
-        let (terminate_tx, terminate_rx) = std::sync::mpsc::channel();
+        let (_terminate_tx, terminate_rx) = std::sync::mpsc::channel();
         let r = worker.run(terminate_rx);
 
         // We assert that the websocket was attempted to be created 2 times:

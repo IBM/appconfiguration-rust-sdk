@@ -52,7 +52,12 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     let property_id = env::var("PROPERTY_ID").expect("PROPERTY_ID should be set.");
 
     let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-    let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration)?;
+    let client = AppConfigurationClientIBMCloud::new(
+        &apikey,
+        &region,
+        configuration,
+        appconfiguration::OfflineMode::Fail,
+    )?;
 
     let entity = CustomerEntity {
         id: "user123".to_string(),

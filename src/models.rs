@@ -24,13 +24,13 @@ use crate::Value;
 /// - AppConfig database dumps (via Web GUI)
 /// - Offline configuration files used in offline-mode
 #[derive(Debug, Deserialize, Clone)]
-pub(crate) struct ConfigurationJson {
+pub struct ConfigurationJson {
     pub environments: Vec<Environment>,
     pub segments: Vec<Segment>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub(crate) struct Environment {
+pub struct Environment {
     #[serde(rename = "name")]
     pub(crate) _name: String,
     pub environment_id: String,
@@ -39,7 +39,7 @@ pub(crate) struct Environment {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) struct Segment {
+pub struct Segment {
     #[serde(rename = "name")]
     pub _name: String,
     pub segment_id: String,
@@ -51,7 +51,7 @@ pub(crate) struct Segment {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub(crate) struct Feature {
+pub struct Feature {
     pub name: String,
     pub feature_id: String,
     #[serde(rename = "type")]
@@ -68,7 +68,7 @@ pub(crate) struct Feature {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) struct Property {
+pub struct Property {
     pub name: String,
     pub property_id: String,
     #[serde(rename = "type")]
@@ -84,7 +84,7 @@ pub(crate) struct Property {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) enum ValueKind {
+pub enum ValueKind {
     #[serde(rename(deserialize = "NUMERIC"))]
     Numeric,
     #[serde(rename(deserialize = "BOOLEAN"))]
@@ -105,7 +105,7 @@ impl Display for ValueKind {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub(crate) struct ConfigValue(pub(crate) serde_json::Value);
+pub struct ConfigValue(pub(crate) serde_json::Value);
 
 impl ConfigValue {
     pub fn as_i64(&self) -> Option<i64> {
@@ -179,7 +179,7 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
 /// NOTE: This is easily confused with `TargetingRule`, which is
 /// sometimes also called "SegmentRule".
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) struct SegmentRule {
+pub struct SegmentRule {
     pub attribute_name: String,
     pub operator: String,
     pub values: Vec<String>,
@@ -189,7 +189,7 @@ pub(crate) struct SegmentRule {
 /// NOTE: This is easily confused with `SegmentRule`, as the field name in
 /// Features containing TargetingRules is called `segment_rules`
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct TargetingRule {
+pub struct TargetingRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
     /// NOTE: why list of lists?
@@ -201,7 +201,7 @@ pub(crate) struct TargetingRule {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct Segments {
+pub struct Segments {
     pub segments: Vec<String>,
 }
 

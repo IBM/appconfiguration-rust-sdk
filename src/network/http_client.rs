@@ -93,7 +93,7 @@ impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader
     }
 }
 
-pub(crate) trait ServerClient: Send + 'static {
+pub trait ServerClient: Send + 'static {
     fn get_configuration(
         &self,
         configuration_id: &ConfigurationId,

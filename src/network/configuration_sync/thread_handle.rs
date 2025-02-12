@@ -27,6 +27,7 @@ pub enum ThreadStatus {
 /// * The thread is terminated when the object goes out of scope
 /// * A `get_thread_status` method to check if thread is running or
 ///   finished with a specific result
+#[derive(Debug)]
 pub(crate) struct ThreadHandle {
     pub(crate) _thread_termination_sender: std::sync::mpsc::Sender<()>,
     pub(crate) thread_handle: Option<JoinHandle<Result<()>>>,

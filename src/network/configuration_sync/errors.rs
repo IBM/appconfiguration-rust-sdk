@@ -21,7 +21,7 @@ use super::current_mode::CurrentModeOfflineReason;
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
-pub(crate) enum Error {
+pub enum Error {
     #[error("Cannot acquire lock")]
     CannotAcquireLock,
 

@@ -1,14 +1,12 @@
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, ServiceAddress,
-    TokenProvider,
+    AppConfigurationClientHttp, ConfigurationId, ServiceAddress, TokenProvider,
 };
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
-use std::thread::{sleep, spawn};
-use std::time::Duration;
+use std::thread::spawn;
 use tungstenite::WebSocket;
 
 fn handle_config_request_trivial_config(server: &TcpListener) {
@@ -60,14 +58,16 @@ fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
         .send(tungstenite::Message::text("test message".to_string()))
         .unwrap();
     websocket
-        .send(tungstenite::Message::text("test messag".to_string()))
+        .send(tungstenite::Message::text(
+            "notification update".to_string(),
+        ))
         .unwrap();
     websocket
 }
 
 struct ServerHandle {
     _terminator: std::sync::mpsc::Sender<()>,
-    config_updated: std::sync::mpsc::Receiver<()>,
+    _config_updated: std::sync::mpsc::Receiver<()>,
     port: u16,
 }
 fn server_thread() -> ServerHandle {
@@ -77,10 +77,10 @@ fn server_thread() -> ServerHandle {
     let server = TcpListener::bind(("127.0.0.1", 0)).expect("Failed to bind");
     let port = server.local_addr().unwrap().port();
     spawn(move || {
-        handle_config_request_enterprise_example(&server);
-
         // notify client that config changed
         let _websocket = handle_websocket(&server);
+
+        handle_config_request_enterprise_example(&server);
 
         // client will request changed config asynchronously
         handle_config_request_trivial_config(&server);
@@ -92,7 +92,7 @@ fn server_thread() -> ServerHandle {
     });
     ServerHandle {
         _terminator: terminator,
-        config_updated: config_updated_rx,
+        _config_updated: config_updated_rx,
         port,
     }
 }
@@ -120,9 +120,15 @@ fn main() {
         "dev".to_string(),
         "collection_id".to_string(),
     );
-    let client =
-        AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id)
-            .unwrap();
+    let _ = AppConfigurationClientHttp::new(
+        address,
+        Box::new(MockTokenProvider {}),
+        config_id,
+        appconfiguration::OfflineMode::Fail,
+    )
+    .unwrap();
 
-    // ??
+    // TODO: write the following integration tests
+    //  * WS is closed from the server side
+    //  * Token is rejected (in the get_configuration request)
 }

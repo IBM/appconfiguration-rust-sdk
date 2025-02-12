@@ -23,7 +23,16 @@ use super::offline::OfflineMode;
 use super::thread_handle::{ThreadHandle, ThreadStatus};
 use super::update_thread_worker::UpdateThreadWorker;
 
-pub(crate) struct LiveConfiguration {
+pub trait LiveConfiguration {
+    fn get_configuration(&self) -> Result<Configuration>;
+
+    fn get_thread_status(&mut self) -> ThreadStatus;
+
+    fn get_current_mode(&self) -> Result<CurrentMode>;
+}
+
+#[derive(Debug)]
+pub struct LiveConfigurationImpl {
     configuration: Arc<Mutex<Option<Configuration>>>,
     offline_mode: OfflineMode,
     current_mode: Arc<Mutex<CurrentMode>>,
@@ -31,7 +40,7 @@ pub(crate) struct LiveConfiguration {
     update_thread: ThreadHandle,
 }
 
-impl LiveConfiguration {
+impl LiveConfigurationImpl {
     pub fn new<T: ServerClient>(
         offline_mode: OfflineMode,
         server_client: T,
@@ -59,8 +68,10 @@ impl LiveConfiguration {
             current_mode,
         }
     }
+}
 
-    pub(crate) fn get_configuration(&self) -> Result<Configuration> {
+impl LiveConfiguration for LiveConfigurationImpl {
+    fn get_configuration(&self) -> Result<Configuration> {
         match &*self.current_mode.lock()? {
             CurrentMode::Online => {
                 match &*self.configuration.lock()? {
@@ -105,11 +116,11 @@ impl LiveConfiguration {
         }
     }
 
-    pub(crate) fn get_thread_status(&mut self) -> ThreadStatus {
+    fn get_thread_status(&mut self) -> ThreadStatus {
         self.update_thread.get_thread_status()
     }
 
-    pub(crate) fn get_current_mode(&self) -> Result<CurrentMode> {
+    fn get_current_mode(&self) -> Result<CurrentMode> {
         Ok(self.current_mode.lock()?.clone())
     }
 }
@@ -118,12 +129,12 @@ impl LiveConfiguration {
 mod tests {
 
     use std::collections::HashMap;
-    use std::hash::Hash;
     use std::sync::mpsc::{self, RecvError};
 
     use crate::models::tests::configuration_property1_enabled;
     use crate::models::Segment;
-    use crate::network::configuration_sync::{live_configuration, SERVER_HEARTBEAT};
+
+    use crate::network::configuration_sync::update_thread_worker::SERVER_HEARTBEAT;
     use crate::network::http_client::WebsocketReader;
 
     use super::*;
@@ -170,7 +181,7 @@ mod tests {
         let configuration_id =
             crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let mut live_config =
-            LiveConfiguration::new(crate::OfflineMode::Fail, server_client, configuration_id);
+            LiveConfigurationImpl::new(crate::OfflineMode::Fail, server_client, configuration_id);
 
         {
             // Blocked beginning of get_configuration_from_server()
@@ -229,7 +240,7 @@ mod tests {
 
             // Expect no change due to heartbeat:
             let config_result = live_config.get_configuration();
-            assert!(matches!(config_result, Ok(_)));
+            assert!(config_result.is_ok());
             assert_eq!(config_result.unwrap(), config);
             let thread_state = live_config.get_thread_status();
             assert!(matches!(thread_state, ThreadStatus::Running));
@@ -248,7 +259,7 @@ mod tests {
 
             // Expect new configuration, and still running/online
             let config_result = live_config.get_configuration();
-            assert!(matches!(config_result, Ok(_)));
+            assert!(config_result.is_ok());
             assert_ne!(config_result.unwrap(), config);
             let thread_state = live_config.get_thread_status();
             assert!(matches!(thread_state, ThreadStatus::Running));
@@ -299,7 +310,7 @@ mod tests {
     #[test]
     fn test_get_configuration_when_online() {
         let (tx, _) = std::sync::mpsc::channel();
-        let mut cfg = LiveConfiguration {
+        let mut cfg = LiveConfigurationImpl {
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             offline_mode: OfflineMode::Fail,
             current_mode: Arc::new(Mutex::new(CurrentMode::Online)),
@@ -335,7 +346,7 @@ mod tests {
     #[test]
     fn test_get_configuration_when_offline() {
         let (tx, _) = std::sync::mpsc::channel();
-        let mut cfg = LiveConfiguration {
+        let mut cfg = LiveConfigurationImpl {
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             offline_mode: OfflineMode::Fail,
             current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
@@ -385,7 +396,7 @@ mod tests {
     #[test]
     fn test_get_configuration_when_defunct() {
         let (tx, _) = std::sync::mpsc::channel();
-        let mut cfg = LiveConfiguration {
+        let mut cfg = LiveConfigurationImpl {
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             offline_mode: OfflineMode::Fail,
             current_mode: Arc::new(Mutex::new(CurrentMode::Defunct(Ok(())))),

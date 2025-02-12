@@ -41,7 +41,8 @@
 //! ```
 //! use appconfiguration::{
 //!     AppConfigurationClient, AppConfigurationClientIBMCloud,
-//!     ConfigurationId, Entity, Result, Value, Feature
+//!     ConfigurationId, Entity, Result, Value, Feature,
+//!     OfflineMode
 //! };
 //! # use std::collections::HashMap;
 //! # pub struct MyEntity;
@@ -62,7 +63,7 @@
 //!
 //! // Create the client connecting to the server
 //! let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration)?;
+//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
 //!
 //! // Get the feature you want to evaluate for your entities
 //! let feature = client.get_feature("AB_testing_feature")?;
@@ -105,6 +106,8 @@ pub use value::Value;
 
 #[cfg(feature = "http_client")]
 pub use client::AppConfigurationClientHttp;
+#[cfg(feature = "http_client")]
+pub use network::configuration_sync::LiveConfigurationImpl;
 #[cfg(feature = "http_client")]
 pub use network::{NetworkError, NetworkResult, ServiceAddress, TokenProvider};
 #[cfg(test)]

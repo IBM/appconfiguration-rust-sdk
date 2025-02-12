@@ -16,11 +16,11 @@ mod current_mode;
 mod errors;
 mod live_configuration;
 mod offline;
-mod thread_handle;
+pub(crate) mod thread_handle;
 mod update_thread_worker;
 
 pub(crate) use errors::{Error, Result};
 
-pub(crate) use live_configuration::LiveConfiguration;
+pub(crate) use current_mode::CurrentMode;
+pub use live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 pub use offline::OfflineMode;
-pub(crate) use update_thread_worker::SERVER_HEARTBEAT;

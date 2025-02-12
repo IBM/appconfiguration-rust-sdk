@@ -54,6 +54,9 @@ pub enum Error {
     #[error(transparent)]
     NetworkError(#[from] NetworkError),
 
+    #[error(transparent)]
+    ConfigurationSyncError(#[from] ConfigurationSyncError),
+
     #[error("{0}")]
     Other(String),
 }
@@ -71,6 +74,16 @@ impl From<SegmentEvaluationError> for Error {
 impl<T> From<PoisonError<T>> for Error {
     fn from(_value: PoisonError<T>) -> Self {
         Error::CannotAcquireLock
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct ConfigurationSyncError(crate::network::configuration_sync::Error);
+
+impl From<crate::network::configuration_sync::Error> for Error {
+    fn from(value: crate::network::configuration_sync::Error) -> Self {
+        Self::ConfigurationSyncError(ConfigurationSyncError(value))
     }
 }
 

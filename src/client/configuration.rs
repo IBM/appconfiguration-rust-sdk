@@ -26,7 +26,7 @@ use super::property_snapshot::PropertySnapshot;
 /// feature/propery evaluation.
 /// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(crate) struct Configuration {
+pub struct Configuration {
     pub(crate) features: HashMap<String, Feature>,
     pub(crate) properties: HashMap<String, Property>,
     pub(crate) segments: HashMap<String, Segment>,
@@ -93,7 +93,7 @@ impl Configuration {
     }
 
     /// Constructs the Configuration, by consuming and filtering data in exchange format
-    pub fn new(environment_id: &str, configuration: ConfigurationJson) -> Result<Self> {
+    pub(crate) fn new(environment_id: &str, configuration: ConfigurationJson) -> Result<Self> {
         let environment = configuration
             .environments
             .into_iter()

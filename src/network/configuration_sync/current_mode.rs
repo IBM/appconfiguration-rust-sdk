@@ -15,14 +15,14 @@
 use crate::network::configuration_sync::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum CurrentMode {
+pub enum CurrentMode {
     Online,
     Offline(CurrentModeOfflineReason),
     Defunct(Result<()>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum CurrentModeOfflineReason {
+pub enum CurrentModeOfflineReason {
     LockError,
     FailedToGetNewConfiguration,
     Initializing,
