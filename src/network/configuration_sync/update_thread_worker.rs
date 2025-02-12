@@ -47,15 +47,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     }
     fn run_internal(&self, thread_termination_receiver: Receiver<()>) -> Result<()> {
         'outer: loop {
-            // When want to have a configuration available asap.
-            // FIXME: Add test case for race condition: if there is a configuration change
-            //        happening between this 'get_configuration_from_server' and the ws
-            //        handshake we are missing those changes. The ws is not yet connected,
-            //        so it won't receive the 'config_update' message and the Configuration
-            //        we got in this call doesn't include those changes.
-            self.update_configuration_from_server_and_current_mode()?;
-
-            // Connect websocket
+            // Connect websocket, now we are receiving all the update notifications
             let r = self
                 .server_client
                 .get_configuration_monitoring_websocket(&self.configuration_id);
@@ -67,13 +59,14 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 }
             };
 
+            // Get the initial configuration
+            self.update_configuration_from_server_and_current_mode()?;
+
             'inner: loop {
                 // If the client is gone, we want to exit the loop so the socket is closed on our side, the thread will be terminanted
                 match thread_termination_receiver.try_recv() {
                     Err(std::sync::mpsc::TryRecvError::Empty) => {}
-                    _ => {
-                        break 'outer;
-                    } // We are done
+                    _ => return Ok(()),
                 }
 
                 // Receive something from the websocket
@@ -84,7 +77,6 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 }
             }
         }
-        Ok(())
     }
 
     /// Whenever this function returns, current_mode is a variant of Offline.
@@ -536,12 +528,15 @@ mod tests {
 
     #[test]
     fn test_run_initial_config_retrieval_fails_unrecoverably() {
-        struct ServerClientMock {}
+        struct ServerClientMock {
+            tx: std::sync::mpsc::Sender<String>,
+        }
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                self.tx.send("get_configuration".to_string()).unwrap();
                 Err(crate::NetworkError::UrlParseError("".to_string()))
             }
 
@@ -550,26 +545,48 @@ mod tests {
                 &self,
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+                self.tx
+                    .send("get_configuration_monitoring_websocket".to_string())
+                    .unwrap();
+                Ok(WebsocketMockReader { message: None })
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
 
+        let (tx_serverclient_call_logs, rx_serverclient_call_logs) = std::sync::mpsc::channel();
         let worker = UpdateThreadWorker::new(
-            ServerClientMock {},
+            ServerClientMock {
+                tx: tx_serverclient_call_logs,
+            },
             configuration_id,
             configuration.clone(),
             current_mode.clone(),
         );
-        let (_, rx) = std::sync::mpsc::channel();
+        let (_, rx_thread_terminator) = std::sync::mpsc::channel();
 
-        let r = worker.run(rx);
+        let r = worker.run(rx_thread_terminator);
         assert!(r.is_err());
         assert_eq!(
             *current_mode.lock().unwrap(),
             CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
+        );
+
+        // We first called the websocket creation, and then get the configuration. This way we
+        // are not loosing configuration updates. Every update notification will be waiting in
+        // the websocket while we work with the initial configuration.
+        assert_eq!(
+            rx_serverclient_call_logs.recv().unwrap(),
+            "get_configuration_monitoring_websocket".to_string()
+        );
+        assert_eq!(
+            rx_serverclient_call_logs.recv().unwrap(),
+            "get_configuration".to_string()
+        );
+        assert_eq!(
+            rx_serverclient_call_logs.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
         );
     }
 

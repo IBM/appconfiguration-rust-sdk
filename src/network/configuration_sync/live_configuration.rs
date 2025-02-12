@@ -91,7 +91,10 @@ impl LiveConfiguration {
                     ))),
                     OfflineMode::Cache => {
                         match &*self.configuration.lock()? {
-                            None => Err(Error::ConfigurationNotYetAvailable),
+                            None => Err(Error::UnrecoverableError(format!(
+                                "Initial configuration failed to retrieve: {:?}",
+                                result
+                            ))),
                             // TODO: we do not want to clone here
                             Some(configuration) => Ok(configuration.clone()),
                         }
@@ -114,10 +117,13 @@ impl LiveConfiguration {
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+    use std::hash::Hash;
     use std::sync::mpsc::{self, RecvError};
 
     use crate::models::tests::configuration_property1_enabled;
-    use crate::network::configuration_sync::SERVER_HEARTBEAT;
+    use crate::models::Segment;
+    use crate::network::configuration_sync::{live_configuration, SERVER_HEARTBEAT};
     use crate::network::http_client::WebsocketReader;
 
     use super::*;
@@ -264,17 +270,168 @@ mod tests {
     }
 
     #[test]
-    fn test_wrong_url() {
-        // TODO: If we provide a wrong URL to the server
-    }
-
-    #[test]
     fn test_wait_for_initial_configuration() {
         // TODO (or not): A way to create a LiveConfiguration object and wait until the first Configuration is available
     }
 
+    fn get_configuration_with_n_segments(n: i32) -> Configuration {
+        let mut cfg = Configuration {
+            features: HashMap::default(),
+            properties: HashMap::default(),
+            segments: HashMap::default(),
+        };
+        for i in 0..n {
+            cfg.segments.insert(
+                format!("segment_{}", i),
+                Segment {
+                    _name: "".into(),
+                    segment_id: "".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: Vec::default(),
+                },
+            );
+        }
+        cfg
+    }
+
+    // Check the configuration that is returned when CurrentMode::Online
     #[test]
-    fn test_when_thread_stopped_we_need_to_be_offline() {
-        // TODO
+    fn test_get_configuration_when_online() {
+        let (tx, _) = std::sync::mpsc::channel();
+        let mut cfg = LiveConfiguration {
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
+            offline_mode: OfflineMode::Fail,
+            current_mode: Arc::new(Mutex::new(CurrentMode::Online)),
+            update_thread: ThreadHandle {
+                _thread_termination_sender: tx,
+                thread_handle: None,
+                finished_thread_status_cached: None,
+            },
+        };
+
+        {
+            cfg.offline_mode = OfflineMode::Cache;
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert!(r.unwrap().segments.is_empty());
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::Fail;
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert!(r.unwrap().segments.is_empty());
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::FallbackData(get_configuration_with_n_segments(2));
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert!(r.unwrap().segments.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_get_configuration_when_offline() {
+        let (tx, _) = std::sync::mpsc::channel();
+        let mut cfg = LiveConfiguration {
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
+            offline_mode: OfflineMode::Fail,
+            current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
+                CurrentModeOfflineReason::ConfigurationDataInvalid,
+            ))),
+            update_thread: ThreadHandle {
+                _thread_termination_sender: tx,
+                thread_handle: None,
+                finished_thread_status_cached: None,
+            },
+        };
+
+        {
+            cfg.offline_mode = OfflineMode::Cache;
+            {
+                cfg.configuration = Arc::new(Mutex::new(None));
+                let r = cfg.get_configuration();
+                assert!(r.is_err());
+                assert_eq!(r.unwrap_err(), Error::ConfigurationNotYetAvailable);
+            }
+            {
+                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
+                let r = cfg.get_configuration();
+                assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+                assert!(r.unwrap().segments.is_empty());
+            }
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::Fail;
+            let r = cfg.get_configuration();
+            assert!(r.is_err(), "Error: {}", r.unwrap_err());
+            assert_eq!(
+                r.unwrap_err(),
+                Error::Offline(CurrentModeOfflineReason::ConfigurationDataInvalid)
+            );
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::FallbackData(get_configuration_with_n_segments(2));
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert_eq!(r.unwrap().segments.len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_get_configuration_when_defunct() {
+        let (tx, _) = std::sync::mpsc::channel();
+        let mut cfg = LiveConfiguration {
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
+            offline_mode: OfflineMode::Fail,
+            current_mode: Arc::new(Mutex::new(CurrentMode::Defunct(Ok(())))),
+            update_thread: ThreadHandle {
+                _thread_termination_sender: tx,
+                thread_handle: None,
+                finished_thread_status_cached: None,
+            },
+        };
+
+        {
+            cfg.offline_mode = OfflineMode::Cache;
+            {
+                cfg.configuration = Arc::new(Mutex::new(None));
+                let r = cfg.get_configuration();
+                assert!(r.is_err());
+                assert_eq!(
+                    r.unwrap_err(),
+                    Error::UnrecoverableError(
+                        "Initial configuration failed to retrieve: Ok(())".to_string()
+                    )
+                );
+            }
+            {
+                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
+                let r = cfg.get_configuration();
+                assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+                assert!(r.unwrap().segments.is_empty());
+            }
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::Fail;
+            let r = cfg.get_configuration();
+            assert!(r.is_err(), "Error: {}", r.unwrap_err());
+            assert_eq!(
+                r.unwrap_err(),
+                Error::ThreadInternalError("Thread finished with status: Ok(())".to_string())
+            );
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::FallbackData(get_configuration_with_n_segments(2));
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert_eq!(r.unwrap().segments.len(), 2);
+        }
     }
 }

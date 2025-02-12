@@ -28,9 +28,9 @@ pub enum ThreadStatus {
 /// * A `get_thread_status` method to check if thread is running or
 ///   finished with a specific result
 pub(crate) struct ThreadHandle {
-    _thread_termination_sender: std::sync::mpsc::Sender<()>,
-    thread_handle: Option<JoinHandle<Result<()>>>,
-    finished_thread_status_cached: Option<ThreadStatus>,
+    pub(crate) _thread_termination_sender: std::sync::mpsc::Sender<()>,
+    pub(crate) thread_handle: Option<JoinHandle<Result<()>>>,
+    pub(crate) finished_thread_status_cached: Option<ThreadStatus>,
 }
 
 impl ThreadHandle {
