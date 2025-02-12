@@ -168,35 +168,15 @@ pub mod tests {
         #[case] entity_attributes: HashMap<String, Value>,
     ) {
         let feature = {
-            let inner_feature = crate::models::Feature {
-                name: "F1".to_string(),
-                feature_id: "f1".to_string(),
-                kind: ValueKind::Numeric,
-                _format: None,
-                enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-                disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-                segment_rules,
-                enabled: true,
-                rollout_percentage: 50,
-            };
-            let enabled_value = (inner_feature.kind, inner_feature.enabled_value.clone())
-                .try_into()
-                .unwrap();
-            let disabled_value = (inner_feature.kind, inner_feature.disabled_value.clone())
-                .try_into()
-                .unwrap();
-            let segment_rules = SegmentRules::new(
-                HashMap::new(),
-                inner_feature.segment_rules.clone(),
-                inner_feature.kind,
-            );
+            let segment_rules =
+                SegmentRules::new(HashMap::new(), segment_rules, ValueKind::Numeric);
             FeatureSnapshot::new(
-                inner_feature.enabled,
-                enabled_value,
-                disabled_value,
-                inner_feature.rollout_percentage,
-                &inner_feature.name,
-                &inner_feature.feature_id,
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                50,
+                "F1",
+                "f1",
                 segment_rules,
             )
         };
@@ -230,35 +210,14 @@ pub mod tests {
     #[test]
     fn test_get_value_disabled_feature() {
         let feature = {
-            let inner_feature = crate::models::Feature {
-                name: "F1".to_string(),
-                feature_id: "f1".to_string(),
-                kind: ValueKind::Numeric,
-                _format: None,
-                enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-                disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-                segment_rules: Vec::new(),
-                enabled: false,
-                rollout_percentage: 100,
-            };
-            let enabled_value = (inner_feature.kind, inner_feature.enabled_value.clone())
-                .try_into()
-                .unwrap();
-            let disabled_value = (inner_feature.kind, inner_feature.disabled_value.clone())
-                .try_into()
-                .unwrap();
-            let segment_rules = SegmentRules::new(
-                HashMap::new(),
-                inner_feature.segment_rules.clone(),
-                inner_feature.kind,
-            );
+            let segment_rules = SegmentRules::new(HashMap::new(), Vec::new(), ValueKind::Numeric);
             FeatureSnapshot::new(
-                inner_feature.enabled,
-                enabled_value,
-                disabled_value,
-                inner_feature.rollout_percentage,
-                &inner_feature.name,
-                &inner_feature.feature_id,
+                false,
+                Value::Int64(-42),
+                Value::Int64(2),
+                100,
+                "F1",
+                "f1",
                 segment_rules,
             )
         };
@@ -273,30 +232,6 @@ pub mod tests {
     #[test]
     fn test_get_value_matching_a_rule() {
         let feature = {
-            let inner_feature = crate::models::Feature {
-                name: "F1".to_string(),
-                feature_id: "f1".to_string(),
-                kind: ValueKind::Numeric,
-                _format: None,
-                enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-                disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-                segment_rules: vec![TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((-48).into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
-                }],
-                enabled: true,
-                rollout_percentage: 50,
-            };
-            let enabled_value = (inner_feature.kind, inner_feature.enabled_value.clone())
-                .try_into()
-                .unwrap();
-            let disabled_value = (inner_feature.kind, inner_feature.disabled_value.clone())
-                .try_into()
-                .unwrap();
             let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
@@ -313,16 +248,23 @@ pub mod tests {
             )]);
             let segment_rules = SegmentRules::new(
                 segments,
-                inner_feature.segment_rules.clone(),
-                inner_feature.kind,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::Number((-48).into())),
+                    order: 0,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
+                }],
+                ValueKind::Numeric,
             );
             FeatureSnapshot::new(
-                inner_feature.enabled,
-                enabled_value,
-                disabled_value,
-                inner_feature.rollout_percentage,
-                &inner_feature.name,
-                &inner_feature.feature_id,
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                50,
+                "F1",
+                "f1",
                 segment_rules,
             )
         };
@@ -360,30 +302,6 @@ pub mod tests {
     #[test]
     fn test_get_value_matching_yielding_default_value() {
         let feature = {
-            let inner_feature = crate::models::Feature {
-                name: "F1".to_string(),
-                feature_id: "f1".to_string(),
-                kind: ValueKind::Numeric,
-                _format: None,
-                enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-                disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-                segment_rules: vec![TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::String("$default".into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
-                }],
-                enabled: true,
-                rollout_percentage: 50,
-            };
-            let enabled_value = (inner_feature.kind, inner_feature.enabled_value.clone())
-                .try_into()
-                .unwrap();
-            let disabled_value = (inner_feature.kind, inner_feature.disabled_value.clone())
-                .try_into()
-                .unwrap();
             let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
@@ -400,16 +318,23 @@ pub mod tests {
             )]);
             let segment_rules = SegmentRules::new(
                 segments,
-                inner_feature.segment_rules.clone(),
-                inner_feature.kind,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::String("$default".into())),
+                    order: 0,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
+                }],
+                ValueKind::Numeric,
             );
             FeatureSnapshot::new(
-                inner_feature.enabled,
-                enabled_value,
-                disabled_value,
-                inner_feature.rollout_percentage,
-                &inner_feature.name,
-                &inner_feature.feature_id,
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                50,
+                "F1",
+                "f1",
                 segment_rules,
             )
         };
@@ -429,32 +354,6 @@ pub mod tests {
     #[test]
     fn test_get_value_matching_segment_rollout_default_value() {
         let feature = {
-            let inner_feature = crate::models::Feature {
-                name: "F1".to_string(),
-                feature_id: "f1".to_string(),
-                kind: ValueKind::Numeric,
-                _format: None,
-                enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
-                disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
-                segment_rules: vec![TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((48).into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::String(
-                        "$default".into(),
-                    ))),
-                }],
-                enabled: true,
-                rollout_percentage: 0,
-            };
-            let enabled_value = (inner_feature.kind, inner_feature.enabled_value.clone())
-                .try_into()
-                .unwrap();
-            let disabled_value = (inner_feature.kind, inner_feature.disabled_value.clone())
-                .try_into()
-                .unwrap();
             let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
@@ -471,16 +370,25 @@ pub mod tests {
             )]);
             let segment_rules = SegmentRules::new(
                 segments,
-                inner_feature.segment_rules.clone(),
-                inner_feature.kind,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::Number((48).into())),
+                    order: 0,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::String(
+                        "$default".into(),
+                    ))),
+                }],
+                ValueKind::Numeric,
             );
             FeatureSnapshot::new(
-                inner_feature.enabled,
-                enabled_value,
-                disabled_value,
-                inner_feature.rollout_percentage,
-                &inner_feature.name,
-                &inner_feature.feature_id,
+                true,
+                Value::Int64(-42),
+                Value::Int64(2),
+                0,
+                "F1",
+                "f1",
                 segment_rules,
             )
         };

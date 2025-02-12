@@ -74,31 +74,14 @@ impl Property for PropertySnapshot {
 
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashMap;
 
     use super::*;
     use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind};
+    use std::collections::HashMap;
 
     #[test]
     fn test_get_value_segment_with_default_value() {
         let property = {
-            let inner_property = crate::models::Property {
-                name: "F1".to_string(),
-                property_id: "f1".to_string(),
-                kind: ValueKind::Numeric,
-                _format: None,
-                value: ConfigValue(serde_json::Value::Number((-42).into())),
-                segment_rules: vec![TargetingRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_1".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::String("$default".into())),
-                    order: 1,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                }],
-                _tags: None,
-            };
-
             let segments = HashMap::from([(
                 "some_segment_id_1".into(),
                 Segment {
@@ -113,15 +96,19 @@ pub mod tests {
                     }],
                 },
             )]);
-            let value = (inner_property.kind, inner_property.value.clone())
-                .try_into()
-                .unwrap();
             let segment_rules = SegmentRules::new(
                 segments,
-                inner_property.segment_rules.clone(),
-                inner_property.kind,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id_1".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::String("$default".into())),
+                    order: 1,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+                }],
+                ValueKind::Numeric,
             );
-            PropertySnapshot::new(value, segment_rules, &inner_property.name)
+            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1")
         };
 
         // Both segment rules match. Expect the one with smaller order to be used:
