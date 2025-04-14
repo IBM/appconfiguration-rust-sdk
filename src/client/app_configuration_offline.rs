@@ -44,7 +44,12 @@ impl AppConfigurationOffline {
 
 impl AppConfigurationClient for AppConfigurationOffline {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
-        Ok(self.config_snapshot.features.keys().cloned().collect())
+        Ok(self
+            .config_snapshot
+            .get_feature_ids()
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
@@ -59,7 +64,12 @@ impl AppConfigurationClient for AppConfigurationOffline {
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
-        Ok(self.config_snapshot.properties.keys().cloned().collect())
+        Ok(self
+            .config_snapshot
+            .get_property_ids()
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {

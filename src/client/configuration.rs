@@ -27,8 +27,8 @@ use super::property_snapshot::PropertySnapshot;
 /// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default)]
 pub(crate) struct Configuration {
-    pub(crate) features: HashMap<String, (Feature, SegmentRules)>,
-    pub(crate) properties: HashMap<String, (Property, SegmentRules)>,
+    features: HashMap<String, (Feature, SegmentRules)>,
+    properties: HashMap<String, (Property, SegmentRules)>,
 }
 
 impl Configuration {
@@ -161,6 +161,14 @@ impl Configuration {
             .filter(|&segment| referenced_segment_ids.contains(&segment.segment_id))
             .map(|segment| (segment.segment_id.clone(), segment.clone()))
             .collect()
+    }
+
+    pub(crate) fn get_feature_ids(&self) -> Vec<&String> {
+        self.features.keys().collect()
+    }
+
+    pub(crate) fn get_property_ids(&self) -> Vec<&String> {
+        self.properties.keys().collect()
     }
 }
 
