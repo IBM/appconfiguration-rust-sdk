@@ -33,6 +33,40 @@ pub(crate) struct Configuration {
 }
 
 impl Configuration {
+    /// Constructs the Configuration, by consuming and filtering data in exchange format
+    pub fn new(environment_id: &str, configuration: ConfigurationJson) -> Result<Self> {
+        let environment = configuration
+            .environments
+            .into_iter()
+            .find(|e| e.environment_id == environment_id)
+            .ok_or(ConfigurationAccessError::EnvironmentNotFound {
+                environment_id: environment_id.to_string(),
+            })?;
+        // FIXME: why not filtering for collection here?
+
+        let mut features = HashMap::new();
+        for mut feature in environment.features {
+            feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
+            features.insert(feature.feature_id.clone(), feature);
+        }
+
+        let mut properties = HashMap::new();
+        for mut property in environment.properties {
+            property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
+            properties.insert(property.property_id.clone(), property);
+        }
+
+        let mut segments = HashMap::new();
+        for segment in configuration.segments {
+            segments.insert(segment.segment_id.clone(), segment.clone());
+        }
+        Ok(Configuration {
+            features,
+            properties,
+            segments,
+        })
+    }
+
     pub fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
         // Get the feature from the snapshot
         let feature = self.features.get(feature_id).ok_or_else(|| {
@@ -90,40 +124,6 @@ impl Configuration {
         let segment_rules =
             SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
         Ok(PropertySnapshot::new(value, segment_rules, &property.name))
-    }
-
-    /// Constructs the Configuration, by consuming and filtering data in exchange format
-    pub fn new(environment_id: &str, configuration: ConfigurationJson) -> Result<Self> {
-        let environment = configuration
-            .environments
-            .into_iter()
-            .find(|e| e.environment_id == environment_id)
-            .ok_or(ConfigurationAccessError::EnvironmentNotFound {
-                environment_id: environment_id.to_string(),
-            })?;
-        // FIXME: why not filtering for collection here?
-
-        let mut features = HashMap::new();
-        for mut feature in environment.features {
-            feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
-            features.insert(feature.feature_id.clone(), feature);
-        }
-
-        let mut properties = HashMap::new();
-        for mut property in environment.properties {
-            property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
-            properties.insert(property.property_id.clone(), property);
-        }
-
-        let mut segments = HashMap::new();
-        for segment in configuration.segments {
-            segments.insert(segment.segment_id.clone(), segment.clone());
-        }
-        Ok(Configuration {
-            features,
-            properties,
-            segments,
-        })
     }
 
     /// Returns a mapping of segment ID to `Segment` for all segments referenced
