@@ -16,7 +16,7 @@ use std::fmt::Display;
 
 use serde::Deserialize;
 
-use crate::Value;
+use crate::{errors::DeserializationError, Error, Result, Value};
 
 /// Represents AppConfig data in a structure intended for data exchange
 /// (typically JSON encoded) used by
@@ -29,8 +29,31 @@ pub(crate) struct ConfigurationJson {
     pub segments: Vec<Segment>,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct Environment {
+impl ConfigurationJson {
+    /// Parses a ConfigurationJson from a file
+    pub(crate) fn new(filepath: &std::path::Path) -> Result<Self> {
+        let file = std::fs::File::open(filepath).map_err(|_| {
+            Error::Other(format!(
+                "File '{}' doesn't exist or cannot be read",
+                filepath.display()
+            ))
+        })?;
+        let reader = std::io::BufReader::new(file);
+
+        serde_json::from_reader(reader).map_err(|e| {
+            Error::DeserializationError(DeserializationError {
+                string: format!(
+                    "Error deserializing Configuration from file '{}'",
+                    filepath.display()
+                ),
+                source: e.into(),
+            })
+        })
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Environment {
     #[serde(rename = "name")]
     pub(crate) _name: String,
     pub environment_id: String,
@@ -146,7 +169,7 @@ impl Display for ConfigValue {
 impl TryFrom<(ValueKind, ConfigValue)> for Value {
     type Error = crate::Error;
 
-    fn try_from(value: (ValueKind, ConfigValue)) -> Result<Self, Self::Error> {
+    fn try_from(value: (ValueKind, ConfigValue)) -> std::result::Result<Self, Self::Error> {
         let (kind, value) = value;
         match kind {
             ValueKind::Numeric => {

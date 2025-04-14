@@ -17,7 +17,7 @@ pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
-use crate::errors::{DeserializationError, Error, Result};
+use crate::errors::Result;
 use crate::models::ConfigurationJson;
 
 use super::AppConfigurationClient;
@@ -36,25 +36,8 @@ impl AppConfigurationOffline {
     /// * `filepath` - The file with the configuration.
     /// * `environment_id` - ID of the environment to use from the configuration file.
     pub fn new(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
-        let file = std::fs::File::open(filepath).map_err(|_| {
-            Error::Other(format!(
-                "File '{}' doesn't exist or cannot be read",
-                filepath.display()
-            ))
-        })?;
-        let reader = std::io::BufReader::new(file);
-
-        let configuration: ConfigurationJson = serde_json::from_reader(reader).map_err(|e| {
-            Error::DeserializationError(DeserializationError {
-                string: format!(
-                    "Error deserializing Configuration from file '{}'",
-                    filepath.display()
-                ),
-                source: e.into(),
-            })
-        })?;
+        let configuration = ConfigurationJson::new(filepath)?;
         let config_snapshot = Configuration::new(environment_id, configuration)?;
-
         Ok(Self { config_snapshot })
     }
 }
