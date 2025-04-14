@@ -52,7 +52,7 @@ impl ConfigurationJson {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize)]
 pub struct Environment {
     #[serde(rename = "name")]
     pub(crate) _name: String,
