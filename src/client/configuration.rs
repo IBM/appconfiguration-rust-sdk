@@ -27,9 +27,8 @@ use super::property_snapshot::PropertySnapshot;
 /// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default)]
 pub(crate) struct Configuration {
-    pub(crate) features: HashMap<String, Feature>,
-    pub(crate) properties: HashMap<String, Property>,
-    pub(crate) segments: HashMap<String, Segment>,
+    pub(crate) features: HashMap<String, (Feature, SegmentRules)>,
+    pub(crate) properties: HashMap<String, (Property, SegmentRules)>,
 }
 
 impl Configuration {
@@ -47,47 +46,63 @@ impl Configuration {
         let mut features = HashMap::new();
         for mut feature in environment.features {
             feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
-            features.insert(feature.feature_id.clone(), feature);
+
+            // Get the segment rules that apply to this feature
+            let segments = Self::get_segments_for_segment_rules(
+                &configuration.segments,
+                &feature.segment_rules,
+            );
+
+            // Integrity DB check: all segment_ids should be available in the snapshot
+            if feature.segment_rules.len() != segments.len() {
+                return Err(ConfigurationAccessError::MissingSegments {
+                    resource_id: feature.feature_id.to_string(),
+                }
+                .into());
+            }
+
+            let segment_rules =
+                SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
+            features.insert(feature.feature_id.clone(), (feature, segment_rules));
         }
 
         let mut properties = HashMap::new();
         for mut property in environment.properties {
             property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
-            properties.insert(property.property_id.clone(), property);
+
+            // Get the segment rules that apply to this property
+            let segments = Self::get_segments_for_segment_rules(
+                &configuration.segments,
+                &property.segment_rules,
+            );
+
+            // Integrity DB check: all segment_ids should be available in the snapshot
+            if property.segment_rules.len() != segments.len() {
+                return Err(ConfigurationAccessError::MissingSegments {
+                    resource_id: property.property_id.to_string(),
+                }
+                .into());
+            }
+
+            let segment_rules =
+                SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
+            properties.insert(property.property_id.clone(), (property, segment_rules));
         }
 
-        let mut segments = HashMap::new();
-        for segment in configuration.segments {
-            segments.insert(segment.segment_id.clone(), segment.clone());
-        }
         Ok(Configuration {
             features,
             properties,
-            segments,
         })
     }
 
     pub fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
         // Get the feature from the snapshot
-        let feature = self.features.get(feature_id).ok_or_else(|| {
+        let (feature, segment_rules) = self.features.get(feature_id).ok_or_else(|| {
             Error::ConfigurationAccessError(ConfigurationAccessError::FeatureNotFound {
                 feature_id: feature_id.to_string(),
             })
         })?;
 
-        // Get the segment rules that apply to this feature
-        let segments = self.get_segments_for_segment_rules(&feature.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if feature.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: feature_id.to_string(),
-            }
-            .into());
-        }
-
-        let segment_rules =
-            SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
         let enabled_value = (feature.kind, feature.enabled_value.clone()).try_into()?;
         let disabled_value = (feature.kind, feature.disabled_value.clone()).try_into()?;
         Ok(FeatureSnapshot::new(
@@ -97,39 +112,30 @@ impl Configuration {
             feature.rollout_percentage,
             &feature.name,
             feature_id,
-            segment_rules,
+            segment_rules.clone(),
         ))
     }
 
     pub fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         // Get the property from the snapshot
-        let property = self.properties.get(property_id).ok_or_else(|| {
+        let (property, segment_rules) = self.properties.get(property_id).ok_or_else(|| {
             Error::ConfigurationAccessError(ConfigurationAccessError::PropertyNotFound {
                 property_id: property_id.to_string(),
             })
         })?;
 
-        // Get the segment rules that apply to this property
-        let segments = self.get_segments_for_segment_rules(&property.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if property.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: property_id.to_string(),
-            }
-            .into());
-        }
-
         let value = (property.kind, property.value.clone()).try_into()?;
-        let segment_rules =
-            SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
-        Ok(PropertySnapshot::new(value, segment_rules, &property.name))
+        Ok(PropertySnapshot::new(
+            value,
+            segment_rules.clone(),
+            &property.name,
+        ))
     }
 
     /// Returns a mapping of segment ID to `Segment` for all segments referenced
     /// by the given `segment_rules`.
-    pub(crate) fn get_segments_for_segment_rules(
-        &self,
+    fn get_segments_for_segment_rules(
+        segments: &[Segment],
         segment_rules: &[TargetingRule],
     ) -> HashMap<String, Segment> {
         let referenced_segment_ids = segment_rules
@@ -143,10 +149,10 @@ impl Configuration {
             .cloned()
             .collect::<HashSet<String>>();
 
-        self.segments
+        segments
             .iter()
-            .filter(|&(key, _)| referenced_segment_ids.contains(key))
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .filter(|&segment| referenced_segment_ids.contains(&segment.segment_id))
+            .map(|segment| (segment.segment_id.clone(), segment.clone()))
             .collect()
     }
 }
