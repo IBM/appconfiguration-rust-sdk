@@ -43,51 +43,58 @@ impl Configuration {
             })?;
         // FIXME: why not filtering for collection here?
 
-        let mut features = HashMap::new();
-        for mut feature in environment.features {
-            feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
+        let features = environment
+            .features
+            .into_iter()
+            .map(|mut feature| {
+                feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
 
-            // Get the segment rules that apply to this feature
-            let segments = Self::get_segments_for_segment_rules(
-                &configuration.segments,
-                &feature.segment_rules,
-            );
+                // Get the segment rules that apply to this feature
+                let segments = Self::get_segments_for_segment_rules(
+                    &configuration.segments,
+                    &feature.segment_rules,
+                );
 
-            // Integrity DB check: all segment_ids should be available in the snapshot
-            if feature.segment_rules.len() != segments.len() {
-                return Err(ConfigurationAccessError::MissingSegments {
-                    resource_id: feature.feature_id.to_string(),
+                // Integrity DB check: all segment_ids should be available in the snapshot
+                if feature.segment_rules.len() != segments.len() {
+                    return Err(ConfigurationAccessError::MissingSegments {
+                        resource_id: feature.feature_id.to_string(),
+                    }
+                    .into());
                 }
-                .into());
-            }
 
-            let segment_rules =
-                SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
-            features.insert(feature.feature_id.clone(), (feature, segment_rules));
-        }
+                let segment_rules =
+                    SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
 
-        let mut properties = HashMap::new();
-        for mut property in environment.properties {
-            property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
+                Ok((feature.feature_id.clone(), (feature, segment_rules)))
+            })
+            .collect::<Result<_>>()?;
 
-            // Get the segment rules that apply to this property
-            let segments = Self::get_segments_for_segment_rules(
-                &configuration.segments,
-                &property.segment_rules,
-            );
+        let properties = environment
+            .properties
+            .into_iter()
+            .map(|mut property| {
+                property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
 
-            // Integrity DB check: all segment_ids should be available in the snapshot
-            if property.segment_rules.len() != segments.len() {
-                return Err(ConfigurationAccessError::MissingSegments {
-                    resource_id: property.property_id.to_string(),
+                // Get the segment rules that apply to this property
+                let segments = Self::get_segments_for_segment_rules(
+                    &configuration.segments,
+                    &property.segment_rules,
+                );
+
+                // Integrity DB check: all segment_ids should be available in the snapshot
+                if property.segment_rules.len() != segments.len() {
+                    return Err(ConfigurationAccessError::MissingSegments {
+                        resource_id: property.property_id.to_string(),
+                    }
+                    .into());
                 }
-                .into());
-            }
 
-            let segment_rules =
-                SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
-            properties.insert(property.property_id.clone(), (property, segment_rules));
-        }
+                let segment_rules =
+                    SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
+                Ok((property.property_id.clone(), (property, segment_rules)))
+            })
+            .collect::<Result<_>>()?;
 
         Ok(Configuration {
             features,
