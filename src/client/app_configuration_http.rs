@@ -169,8 +169,8 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
         Ok(self
             .latest_config_snapshot
             .lock()?
-            .features
-            .keys()
+            .get_feature_ids()
+            .into_iter()
             .cloned()
             .collect())
     }
@@ -191,8 +191,8 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
             .latest_config_snapshot
             .lock()
             .map_err(|_| ConfigurationAccessError::LockAcquisitionError)?
-            .properties
-            .keys()
+            .get_property_ids()
+            .into_iter()
             .cloned()
             .collect())
     }
