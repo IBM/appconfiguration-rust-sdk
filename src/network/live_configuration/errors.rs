@@ -1,4 +1,4 @@
-// (C) Copyright IBM Corp. 2024.
+// (C) Copyright IBM Corp. 2025.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(crate) mod http_client;
-mod token_provider;
+use thiserror::Error;
 
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
-pub(crate) mod live_configuration;
+pub(crate) type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum Error {}

@@ -89,6 +89,7 @@ mod models;
 mod network;
 mod property;
 mod segment_evaluation;
+pub(crate) mod utils;
 mod value;
 
 pub use client::{
