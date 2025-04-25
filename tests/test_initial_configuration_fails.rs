@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 use std::thread::spawn;
 
 use appconfiguration::{
-    AppConfigurationClientHttp, ConfigurationId, Error, ServiceAddress, TokenProvider,
+    AppConfigurationClientHttp, ConfigurationId, NetworkError, ServiceAddress, TokenProvider,
 };
 
 fn handle_config_request_error(server: &TcpListener) {
@@ -83,7 +83,7 @@ fn server_thread() -> ServerHandle {
 struct MockTokenProvider {}
 
 impl TokenProvider for MockTokenProvider {
-    fn get_access_token(&self) -> appconfiguration::Result<String> {
+    fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
         Ok("mock_token".into())
     }
 }
@@ -111,12 +111,18 @@ fn main() {
     );
 
     assert!(client.is_err());
-    assert!(matches!(client.unwrap_err(), Error::ReqwestError(_)));
+    assert!(matches!(
+        client.unwrap_err(),
+        appconfiguration::Error::NetworkError(NetworkError::ReqwestError(_))
+    ));
 
     // Test response is successful (200) but configuration JSON is invalid
     let client =
         AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id);
 
     assert!(client.is_err());
-    assert!(matches!(client.unwrap_err(), Error::ProtocolError(_)));
+    assert!(matches!(
+        client.unwrap_err(),
+        appconfiguration::Error::NetworkError(NetworkError::ProtocolError)
+    ));
 }

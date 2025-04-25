@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::TokenProvider;
+use super::{NetworkError, NetworkResult, TokenProvider};
 use crate::models::ConfigurationJson;
-use crate::{ConfigurationId, Error, Result};
+use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;
 use tungstenite::stream::MaybeTlsStream;
@@ -101,7 +101,7 @@ impl ServerClientImpl {
     pub fn new(
         service_address: ServiceAddress,
         token_provider: Box<dyn TokenProvider>,
-    ) -> Result<Self> {
+    ) -> NetworkResult<Self> {
         let access_token = RefCell::new(token_provider.get_access_token()?);
         Ok(Self {
             service_address,
@@ -110,19 +110,23 @@ impl ServerClientImpl {
         })
     }
 
-    pub fn get_configuration(&self, collection: &ConfigurationId) -> Result<ConfigurationJson> {
+    pub fn get_configuration(
+        &self,
+        configuration_id: &ConfigurationId,
+    ) -> NetworkResult<ConfigurationJson> {
         let url = format!(
             "{}/feature/v1/instances/{}/config",
             self.service_address.base_url(ServiceAddressProtocol::Http),
-            collection.guid
+            configuration_id.guid
         );
+        let url = Url::parse(&url).map_err(|_| NetworkError::UrlParseError(url))?;
         let client = Client::new();
         let r = client
             .get(url)
             .query(&[
                 ("action", "sdkConfig"),
-                ("environment_id", &collection.environment_id),
-                ("collection_id", &collection.collection_id),
+                ("environment_id", &configuration_id.environment_id),
+                ("collection_id", &configuration_id.collection_id),
             ])
             .header("Accept", "application/json")
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
@@ -130,9 +134,7 @@ impl ServerClientImpl {
             .send();
 
         match r {
-            Ok(response) => response.json().map_err(|_| {
-                Error::ProtocolError("Failed to deserialize JSON from server response".to_string())
-            }),
+            Ok(response) => response.json().map_err(|_| NetworkError::ProtocolError),
             Err(e) => {
                 // TODO: Identify if token expired, get new one and retry
                 if false {
@@ -147,13 +149,12 @@ impl ServerClientImpl {
     pub fn get_configuration_monitoring_websocket(
         &self,
         collection: &ConfigurationId,
-    ) -> Result<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
+    ) -> NetworkResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
         let ws_url = format!(
             "{}/wsfeature",
             self.service_address.base_url(ServiceAddressProtocol::Ws)
         );
-        let mut ws_url = Url::parse(&ws_url)
-            .map_err(|e| Error::Other(format!("Cannot parse '{}' as URL: {}", ws_url, e)))?;
+        let mut ws_url = Url::parse(&ws_url).map_err(|_| NetworkError::UrlParseError(ws_url))?;
 
         ws_url
             .query_pairs_mut()
@@ -164,21 +165,19 @@ impl ServerClientImpl {
         let mut request = ws_url
             .as_str()
             .into_client_request()
-            .map_err(Error::TungsteniteError)?;
+            .map_err(NetworkError::TungsteniteError)?;
         let headers = request.headers_mut();
         headers.insert(
             "User-Agent",
             "appconfiguration-rust-sdk/0.0.1"
                 .parse()
-                .map_err(|_| Error::Other("Invalid header value for 'User-Agent'".to_string()))?,
+                .map_err(|_| NetworkError::InvalidHeaderValue("User-Agent".to_string()))?,
         );
         headers.insert(
             "Authorization",
             format!("Bearer {}", self.access_token.borrow())
                 .parse()
-                .map_err(|_| {
-                    Error::Other("Invalid header value for 'Authorization'".to_string())
-                })?,
+                .map_err(|_| NetworkError::InvalidHeaderValue("Authorization".to_string()))?,
         );
 
         Ok(connect(request)?)
