@@ -1,5 +1,5 @@
 use appconfiguration::{
-    AppConfigurationClientHttp, ConfigurationId, Error, ServiceAddress, TokenProvider,
+    AppConfigurationClientHttp, ConfigurationId, NetworkError, ServiceAddress, TokenProvider,
 };
 
 use std::io::{BufRead, BufReader, Write};
@@ -67,7 +67,7 @@ fn server_thread() -> ServerHandle {
 struct MockTokenProvider {}
 
 impl TokenProvider for MockTokenProvider {
-    fn get_access_token(&self) -> appconfiguration::Result<String> {
+    fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
         Ok("mock_token".into())
     }
 }
@@ -90,5 +90,8 @@ fn main() {
         AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id);
 
     assert!(client.is_err());
-    assert!(matches!(client.unwrap_err(), Error::TungsteniteError(_)));
+    assert!(matches!(
+        client.unwrap_err(),
+        appconfiguration::Error::NetworkError(NetworkError::TungsteniteError(_))
+    ));
 }

@@ -101,7 +101,7 @@ fn server_thread() -> ServerHandle {
 struct MockTokenProvider {}
 
 impl TokenProvider for MockTokenProvider {
-    fn get_access_token(&self) -> appconfiguration::Result<String> {
+    fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
         Ok("mock_token".into())
     }
 }
