@@ -17,13 +17,8 @@ use crate::models::ConfigurationJson;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::WebSocket;
-
-use std::net::TcpStream;
 
 use tungstenite::client::IntoClientRequest;
-use tungstenite::handshake::client::Response;
 
 use tungstenite::connect;
 use url::Url;
@@ -86,6 +81,30 @@ impl ServiceAddress {
     }
 }
 
+pub(crate) trait WebsocketReader: Send + 'static {
+    fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message>;
+}
+
+impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader
+    for tungstenite::WebSocket<T>
+{
+    fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
+        self.read()
+    }
+}
+
+pub trait ServerClient: Send + 'static {
+    fn get_configuration(
+        &self,
+        configuration_id: &ConfigurationId,
+    ) -> NetworkResult<ConfigurationJson>;
+
+    fn get_configuration_monitoring_websocket(
+        &self,
+        collection: &ConfigurationId,
+    ) -> NetworkResult<impl WebsocketReader>;
+}
+
 #[derive(Debug)]
 pub(crate) struct ServerClientImpl {
     service_address: ServiceAddress,
@@ -109,8 +128,10 @@ impl ServerClientImpl {
             access_token,
         })
     }
+}
 
-    pub fn get_configuration(
+impl ServerClient for ServerClientImpl {
+    fn get_configuration(
         &self,
         configuration_id: &ConfigurationId,
     ) -> NetworkResult<ConfigurationJson> {
@@ -146,10 +167,10 @@ impl ServerClientImpl {
         }
     }
 
-    pub fn get_configuration_monitoring_websocket(
+    fn get_configuration_monitoring_websocket(
         &self,
         collection: &ConfigurationId,
-    ) -> NetworkResult<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
+    ) -> NetworkResult<impl WebsocketReader> {
         let ws_url = format!(
             "{}/wsfeature",
             self.service_address.base_url(ServiceAddressProtocol::Ws)
@@ -180,7 +201,8 @@ impl ServerClientImpl {
                 .map_err(|_| NetworkError::InvalidHeaderValue("Authorization".to_string()))?,
         );
 
-        Ok(connect(request)?)
+        let (websocket, _) = connect(request)?;
+        Ok(websocket)
     }
 }
 
