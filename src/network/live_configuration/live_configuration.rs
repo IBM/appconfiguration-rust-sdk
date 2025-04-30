@@ -22,7 +22,7 @@ use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus};
 use crate::ConfigurationId;
 
-pub(crate) trait LiveConfiguration {
+pub trait LiveConfiguration {
     /// Returns the current configuration
     ///
     /// Depending on the current operation mode (see [`LiveConfiguration::get_current_mode`]) and

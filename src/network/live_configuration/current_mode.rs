@@ -15,15 +15,14 @@
 use super::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum CurrentMode {
+pub enum CurrentMode {
     Online,
     Offline(CurrentModeOfflineReason),
     Defunct(Result<()>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum CurrentModeOfflineReason {
-    LockError,
+pub enum CurrentModeOfflineReason {
     FailedToGetNewConfiguration,
     Initializing,
     WebsocketClosed,
@@ -34,7 +33,6 @@ pub(crate) enum CurrentModeOfflineReason {
 impl std::fmt::Display for CurrentModeOfflineReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CurrentModeOfflineReason::LockError => write!(f, "LockError"),
             CurrentModeOfflineReason::FailedToGetNewConfiguration => {
                 write!(f, "FailedToGetNewConfiguration")
             }

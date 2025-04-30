@@ -50,6 +50,9 @@ pub enum Error {
     #[error(transparent)]
     NetworkError(#[from] NetworkError),
 
+    #[error(transparent)]
+    LiveConfigurationError(#[from] LiveConfigurationError),
+
     #[error("{0}")]
     Other(String),
 }
@@ -108,5 +111,15 @@ pub enum ConfigurationAccessError {
 impl<T> From<PoisonError<T>> for ConfigurationAccessError {
     fn from(_value: PoisonError<T>) -> Self {
         ConfigurationAccessError::LockAcquisitionError
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct LiveConfigurationError(crate::network::live_configuration::Error);
+
+impl From<crate::network::live_configuration::Error> for Error {
+    fn from(value: crate::network::live_configuration::Error) -> Self {
+        Self::LiveConfigurationError(LiveConfigurationError(value))
     }
 }

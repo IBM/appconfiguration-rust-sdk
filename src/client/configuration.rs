@@ -26,7 +26,7 @@ use super::property_snapshot::PropertySnapshot;
 /// feature/propery evaluation.
 /// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default, Clone)]
-pub(crate) struct Configuration {
+pub struct Configuration {
     features: HashMap<String, (Feature, SegmentRules)>,
     properties: HashMap<String, (Property, SegmentRules)>,
 }

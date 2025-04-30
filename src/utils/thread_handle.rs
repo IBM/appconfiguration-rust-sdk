@@ -16,7 +16,7 @@ use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum ThreadStatus<ResultType> {
+pub enum ThreadStatus<ResultType> {
     Running,
     Finished(ResultType),
     FailedInternalError(String),
