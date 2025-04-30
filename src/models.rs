@@ -73,7 +73,7 @@ pub(crate) struct Segment {
     pub rules: Vec<SegmentRule>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub(crate) struct Feature {
     pub name: String,
     pub feature_id: String,
@@ -90,7 +90,7 @@ pub(crate) struct Feature {
     pub rollout_percentage: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub(crate) struct Property {
     pub name: String,
     pub property_id: String,

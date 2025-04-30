@@ -15,6 +15,7 @@
 mod current_mode;
 mod errors;
 mod live_configuration;
+mod update_thread_worker;
 
 pub(crate) use current_mode::CurrentMode;
 pub(crate) use errors::{Error, Result};
