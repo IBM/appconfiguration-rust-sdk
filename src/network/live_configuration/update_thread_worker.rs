@@ -371,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_websocket_wgen_get_configuration_succeeds() {
+    fn test_handle_websocket_when_get_configuration_succeeds() {
         struct ServerClientMock {}
         impl ServerClient for ServerClientMock {
             fn get_configuration(
