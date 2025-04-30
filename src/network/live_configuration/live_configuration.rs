@@ -261,11 +261,6 @@ mod tests {
     }
 
     #[test]
-    fn test_wait_for_initial_configuration() {
-        // TODO (or not): A way to create a LiveConfiguration object and wait until the first Configuration is available
-    }
-
-    #[test]
     fn test_get_configuration_when_offline() {
         let (tx, _) = std::sync::mpsc::channel();
         let cfg = LiveConfigurationImpl {
