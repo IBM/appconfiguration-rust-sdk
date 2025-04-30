@@ -12,15 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod errors;
-pub(crate) mod http_client;
-mod token_provider;
+use thiserror::Error;
 
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
-pub(crate) mod live_configuration;
+#[derive(Debug, Error)]
+pub enum NetworkError {
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
 
-pub use errors::NetworkError;
-pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
+    #[error(transparent)]
+    TungsteniteError(#[from] tungstenite::Error),
+
+    #[error("Protocol error. Unexpected data received from server")]
+    ProtocolError,
+
+    #[error("Cannot parse '{0}' as URL")]
+    UrlParseError(String),
+
+    #[error("Invalid header value for '{0}'")]
+    InvalidHeaderValue(String),
+}

@@ -106,6 +106,6 @@ pub use value::Value;
 #[cfg(feature = "http_client")]
 pub use client::AppConfigurationClientHttp;
 #[cfg(feature = "http_client")]
-pub use network::{ServiceAddress, TokenProvider};
+pub use network::{NetworkError, NetworkResult, ServiceAddress, TokenProvider};
 #[cfg(test)]
 mod tests;
