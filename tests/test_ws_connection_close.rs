@@ -1,5 +1,6 @@
 use appconfiguration::{
-    AppConfigurationClientHttp, ConfigurationId, ServiceAddress, TokenProvider,
+    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, LiveConfigurationImpl,
+    ServiceAddress, TokenProvider,
 };
 use tungstenite::WebSocket;
 
@@ -7,22 +8,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
-use std::thread::spawn;
-
-fn handle_config_request_trivial_config(server: &TcpListener) {
-    let json_payload = serde_json::json!({
-        "environments": [
-            {
-                "name": "Dev",
-                "environment_id": "dev",
-                "features": [],
-                "properties": []
-            }
-        ],
-        "segments": []
-    });
-    handle_config_request(server, json_payload.to_string());
-}
+use std::thread::{sleep, spawn};
+use std::time::Duration;
 
 fn handle_config_request_enterprise_example(server: &TcpListener) {
     let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -57,42 +44,38 @@ fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
     websocket
         .send(tungstenite::Message::text("test message".to_string()))
         .unwrap();
-    websocket
-        .send(tungstenite::Message::text(
-            "notification update".to_string(),
-        ))
-        .unwrap();
+
     websocket
 }
 
 struct ServerHandle {
     _terminator: std::sync::mpsc::Sender<()>,
-    _config_updated: std::sync::mpsc::Receiver<()>,
+    config_updated: std::sync::mpsc::Sender<()>,
     port: u16,
 }
 fn server_thread() -> ServerHandle {
     let (terminator, receiver) = channel();
-    let (config_updated_tx, config_updated_rx) = channel();
+    let (config_updated_tx, update_config_rx) = channel();
 
     let server = TcpListener::bind(("127.0.0.1", 0)).expect("Failed to bind");
     let port = server.local_addr().unwrap().port();
     spawn(move || {
         // notify client that config changed
-        let _websocket = handle_websocket(&server);
+        let mut websocket = handle_websocket(&server);
 
         handle_config_request_enterprise_example(&server);
 
-        // client will request changed config asynchronously
-        handle_config_request_trivial_config(&server);
+        // Wait for the client to recieve (and test) the first config
+        update_config_rx.recv().unwrap();
 
-        // we now allow the test to continue
-        config_updated_tx.send(()).unwrap();
+        // Now send a WS close message. Server goes away!
+        websocket.send(tungstenite::Message::Close(None)).unwrap();
 
         let _ = receiver.recv();
     });
     ServerHandle {
         _terminator: terminator,
-        _config_updated: config_updated_rx,
+        config_updated: config_updated_tx,
         port,
     }
 }
@@ -103,6 +86,15 @@ struct MockTokenProvider {}
 impl TokenProvider for MockTokenProvider {
     fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
         Ok("mock_token".into())
+    }
+}
+
+fn wait_until_online(client: &AppConfigurationClientHttp<LiveConfigurationImpl>) {
+    loop {
+        if client.is_online().unwrap() {
+            break;
+        };
+        sleep(Duration::from_millis(10));
     }
 }
 
@@ -120,10 +112,32 @@ fn main() {
         "dev".to_string(),
         "collection_id".to_string(),
     );
-    let _ = AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id)
-        .unwrap();
+    let client =
+        AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id)
+            .unwrap();
 
-    // TODO: write the following integration tests
-    //  * WS is closed from the server side
-    //  * Token is rejected (in the get_configuration request)
+    wait_until_online(&client);
+
+    // Tell the server that now it can progress
+    server.config_updated.send(()).unwrap();
+    sleep(Duration::from_millis(10));
+
+    // Close the WS on the server side
+    let r = client.get_feature("id");
+    assert!(r.is_err(), "{:?}", r);
+    assert_eq!(
+        r.unwrap_err().to_string(),
+        "Connection to server lost: WebsocketClosed"
+    );
+
+    // We are not online
+    let r = client.is_online();
+    assert!(matches!(r, Ok(false)));
+
+    // Clean-up: when `server` goes out of scope, it will destroy it's `_terminator` and
+    // the server thread will be killed. When it goes away, the thread in the client
+    // will enter a loop trying to reconnect to the server and failing because there is no
+    // server listening at the URL... however, it will retry and retry because it's considered
+    // a recoverable error (in prod, server might become alive again).
+    // Finally, when the test session ends, the thread will be garbage-collected.
 }
