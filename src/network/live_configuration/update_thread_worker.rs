@@ -94,7 +94,6 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     pub(crate) fn run(&self, thread_termination_receiver: Receiver<()>) -> Result<()> {
         let result = self.run_internal(thread_termination_receiver);
         *self.current_mode.lock().unwrap() = CurrentMode::Defunct(result.clone());
-        // TODO: maybe we do not need to return anything here anymore
         result
     }
 
