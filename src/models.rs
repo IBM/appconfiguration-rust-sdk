@@ -61,7 +61,7 @@ pub struct Environment {
     pub properties: Vec<Property>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Segment {
     #[serde(rename = "name")]
     pub _name: String,
@@ -73,7 +73,7 @@ pub struct Segment {
     pub rules: Vec<SegmentRule>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Feature {
     pub name: String,
     pub feature_id: String,
@@ -90,7 +90,7 @@ pub struct Feature {
     pub rollout_percentage: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Property {
     pub name: String,
     pub property_id: String,
@@ -106,7 +106,7 @@ pub struct Property {
     pub segment_rules: Vec<TargetingRule>,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum ValueKind {
     #[serde(rename(deserialize = "NUMERIC"))]
     Numeric,
@@ -127,7 +127,7 @@ impl Display for ValueKind {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct ConfigValue(pub(crate) serde_json::Value);
 
 impl ConfigValue {
@@ -201,7 +201,7 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
 /// Those are the rules to check if an entity belongs to a segment.
 /// NOTE: This is easily confused with `TargetingRule`, which is
 /// sometimes also called "SegmentRule".
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct SegmentRule {
     pub attribute_name: String,
     pub operator: String,
@@ -211,7 +211,7 @@ pub struct SegmentRule {
 /// Associates a Feature/Property to one or more Segments
 /// NOTE: This is easily confused with `SegmentRule`, as the field name in
 /// Features containing TargetingRules is called `segment_rules`
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct TargetingRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
@@ -223,7 +223,7 @@ pub struct TargetingRule {
     pub rollout_percentage: Option<ConfigValue>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Segments {
     pub segments: Vec<String>,
 }

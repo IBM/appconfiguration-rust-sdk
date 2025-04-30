@@ -25,10 +25,10 @@ use super::property_snapshot::PropertySnapshot;
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.
 /// It contains a subset of models::ConfigurationJson, adding indexing.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Configuration {
-    features: HashMap<String, (Feature, SegmentRules)>,
-    properties: HashMap<String, (Property, SegmentRules)>,
+    pub(crate) features: HashMap<String, (Feature, SegmentRules)>,
+    pub(crate) properties: HashMap<String, (Property, SegmentRules)>,
 }
 
 impl Configuration {

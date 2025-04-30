@@ -186,3 +186,557 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct WebsocketMockReader {
+        message: Option<tungstenite::error::Result<tungstenite::Message>>,
+    }
+    impl WebsocketReader for WebsocketMockReader {
+        fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
+            self.message.take().unwrap()
+        }
+    }
+    #[test]
+    fn test_update_configuration_happy() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
+            CurrentModeOfflineReason::Initializing,
+        )));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_some());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+    }
+
+    #[test]
+    fn test_update_configuration_invalid_configuration() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id =
+            ConfigurationId::new("".into(), "non_existing_environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
+            CurrentModeOfflineReason::Initializing,
+        )));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Offline(CurrentModeOfflineReason::ConfigurationDataInvalid)
+        );
+    }
+
+    #[test]
+    fn test_update_configuration_network_error_recoverable() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Err(crate::NetworkError::ProtocolError)
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        // check if we transition from online to offline:
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
+        );
+
+        // Test if offline mode is preserved:
+        *current_mode.lock().unwrap() =
+            CurrentMode::Offline(CurrentModeOfflineReason::Initializing);
+        let r = worker.update_configuration_from_server_and_current_mode();
+        assert!(r.is_ok());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Offline(CurrentModeOfflineReason::Initializing)
+        );
+    }
+
+    #[test]
+    fn test_update_configuration_network_error_non_recoverable() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Err(crate::NetworkError::CannotAcquireLock)
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.update_configuration_from_server_and_current_mode();
+
+        // check if we transition from online to offline:
+        assert!(r.is_err());
+        // If error is returned, we do not guarantee anything on configuration and current_mode.
+    }
+
+    #[test]
+    fn test_handle_websocket_wgen_get_configuration_succeeds() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
+            CurrentModeOfflineReason::Initializing,
+        )));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        // we expect after heartbeat to change to online:
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
+        });
+        assert!(r.unwrap().is_some());
+        assert!(configuration.lock().unwrap().is_some());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+
+        // A repeated heartbeat should not re-fetch config (noop once online)
+        *configuration.lock().unwrap() = None;
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
+        });
+        assert!(r.unwrap().is_some());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+
+        // Any other message type is a noop
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::Ping(tungstenite::Bytes::new()))),
+        });
+        assert!(r.unwrap().is_some());
+        assert!(configuration.lock().unwrap().is_none());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+
+        // any other text message should lead to a config update (None -> Some)
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::text(""))),
+        });
+        assert!(r.unwrap().is_some());
+        assert!(configuration.lock().unwrap().is_some());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+
+        // After websocket is closed, it is consumed and we are offline
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::Close(None))),
+        });
+        assert!(r.unwrap().is_none()); // WS consumed
+        assert!(configuration.lock().unwrap().is_some());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Offline(CurrentModeOfflineReason::WebsocketClosed)
+        );
+    }
+
+    #[test]
+    fn test_handle_websocket_update_when_get_configuration_fails() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Err(crate::NetworkError::UrlParseError("".to_string()))
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
+            CurrentModeOfflineReason::Initializing,
+        )));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        // A heartbeat in offline mode will trigger config retrieval.
+        // Test that errors are propagated:
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
+        });
+        assert!(r.is_err());
+
+        // Any other message will trigger config retrieval.
+        // Test that errors are propagated:
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::text(""))),
+        });
+        assert!(r.is_err());
+
+        // Additionally we check that a heartbeat when online is a noop
+        *current_mode.lock().unwrap() = CurrentMode::Online;
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
+        });
+        assert!(r.is_ok());
+    }
+
+    #[test]
+    fn test_handle_websocket_read_failure() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                unreachable!()
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+
+        let r = worker.handle_websocket_message(WebsocketMockReader {
+            message: Some(Err(tungstenite::Error::AttackAttempt)),
+        });
+
+        // Websocket read errors are recoverable -> Ok(_) is returned
+        assert!(r.is_ok());
+
+        // websocket read error causes websocket to not be given back (consumed)
+        assert!(r.unwrap().is_none());
+
+        // websocket read error changes current_mode to Offline
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Offline(CurrentModeOfflineReason::WebsocketError)
+        );
+    }
+
+    #[test]
+    fn test_run_initial_config_retrieval_fails_unrecoverably() {
+        struct ServerClientMock {
+            tx: std::sync::mpsc::Sender<String>,
+        }
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                self.tx.send("get_configuration".to_string()).unwrap();
+                Err(crate::NetworkError::UrlParseError("".to_string()))
+            }
+
+            #[allow(unreachable_code)]
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                self.tx
+                    .send("get_configuration_monitoring_websocket".to_string())
+                    .unwrap();
+                Ok(WebsocketMockReader { message: None })
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let (tx_serverclient_call_logs, rx_serverclient_call_logs) = std::sync::mpsc::channel();
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {
+                tx: tx_serverclient_call_logs,
+            },
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+        let (_, rx_thread_terminator) = std::sync::mpsc::channel();
+
+        let r = worker.run(rx_thread_terminator);
+        assert!(r.is_err());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
+        );
+
+        // We first called the websocket creation, and then get the configuration. This way we
+        // are not loosing configuration updates. Every update notification will be waiting in
+        // the websocket while we work with the initial configuration.
+        assert_eq!(
+            rx_serverclient_call_logs.recv().unwrap(),
+            "get_configuration_monitoring_websocket".to_string()
+        );
+        assert_eq!(
+            rx_serverclient_call_logs.recv().unwrap(),
+            "get_configuration".to_string()
+        );
+        assert_eq!(
+            rx_serverclient_call_logs.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        );
+    }
+
+    #[test]
+    fn test_run_get_websocket_fail() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                Err::<WebsocketMockReader, _>(crate::NetworkError::InvalidHeaderValue("".into()))
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+        let (_, rx) = std::sync::mpsc::channel();
+
+        let r = worker.run(rx);
+        assert!(r.is_err());
+        assert_eq!(
+            *current_mode.lock().unwrap(),
+            CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
+        );
+    }
+
+    #[test]
+    fn test_run_thread_terminated() {
+        struct ServerClientMock {}
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                Ok(WebsocketMockReader {
+                    message: Some(Err(tungstenite::Error::AttackAttempt)),
+                })
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let worker = UpdateThreadWorker::new(
+            ServerClientMock {},
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+        let (tx, rx) = std::sync::mpsc::channel();
+        drop(tx);
+        let r = worker.run(rx);
+        assert!(r.is_ok());
+        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
+    }
+
+    #[test]
+    fn test_run_websocket_reconnect() {
+        struct ServerClientMock {
+            rx: std::sync::mpsc::Receiver<crate::NetworkResult<WebsocketMockReader>>,
+        }
+        impl ServerClient for ServerClientMock {
+            fn get_configuration(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+                Ok(crate::models::tests::configuration_feature1_enabled())
+            }
+
+            fn get_configuration_monitoring_websocket(
+                &self,
+                _collection: &ConfigurationId,
+            ) -> crate::NetworkResult<impl WebsocketReader> {
+                self.rx.recv().unwrap()
+            }
+        }
+        let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
+        let configuration = Arc::new(Mutex::new(None));
+        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+
+        let (get_ws_tx, get_ws_rx) = std::sync::mpsc::channel();
+
+        let server_client = ServerClientMock { rx: get_ws_rx };
+
+        get_ws_tx
+            .send(Ok(WebsocketMockReader {
+                message: Some(Err(tungstenite::Error::AttackAttempt)),
+            }))
+            .unwrap();
+        get_ws_tx
+            .send(Err(NetworkError::CannotAcquireLock))
+            .unwrap();
+
+        let worker = UpdateThreadWorker::new(
+            server_client,
+            configuration_id,
+            configuration.clone(),
+            current_mode.clone(),
+        );
+        let (_terminate_tx, terminate_rx) = std::sync::mpsc::channel();
+        let r = worker.run(terminate_rx);
+
+        // We assert that the websocket was attempted to be created 2 times:
+        // Fist time successfully, but with a websocket returning errors on read causing reconnect
+        // Second time (reconnect attempt) fails with CannotAcquireLock error.
+        // The second fails WS creation is unrecoverable, which we can test:
+        assert_eq!(r.unwrap_err(), Error::CannotAcquireLock);
+    }
+}

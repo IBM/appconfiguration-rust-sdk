@@ -25,7 +25,7 @@ use crate::models::ValueKind;
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SegmentRules {
     targeting_rules: Vec<TargetingRule>,
     segments: HashMap<String, Segment>,
