@@ -1,6 +1,6 @@
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, ServiceAddress,
-    TokenProvider,
+    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, LiveConfigurationImpl,
+    ServiceAddress, TokenProvider,
 };
 
 use std::io::{BufRead, BufReader, Write};
@@ -60,39 +60,43 @@ fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
         .send(tungstenite::Message::text("test message".to_string()))
         .unwrap();
     websocket
-        .send(tungstenite::Message::text("test messag".to_string()))
-        .unwrap();
-    websocket
 }
 
 struct ServerHandle {
     _terminator: std::sync::mpsc::Sender<()>,
-    config_updated: std::sync::mpsc::Receiver<()>,
+    config_updated: std::sync::mpsc::Sender<()>,
     port: u16,
 }
 fn server_thread() -> ServerHandle {
     let (terminator, receiver) = channel();
-    let (config_updated_tx, config_updated_rx) = channel();
+    let (update_config_tx, update_config_rx) = channel();
 
     let server = TcpListener::bind(("127.0.0.1", 0)).expect("Failed to bind");
     let port = server.local_addr().unwrap().port();
     spawn(move || {
+        // notify client that config changed
+        let mut websocket = handle_websocket(&server);
+
         handle_config_request_enterprise_example(&server);
 
-        // notify client that config changed
-        let _websocket = handle_websocket(&server);
+        // Wait until the client has already tested the first configuration
+        update_config_rx.recv().unwrap();
+
+        // Notify there is new configuration
+        websocket
+            .send(tungstenite::Message::text(
+                "notify config changed".to_string(),
+            ))
+            .unwrap();
 
         // client will request changed config asynchronously
         handle_config_request_trivial_config(&server);
-
-        // we now allow the test to continue
-        config_updated_tx.send(()).unwrap();
 
         let _ = receiver.recv();
     });
     ServerHandle {
         _terminator: terminator,
-        config_updated: config_updated_rx,
+        config_updated: update_config_tx,
         port,
     }
 }
@@ -103,6 +107,15 @@ struct MockTokenProvider {}
 impl TokenProvider for MockTokenProvider {
     fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
         Ok("mock_token".into())
+    }
+}
+
+fn wait_until_online(client: &AppConfigurationClientHttp<LiveConfigurationImpl>) {
+    loop {
+        if client.is_online().unwrap() {
+            break;
+        };
+        sleep(Duration::from_millis(10));
     }
 }
 
@@ -124,12 +137,14 @@ fn main() {
         AppConfigurationClientHttp::new(address, Box::new(MockTokenProvider {}), config_id)
             .unwrap();
 
+    wait_until_online(&client);
+
     let mut features = client.get_feature_ids().unwrap();
     features.sort();
     assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f5", "f6"]);
 
-    // TODO: Once we can subscribe to config updates via client APIs, we don't need to wait for signal, neither the loop below
-    server.config_updated.recv().unwrap();
+    // Tell the server that now it can actually send the new config
+    server.config_updated.send(()).unwrap();
 
     let start = std::time::Instant::now();
     loop {

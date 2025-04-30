@@ -19,5 +19,4 @@ mod update_thread_worker;
 
 pub(crate) use current_mode::CurrentMode;
 pub(crate) use errors::{Error, Result};
-pub use live_configuration::LiveConfiguration;
-pub(crate) use live_configuration::LiveConfigurationImpl;
+pub use live_configuration::{LiveConfiguration, LiveConfigurationImpl};
