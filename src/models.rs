@@ -245,7 +245,7 @@ pub(crate) mod tests {
     }
 
     #[fixture]
-    // Create a [`Configuration`] object from the data files
+    // Creates a [`ConfigurationJson`] object from the data files
     pub(crate) fn example_configuration_enterprise(
         example_configuration_enterprise_path: PathBuf,
     ) -> ConfigurationJson {

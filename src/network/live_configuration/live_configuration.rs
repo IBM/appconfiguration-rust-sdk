@@ -25,8 +25,9 @@ use crate::ConfigurationId;
 pub trait LiveConfiguration {
     /// Returns the current configuration
     ///
-    /// Depending on the current operation mode (see [`LiveConfiguration::get_current_mode`]),
-    /// this function might return an error.
+    /// Depending on the current operation mode (see [`LiveConfiguration::get_current_mode`]) and
+    /// the configured offline behavior (see [`OfflineMode`]) for this object, this
+    /// configuration might come from different sources: server, cache or user-provided.
     fn get_configuration(&self) -> Result<Configuration>;
 
     /// Utility method to know the current status of the inner thread that keeps
@@ -149,10 +150,15 @@ mod tests {
 
     use std::sync::mpsc::{self, RecvError};
 
-    use crate::models::tests::configuration_property1_enabled;
+    use rstest::rstest;
+
+    use crate::models::tests::{
+        configuration_property1_enabled, example_configuration_enterprise_path,
+    };
 
     use crate::network::http_client::WebsocketReader;
     use crate::network::live_configuration::update_thread_worker::SERVER_HEARTBEAT;
+    use crate::AppConfigurationOffline;
 
     use super::*;
 
@@ -297,10 +303,54 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_get_configuration_when_offline() {
+    // Check the configuration that is returned when CurrentMode::Online
+    #[rstest]
+    fn test_get_configuration_when_online(
+        example_configuration_enterprise_path: std::path::PathBuf,
+    ) {
         let (tx, _) = std::sync::mpsc::channel();
-        let cfg = LiveConfigurationImpl {
+        let mut cfg = LiveConfigurationImpl {
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
+            offline_mode: OfflineMode::Fail,
+            current_mode: Arc::new(Mutex::new(CurrentMode::Online)),
+            update_thread: ThreadHandle {
+                _thread_termination_sender: tx,
+                thread_handle: None,
+                finished_thread_status_cached: None,
+            },
+        };
+
+        {
+            cfg.offline_mode = OfflineMode::Cache;
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert!(r.unwrap().features.is_empty());
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::Fail;
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert!(r.unwrap().features.is_empty());
+        }
+
+        {
+            let offline =
+                AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev")
+                    .unwrap();
+            cfg.offline_mode = OfflineMode::FallbackData(offline);
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert!(r.unwrap().features.is_empty());
+        }
+    }
+
+    #[rstest]
+    fn test_get_configuration_when_offline(
+        example_configuration_enterprise_path: std::path::PathBuf,
+    ) {
+        let (tx, _) = std::sync::mpsc::channel();
+        let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
@@ -314,6 +364,7 @@ mod tests {
         };
 
         {
+            cfg.offline_mode = OfflineMode::Fail;
             let r = cfg.get_configuration();
             assert!(r.is_err(), "Error: {}", r.unwrap_err());
             assert_eq!(
@@ -321,12 +372,40 @@ mod tests {
                 Error::Offline(CurrentModeOfflineReason::ConfigurationDataInvalid)
             );
         }
+
+        {
+            cfg.offline_mode = OfflineMode::Cache;
+            {
+                cfg.configuration = Arc::new(Mutex::new(None));
+                let r = cfg.get_configuration();
+                assert!(r.is_err());
+                assert_eq!(r.unwrap_err(), Error::ConfigurationNotYetAvailable);
+            }
+            {
+                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
+                let r = cfg.get_configuration();
+                assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+                assert!(r.unwrap().features.is_empty());
+            }
+        }
+
+        {
+            let offline =
+                AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev")
+                    .unwrap();
+            cfg.offline_mode = OfflineMode::FallbackData(offline);
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert_eq!(r.unwrap().features.len(), 6);
+        }
     }
 
-    #[test]
-    fn test_get_configuration_when_defunct() {
+    #[rstest]
+    fn test_get_configuration_when_defunct(
+        example_configuration_enterprise_path: std::path::PathBuf,
+    ) {
         let (tx, _) = std::sync::mpsc::channel();
-        let cfg = LiveConfigurationImpl {
+        let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new(Mutex::new(CurrentMode::Defunct(Ok(())))),
@@ -338,12 +417,44 @@ mod tests {
         };
 
         {
+            cfg.offline_mode = OfflineMode::Fail;
             let r = cfg.get_configuration();
             assert!(r.is_err(), "Error: {}", r.unwrap_err());
             assert_eq!(
                 r.unwrap_err(),
                 Error::ThreadInternalError("Thread finished with status: Ok(())".to_string())
             );
+        }
+
+        {
+            cfg.offline_mode = OfflineMode::Cache;
+            {
+                cfg.configuration = Arc::new(Mutex::new(None));
+                let r = cfg.get_configuration();
+                assert!(r.is_err());
+                assert_eq!(
+                    r.unwrap_err(),
+                    Error::UnrecoverableError(
+                        "Initial configuration failed to retrieve: Ok(())".to_string()
+                    )
+                );
+            }
+            {
+                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
+                let r = cfg.get_configuration();
+                assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+                assert!(r.unwrap().features.is_empty());
+            }
+        }
+
+        {
+            let offline =
+                AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev")
+                    .unwrap();
+            cfg.offline_mode = OfflineMode::FallbackData(offline);
+            let r = cfg.get_configuration();
+            assert!(r.is_ok(), "Error: {}", r.unwrap_err());
+            assert_eq!(r.unwrap().features.len(), 6);
         }
     }
 }
