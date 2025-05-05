@@ -1,4 +1,4 @@
-use appconfiguration::{AppConfigurationClientHttp, LiveConfigurationImpl, TokenProvider};
+use appconfiguration::{AppConfigurationClientHttp, LiveConfiguration, TokenProvider};
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
@@ -68,7 +68,7 @@ pub fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
     websocket
 }
 
-pub fn wait_until_online(client: &AppConfigurationClientHttp<LiveConfigurationImpl>) {
+pub fn wait_until_online<T: LiveConfiguration>(client: &AppConfigurationClientHttp<T>) {
     loop {
         if client.is_online().unwrap() {
             break;

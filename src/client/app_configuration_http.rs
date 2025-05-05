@@ -51,7 +51,9 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         let live_configuration = LiveConfigurationImpl::new(server_client, configuration_id);
         Ok(Self { live_configuration })
     }
+}
 
+impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
     pub fn is_online(&self) -> Result<bool> {
         Ok(self.live_configuration.get_current_mode()? == CurrentMode::Online)
     }

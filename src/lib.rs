@@ -106,7 +106,7 @@ pub use value::Value;
 #[cfg(feature = "http_client")]
 pub use client::AppConfigurationClientHttp;
 #[cfg(feature = "http_client")]
-pub use network::live_configuration::LiveConfigurationImpl;
+pub use network::live_configuration::LiveConfiguration;
 #[cfg(feature = "http_client")]
 pub use network::{NetworkError, NetworkResult, ServiceAddress, TokenProvider};
 #[cfg(test)]
