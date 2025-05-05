@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use super::current_mode::CurrentModeOfflineReason;
 use super::update_thread_worker::UpdateThreadWorker;
-use super::{CurrentMode, Error, Result};
+use super::{CurrentMode, Error, OfflineMode, Result};
 use crate::client::configuration::Configuration;
 use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus};
@@ -48,12 +48,19 @@ pub struct LiveConfigurationImpl {
 
     /// Handler to the internal thread that takes care of updating the [`LiveConfigurationImpl::configuration`].
     update_thread: ThreadHandle<Result<()>>,
+
+    /// Behaviour while the server is offline
+    offline_mode: OfflineMode,
 }
 
 impl LiveConfigurationImpl {
     /// Creates a new [`LiveConfigurationImpl`] object and starts a thread running an instance
     /// of [`UpdateThreadWorker`].
-    pub fn new<T: ServerClient>(server_client: T, configuration_id: ConfigurationId) -> Self {
+    pub fn new<T: ServerClient>(
+        offline_mode: OfflineMode,
+        server_client: T,
+        configuration_id: ConfigurationId,
+    ) -> Self {
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
             CurrentModeOfflineReason::Initializing,
@@ -73,6 +80,7 @@ impl LiveConfigurationImpl {
             configuration,
             update_thread,
             current_mode,
+            offline_mode,
         }
     }
 }
@@ -89,12 +97,41 @@ impl LiveConfiguration for LiveConfigurationImpl {
                 }
             }
             CurrentMode::Offline(current_mode_offline_reason) => {
-                Err(Error::Offline(current_mode_offline_reason.clone()))
+                match &self.offline_mode {
+                    OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason.clone())),
+                    OfflineMode::Cache => {
+                        match &*self.configuration.lock()? {
+                            None => Err(Error::ConfigurationNotYetAvailable),
+                            // TODO: we do not want to clone here
+                            Some(configuration) => Ok(configuration.clone()),
+                        }
+                    }
+                    OfflineMode::FallbackData(app_configuration_offline) => {
+                        // TODO: we do not want to clone here
+                        Ok(app_configuration_offline.config_snapshot.clone())
+                    }
+                }
             }
-            CurrentMode::Defunct(result) => Err(Error::ThreadInternalError(format!(
-                "Thread finished with status: {:?}",
-                result
-            ))),
+            CurrentMode::Defunct(result) => match &self.offline_mode {
+                OfflineMode::Fail => Err(Error::ThreadInternalError(format!(
+                    "Thread finished with status: {:?}",
+                    result
+                ))),
+                OfflineMode::Cache => {
+                    match &*self.configuration.lock()? {
+                        None => Err(Error::UnrecoverableError(format!(
+                            "Initial configuration failed to retrieve: {:?}",
+                            result
+                        ))),
+                        // TODO: we do not want to clone here
+                        Some(configuration) => Ok(configuration.clone()),
+                    }
+                }
+                OfflineMode::FallbackData(app_configuration_offline) => {
+                    // TODO: we do not want to clone here
+                    Ok(app_configuration_offline.config_snapshot.clone())
+                }
+            },
         }
     }
 
@@ -160,7 +197,8 @@ mod tests {
 
         let configuration_id =
             crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let mut live_config = LiveConfigurationImpl::new(server_client, configuration_id);
+        let mut live_config =
+            LiveConfigurationImpl::new(OfflineMode::Fail, server_client, configuration_id);
 
         {
             // Blocked beginning of get_configuration_from_server()
@@ -263,6 +301,7 @@ mod tests {
     fn test_get_configuration_when_offline() {
         let (tx, _) = std::sync::mpsc::channel();
         let cfg = LiveConfigurationImpl {
+            offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
                 CurrentModeOfflineReason::ConfigurationDataInvalid,
@@ -288,6 +327,7 @@ mod tests {
     fn test_get_configuration_when_defunct() {
         let (tx, _) = std::sync::mpsc::channel();
         let cfg = LiveConfigurationImpl {
+            offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new(Mutex::new(CurrentMode::Defunct(Ok(())))),
             update_thread: ThreadHandle {

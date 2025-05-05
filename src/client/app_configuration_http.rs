@@ -20,7 +20,7 @@ use crate::errors::Result;
 
 use crate::network::live_configuration::{CurrentMode, LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
-use crate::ServerClientImpl;
+use crate::{OfflineMode, ServerClientImpl};
 
 use super::{AppConfigurationClient, ConfigurationId};
 
@@ -41,14 +41,17 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
     /// * `service_address` - The address of the server to connect to.
     /// * `token_provider` - An object that can provide the tokens required by the server.
     /// * `configuration_id` - Identifies the App Configuration configuration to use.
+    /// * `offline_mode` - Behavior when the configuration might not be synced with the server
     pub fn new(
         service_address: ServiceAddress,
         token_provider: Box<dyn TokenProvider>,
         configuration_id: ConfigurationId,
+        offline_mode: OfflineMode,
     ) -> Result<Self> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
 
-        let live_configuration = LiveConfigurationImpl::new(server_client, configuration_id);
+        let live_configuration =
+            LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
         Ok(Self { live_configuration })
     }
 }

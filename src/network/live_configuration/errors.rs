@@ -33,6 +33,9 @@ pub enum Error {
 
     #[error("{0}")]
     UnrecoverableError(String),
+
+    #[error("Configuration is not yet available (try again later)")]
+    ConfigurationNotYetAvailable,
 }
 
 impl<T> From<PoisonError<T>> for Error {
