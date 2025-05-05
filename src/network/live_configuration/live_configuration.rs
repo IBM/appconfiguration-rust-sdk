@@ -25,9 +25,8 @@ use crate::ConfigurationId;
 pub trait LiveConfiguration {
     /// Returns the current configuration
     ///
-    /// Depending on the current operation mode (see [`LiveConfiguration::get_current_mode`]) and
-    /// the configured offline behavior (see [`OfflineMode`]) for this object, this
-    /// configuration might come from different sources: server, cache or user-provided.
+    /// Depending on the current operation mode (see [`LiveConfiguration::get_current_mode`]),
+    /// this function might return an error.
     fn get_configuration(&self) -> Result<Configuration>;
 
     /// Utility method to know the current status of the inner thread that keeps
