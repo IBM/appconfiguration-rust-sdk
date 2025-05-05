@@ -1,4 +1,4 @@
-// (C) Copyright IBM Corp. 2024.
+// (C) Copyright IBM Corp. 2025.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,32 +16,27 @@ use std::sync::PoisonError;
 
 use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum NetworkError {
-    #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
+use super::current_mode::CurrentModeOfflineReason;
 
-    #[error(transparent)]
-    TungsteniteError(#[from] tungstenite::Error),
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
-    #[error("Protocol error. Unexpected data received from server")]
-    ProtocolError,
-
-    #[error("Cannot parse '{0}' as URL")]
-    UrlParseError(String),
-
-    #[error("Invalid header value for '{0}'")]
-    InvalidHeaderValue(String),
-
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum Error {
     #[error("Cannot acquire lock")]
     CannotAcquireLock,
 
-    #[error("Contact to server lost")]
-    ContactToServerLost,
+    #[error("Connection to server lost: {0}")]
+    Offline(CurrentModeOfflineReason),
+
+    #[error("Thread failed with internal error: {0}")]
+    ThreadInternalError(String),
+
+    #[error("{0}")]
+    UnrecoverableError(String),
 }
 
-impl<T> From<PoisonError<T>> for NetworkError {
+impl<T> From<PoisonError<T>> for Error {
     fn from(_value: PoisonError<T>) -> Self {
-        NetworkError::CannotAcquireLock
+        Error::CannotAcquireLock
     }
 }

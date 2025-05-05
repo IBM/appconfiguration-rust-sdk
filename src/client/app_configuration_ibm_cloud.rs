@@ -17,6 +17,7 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
+use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
 use crate::IBMCloudTokenProvider;
 
@@ -26,7 +27,7 @@ use super::{AppConfigurationClient, ConfigurationId};
 /// AppConfiguration client connection to IBM Cloud.
 #[derive(Debug)]
 pub struct AppConfigurationClientIBMCloud {
-    client: AppConfigurationClientHttp,
+    client: AppConfigurationClientHttp<LiveConfigurationImpl>,
 }
 
 impl AppConfigurationClientIBMCloud {

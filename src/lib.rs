@@ -89,6 +89,7 @@ mod models;
 mod network;
 mod property;
 mod segment_evaluation;
+pub(crate) mod utils;
 mod value;
 
 pub use client::{
@@ -104,6 +105,8 @@ pub use value::Value;
 
 #[cfg(feature = "http_client")]
 pub use client::AppConfigurationClientHttp;
+#[cfg(feature = "http_client")]
+pub use network::live_configuration::LiveConfiguration;
 #[cfg(feature = "http_client")]
 pub use network::{NetworkError, NetworkResult, ServiceAddress, TokenProvider};
 #[cfg(test)]

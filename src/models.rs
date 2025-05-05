@@ -24,7 +24,7 @@ use crate::{errors::DeserializationError, Error, Result, Value};
 /// - AppConfig database dumps (via Web GUI)
 /// - Offline configuration files used in offline-mode
 #[derive(Debug, Deserialize)]
-pub(crate) struct ConfigurationJson {
+pub struct ConfigurationJson {
     pub environments: Vec<Environment>,
     pub segments: Vec<Segment>,
 }
@@ -53,7 +53,7 @@ impl ConfigurationJson {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Environment {
+pub struct Environment {
     #[serde(rename = "name")]
     pub(crate) _name: String,
     pub environment_id: String,
@@ -61,8 +61,8 @@ pub(crate) struct Environment {
     pub properties: Vec<Property>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub(crate) struct Segment {
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct Segment {
     #[serde(rename = "name")]
     pub _name: String,
     pub segment_id: String,
@@ -73,8 +73,8 @@ pub(crate) struct Segment {
     pub rules: Vec<SegmentRule>,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct Feature {
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct Feature {
     pub name: String,
     pub feature_id: String,
     #[serde(rename = "type")]
@@ -90,8 +90,8 @@ pub(crate) struct Feature {
     pub rollout_percentage: u32,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct Property {
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct Property {
     pub name: String,
     pub property_id: String,
     #[serde(rename = "type")]
@@ -106,8 +106,8 @@ pub(crate) struct Property {
     pub segment_rules: Vec<TargetingRule>,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq)]
-pub(crate) enum ValueKind {
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
+pub enum ValueKind {
     #[serde(rename(deserialize = "NUMERIC"))]
     Numeric,
     #[serde(rename(deserialize = "BOOLEAN"))]
@@ -127,8 +127,8 @@ impl Display for ValueKind {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub(crate) struct ConfigValue(pub(crate) serde_json::Value);
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ConfigValue(pub(crate) serde_json::Value);
 
 impl ConfigValue {
     pub fn as_i64(&self) -> Option<i64> {
@@ -201,8 +201,8 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
 /// Those are the rules to check if an entity belongs to a segment.
 /// NOTE: This is easily confused with `TargetingRule`, which is
 /// sometimes also called "SegmentRule".
-#[derive(Clone, Debug, Deserialize)]
-pub(crate) struct SegmentRule {
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct SegmentRule {
     pub attribute_name: String,
     pub operator: String,
     pub values: Vec<String>,
@@ -211,8 +211,8 @@ pub(crate) struct SegmentRule {
 /// Associates a Feature/Property to one or more Segments
 /// NOTE: This is easily confused with `SegmentRule`, as the field name in
 /// Features containing TargetingRules is called `segment_rules`
-#[derive(Debug, Deserialize, Clone)]
-pub(crate) struct TargetingRule {
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct TargetingRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
     /// NOTE: why list of lists?
@@ -223,8 +223,8 @@ pub(crate) struct TargetingRule {
     pub rollout_percentage: Option<ConfigValue>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub(crate) struct Segments {
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct Segments {
     pub segments: Vec<String>,
 }
 

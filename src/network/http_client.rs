@@ -82,6 +82,8 @@ impl ServiceAddress {
 }
 
 pub(crate) trait WebsocketReader: Send + 'static {
+    /// Reads a message from the stream, if possible. If the connection have been closed,
+    /// this will also return the close message
     fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message>;
 }
 
