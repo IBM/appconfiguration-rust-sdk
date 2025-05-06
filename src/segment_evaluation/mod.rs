@@ -53,20 +53,24 @@ impl SegmentRules {
     /// Find the segment rule which matches for a given entity.
     /// Returns the matching SegmentRule and the Segment which the entity was
     /// associated to. (A SegmentRule/TargetingRule can point to multiple Segments)
-    pub(crate) fn find_applicable_segment_rule_for_entity(
+    pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
         entity: &impl Entity,
     ) -> Result<Option<(SegmentRule, &Segment)>> {
-        todo!()
-        // for targeting_rule in self.targeting_rules.iter() {
-        //     if targeting_rule_applies_to_entity(&self.segments, targeting_rule, entity)? {
-        //         return Ok(Some(SegmentRule {
-        //             targeting_rule,
-        //             kind: self.kind,
-        //         }));
-        //     }
-        // }
-        // Ok(None)
+        for targeting_rule in self.targeting_rules.iter() {
+            if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(&self.segments, targeting_rule, entity)? {
+                return Ok(Some(
+                    (
+                    SegmentRule {
+                        targeting_rule,
+                        kind: self.kind,
+                    },
+                    segment
+                    )
+                ));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -127,27 +131,24 @@ impl SegmentRule<'_> {
 // Finds out if a given TargetingRule (referring to multiple Segments) applies to a given entity.
 // Basically this means it returns true, if one of the segments referred to by
 // the targeting_rule matches the entity.
-fn targeting_rule_applies_to_entity(
-    segments: &HashMap<String, Segment>,
+fn find_segment_of_targeting_rule_which_applies_to_entity<'a>(
+    segments: &'a HashMap<String, Segment>,
     targeting_rule: &TargetingRule,
     entity: &impl Entity,
-) -> std::result::Result<bool, SegmentEvaluationError> {
+) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
     // NOTE: In the JSON model the targeted segments (list of list) are called "rules" of a targeting rule.
     let targeted_segment_list_of_list = &targeting_rule.rules;
     for targeted_segment_list in targeted_segment_list_of_list.iter() {
-        let rule_applies = segment_applies_to_entity(segments, &targeted_segment_list.segments, entity)?;
-        if rule_applies {
-            return Ok(true);
-        }
+        return Ok(find_segment_which_applies_to_entity(segments, &targeted_segment_list.segments, entity)?);
     }
-    Ok(false)
+    Ok(None)
 }
 
-fn segment_applies_to_entity(
-    segments: &HashMap<String, Segment>,
+fn find_segment_which_applies_to_entity<'a>(
+    segments: &'a HashMap<String, Segment>,
     segment_ids: &[String],
     entity: &impl Entity,
-) -> std::result::Result<bool, SegmentEvaluationError> {
+) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
     for segment_id in segment_ids.iter() {
         let segment = segments
             .get(segment_id)
@@ -156,10 +157,10 @@ fn segment_applies_to_entity(
             ))?;
         let applies = belong_to_segment(segment, entity.get_attributes())?;
         if applies {
-            return Ok(true);
+            return Ok(Some(segment));
         }
     }
-    Ok(false)
+    Ok(None)
 }
 
 fn belong_to_segment(
@@ -322,7 +323,7 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Segment evaluation should succeed:
         let (rule, segment) = rule.unwrap().unwrap();
         // And we should get the correct rule and the matched segment
@@ -343,7 +344,7 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Segment evaluation should not fail:
         let rule = rule.unwrap();
         // But no segment should be found:
@@ -370,7 +371,7 @@ pub mod tests {
             }];
             SegmentRules::new(segments, targeting_rules, ValueKind::String)
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Error message should look something like this:
         //  Failed to evaluate entity: Failed to evaluate entity 'a2' against targeting rule '0'.
         //  Caused by: Segment 'non_existing_segment_id' not found.
@@ -395,7 +396,7 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         let e = rule.unwrap_err();
         assert!(matches!(e, Error::EntityEvaluationError(_)));
         let Error::EntityEvaluationError(EntityEvaluationError(
