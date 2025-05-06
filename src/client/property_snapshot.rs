@@ -55,7 +55,7 @@ impl PropertySnapshot {
             .segment_rules
             .find_applicable_segment_rule_for_entity(entity)?
         {
-            Some(segment_rule) => segment_rule.value(&self.value),
+            Some((segment_rule, _)) => segment_rule.value(&self.value),
             None => Ok(self.value.clone()),
         }
     }
