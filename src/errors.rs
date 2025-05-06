@@ -2,6 +2,7 @@ use std::sync::PoisonError;
 
 use thiserror::Error;
 
+use crate::network::errors::NetworkError;
 use crate::segment_evaluation::errors::SegmentEvaluationError;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -29,9 +30,6 @@ pub enum Error {
     MismatchType,
 
     #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
-
-    #[error(transparent)]
     TungsteniteError(#[from] tungstenite::Error),
 
     #[error("Protocol error. Unexpected data received from server")]
@@ -48,6 +46,12 @@ pub enum Error {
 
     #[error("Failed to evaluate entity: {0}")]
     EntityEvaluationError(EntityEvaluationError),
+
+    #[error(transparent)]
+    NetworkError(#[from] NetworkError),
+
+    #[error(transparent)]
+    LiveConfigurationError(#[from] LiveConfigurationError),
 
     #[error("{0}")]
     Other(String),
@@ -107,5 +111,15 @@ pub enum ConfigurationAccessError {
 impl<T> From<PoisonError<T>> for ConfigurationAccessError {
     fn from(_value: PoisonError<T>) -> Self {
         ConfigurationAccessError::LockAcquisitionError
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct LiveConfigurationError(crate::network::live_configuration::Error);
+
+impl From<crate::network::live_configuration::Error> for Error {
+    fn from(value: crate::network::live_configuration::Error) -> Self {
+        Self::LiveConfigurationError(LiveConfigurationError(value))
     }
 }

@@ -1,4 +1,4 @@
-// (C) Copyright IBM Corp. 2024.
+// (C) Copyright IBM Corp. 2025.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod errors;
-pub(crate) mod http_client;
-mod token_provider;
+mod current_mode;
+mod errors;
+mod live_configuration;
+mod update_thread_worker;
 
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
-pub(crate) mod live_configuration;
-
-pub use errors::NetworkError;
-pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
+pub(crate) use current_mode::CurrentMode;
+pub(crate) use errors::{Error, Result};
+pub use live_configuration::{LiveConfiguration, LiveConfigurationImpl};

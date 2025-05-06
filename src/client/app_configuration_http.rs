@@ -12,32 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::configuration::Configuration;
 pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
-use crate::errors::{ConfigurationAccessError, Error, Result};
+use crate::errors::Result;
+
+use crate::network::live_configuration::{CurrentMode, LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::ServerClientImpl;
-use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
-use std::thread;
-
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::Message;
-use tungstenite::WebSocket;
 
 use super::{AppConfigurationClient, ConfigurationId};
 
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
-pub struct AppConfigurationClientHttp {
-    latest_config_snapshot: Arc<Mutex<Configuration>>,
-    _thread_terminator: std::sync::mpsc::Sender<()>,
+pub struct AppConfigurationClientHttp<T: LiveConfiguration> {
+    live_configuration: T,
 }
 
-impl AppConfigurationClientHttp {
+impl AppConfigurationClientHttp<LiveConfigurationImpl> {
     /// Creates a new [`AppConfigurationClient`] connecting to the server specified in the constructor arguments
     ///
     /// This client keeps a websocket open to the server to receive live-updates
@@ -55,144 +48,32 @@ impl AppConfigurationClientHttp {
     ) -> Result<Self> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
 
-        // Populate initial configuration
-        let latest_config_snapshot: Arc<Mutex<Configuration>> = Arc::new(Mutex::new(
-            Self::get_configuration_snapshot(&server_client, &configuration_id)?,
-        ));
-
-        // start monitoring configuration
-        let terminator = Self::update_cache_in_background(
-            latest_config_snapshot.clone(),
-            server_client,
-            configuration_id,
-        )?;
-
-        let client = Self {
-            latest_config_snapshot,
-            _thread_terminator: terminator,
-        };
-
-        Ok(client)
-    }
-
-    fn get_configuration_snapshot(
-        server_client: &ServerClientImpl,
-        configuration_id: &ConfigurationId,
-    ) -> Result<Configuration> {
-        let configuration = server_client.get_configuration(configuration_id)?;
-        Configuration::new(&configuration_id.environment_id, configuration)
-    }
-
-    fn wait_for_configuration_update(
-        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-        server_client_impl: &ServerClientImpl,
-        configuration_id: &ConfigurationId,
-    ) -> Result<Configuration> {
-        loop {
-            // read() blocks until something happens.
-            match socket.read()? {
-                Message::Text(text) => match text.as_str() {
-                    "test message" => {} // periodically sent by the server
-                    _ => {
-                        return Self::get_configuration_snapshot(
-                            server_client_impl,
-                            configuration_id,
-                        );
-                    }
-                },
-                Message::Close(_) => {
-                    return Err(Error::Other("Connection closed by the server".into()));
-                }
-                _ => {}
-            }
-        }
-    }
-
-    fn update_configuration_on_change(
-        mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
-        latest_config_snapshot: Arc<Mutex<Configuration>>,
-        server_client_impl: ServerClientImpl,
-        configuration_id: ConfigurationId,
-    ) -> std::sync::mpsc::Sender<()> {
-        let (sender, receiver) = std::sync::mpsc::channel();
-
-        thread::spawn(move || {
-            loop {
-                // If the sender has gone (AppConfiguration instance is dropped), then finish this thread
-                if let Err(e) = receiver.try_recv() {
-                    if e == std::sync::mpsc::TryRecvError::Disconnected {
-                        break;
-                    }
-                }
-
-                let config_snapshot = Self::wait_for_configuration_update(
-                    &mut socket,
-                    &server_client_impl,
-                    &configuration_id,
-                );
-
-                match config_snapshot {
-                    Ok(config_snapshot) => *latest_config_snapshot.lock()? = config_snapshot,
-                    Err(e) => {
-                        println!("Waiting for configuration update failed. Stopping to monitor for changes.: {e}");
-                        break;
-                    }
-                }
-            }
-            Ok::<(), Error>(())
-        });
-
-        sender
-    }
-
-    fn update_cache_in_background(
-        latest_config_snapshot: Arc<Mutex<Configuration>>,
-        server_client_impl: ServerClientImpl,
-        configuration_id: ConfigurationId,
-    ) -> Result<std::sync::mpsc::Sender<()>> {
-        let (socket, _response) =
-            server_client_impl.get_configuration_monitoring_websocket(&configuration_id)?;
-
-        let sender = Self::update_configuration_on_change(
-            socket,
-            latest_config_snapshot,
-            server_client_impl,
-            configuration_id,
-        );
-
-        Ok(sender)
+        let live_configuration = LiveConfigurationImpl::new(server_client, configuration_id);
+        Ok(Self { live_configuration })
     }
 }
 
-impl AppConfigurationClient for AppConfigurationClientHttp {
+impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
+    pub fn is_online(&self) -> Result<bool> {
+        Ok(self.live_configuration.get_current_mode()? == CurrentMode::Online)
+    }
+}
+
+impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp<T> {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
         Ok(self
-            .latest_config_snapshot
-            .lock()?
-            .features
-            .keys()
+            .live_configuration
+            .get_configuration()?
+            .get_feature_ids()
+            .into_iter()
             .cloned()
             .collect())
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        let config_snapshot = self.latest_config_snapshot.lock()?;
-
-        // Get the feature from the snapshot
-        let feature = config_snapshot.get_feature(feature_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = config_snapshot.get_segments_for_segment_rules(&feature.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if feature.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: feature_id.to_string(),
-            }
-            .into());
-        }
-
-        Ok(FeatureSnapshot::new(feature.clone(), segments))
+        self.live_configuration
+            .get_configuration()?
+            .get_feature(feature_id)
     }
 
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
@@ -204,33 +85,18 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
         Ok(self
-            .latest_config_snapshot
-            .lock()
-            .map_err(|_| ConfigurationAccessError::LockAcquisitionError)?
-            .properties
-            .keys()
+            .live_configuration
+            .get_configuration()?
+            .get_property_ids()
+            .into_iter()
             .cloned()
             .collect())
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        let config_snapshot = self.latest_config_snapshot.lock()?;
-
-        // Get the property from the snapshot
-        let property = config_snapshot.get_property(property_id)?;
-
-        // Get the segment rules that apply to this property
-        let segments = config_snapshot.get_segments_for_segment_rules(&property.segment_rules);
-
-        // Integrity DB check: all segment_ids should be available in the snapshot
-        if property.segment_rules.len() != segments.len() {
-            return Err(ConfigurationAccessError::MissingSegments {
-                resource_id: property_id.to_string(),
-            }
-            .into());
-        }
-
-        Ok(PropertySnapshot::new(property.clone(), segments))
+        self.live_configuration
+            .get_configuration()?
+            .get_property(property_id)
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
@@ -241,27 +107,49 @@ impl AppConfigurationClient for AppConfigurationClientHttp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::configuration::Configuration;
     use crate::models::tests::{
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
     };
+    use crate::utils::ThreadStatus;
     use crate::{models::ConfigurationJson, Feature, Property};
     use rstest::rstest;
+
+    struct LiveConfigurationMock {
+        configuration: Configuration,
+    }
+    impl LiveConfiguration for LiveConfigurationMock {
+        fn get_configuration(&self) -> crate::network::live_configuration::Result<Configuration> {
+            Ok(self.configuration.clone())
+        }
+
+        fn get_thread_status(
+            &mut self,
+        ) -> ThreadStatus<crate::network::live_configuration::Result<()>> {
+            todo!()
+        }
+
+        fn get_current_mode(&self) -> crate::network::live_configuration::Result<CurrentMode> {
+            todo!()
+        }
+    }
 
     #[rstest]
     fn test_get_feature_persistence(
         example_configuration_enterprise: ConfigurationJson,
         configuration_feature1_enabled: ConfigurationJson,
     ) {
-        let client = {
+        let mut client = {
             let configuration_snapshot =
                 Configuration::new("dev", example_configuration_enterprise).unwrap();
 
-            let (sender, _) = std::sync::mpsc::channel();
+            let live_cfg_mock = LiveConfigurationMock {
+                configuration: configuration_snapshot,
+            };
 
             AppConfigurationClientHttp {
-                latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
-                _thread_terminator: sender,
+                live_configuration: live_cfg_mock,
             }
         };
 
@@ -273,7 +161,9 @@ mod tests {
         // We simulate an update of the configuration:
         let configuration_snapshot =
             Configuration::new("environment_id", configuration_feature1_enabled).unwrap();
-        *client.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
+        client.live_configuration = LiveConfigurationMock {
+            configuration: configuration_snapshot,
+        };
         // The feature value should not have changed (as we did not retrieve it again)
         let feature_value2 = feature.get_value(&entity).unwrap();
         assert_eq!(feature_value2, feature_value1);
@@ -290,15 +180,16 @@ mod tests {
         example_configuration_enterprise: ConfigurationJson,
         configuration_property1_enabled: ConfigurationJson,
     ) {
-        let client = {
+        let mut client = {
             let configuration_snapshot =
                 Configuration::new("dev", example_configuration_enterprise).unwrap();
 
-            let (sender, _) = std::sync::mpsc::channel();
+            let live_cfg_mock = LiveConfigurationMock {
+                configuration: configuration_snapshot,
+            };
 
             AppConfigurationClientHttp {
-                latest_config_snapshot: Arc::new(Mutex::new(configuration_snapshot)),
-                _thread_terminator: sender,
+                live_configuration: live_cfg_mock,
             }
         };
 
@@ -310,7 +201,9 @@ mod tests {
         // We simulate an update of the configuration:
         let configuration_snapshot =
             Configuration::new("environment_id", configuration_property1_enabled).unwrap();
-        *client.latest_config_snapshot.lock().unwrap() = configuration_snapshot;
+        client.live_configuration = LiveConfigurationMock {
+            configuration: configuration_snapshot,
+        };
         // The property value should not have changed (as we did not retrieve it again)
         let property_value2 = property.get_value(&entity).unwrap();
         assert_eq!(property_value2, property_value1);

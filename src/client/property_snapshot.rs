@@ -15,7 +15,6 @@
 use crate::entity::Entity;
 use crate::value::Value;
 use crate::Property;
-use std::collections::HashMap;
 
 use crate::errors::Result;
 use crate::segment_evaluation::SegmentRules;
@@ -29,17 +28,11 @@ pub struct PropertySnapshot {
 }
 
 impl PropertySnapshot {
-    pub(crate) fn new(
-        property: crate::models::Property,
-        segments: HashMap<String, crate::models::Segment>,
-    ) -> Self {
-        let segment_rules = SegmentRules::new(segments, property.segment_rules, property.kind);
+    pub(crate) fn new(value: Value, segment_rules: SegmentRules, name: &str) -> Self {
         Self {
-            value: (property.kind, property.value)
-                .try_into()
-                .expect("TODO: Handle error here"),
+            value,
             segment_rules,
-            name: property.name,
+            name: name.to_string(),
         }
     }
 
@@ -88,30 +81,15 @@ impl Property for PropertySnapshot {
 
 #[cfg(test)]
 pub mod tests {
+
     use super::*;
     use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind};
+    use std::collections::HashMap;
 
     #[test]
     fn test_get_value_segment_with_default_value() {
-        let inner_property = crate::models::Property {
-            name: "F1".to_string(),
-            property_id: "f1".to_string(),
-            kind: ValueKind::Numeric,
-            _format: None,
-            value: ConfigValue(serde_json::Value::Number((-42).into())),
-            segment_rules: vec![TargetingRule {
-                rules: vec![Segments {
-                    segments: vec!["some_segment_id_1".into()],
-                }],
-                value: ConfigValue(serde_json::Value::String("$default".into())),
-                order: 1,
-                rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-            }],
-            _tags: None,
-        };
-        let property = PropertySnapshot::new(
-            inner_property,
-            HashMap::from([(
+        let property = {
+            let segments = HashMap::from([(
                 "some_segment_id_1".into(),
                 Segment {
                     _name: "".into(),
@@ -124,8 +102,21 @@ pub mod tests {
                         values: vec!["heinz".into()],
                     }],
                 },
-            )]),
-        );
+            )]);
+            let segment_rules = SegmentRules::new(
+                segments,
+                vec![TargetingRule {
+                    rules: vec![Segments {
+                        segments: vec!["some_segment_id_1".into()],
+                    }],
+                    value: ConfigValue(serde_json::Value::String("$default".into())),
+                    order: 1,
+                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+                }],
+                ValueKind::Numeric,
+            );
+            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1")
+        };
 
         // Both segment rules match. Expect the one with smaller order to be used:
         let entity = crate::tests::GenericEntity {

@@ -17,7 +17,7 @@ pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
-use crate::errors::{DeserializationError, Error, Result};
+use crate::errors::Result;
 use crate::models::ConfigurationJson;
 
 use super::AppConfigurationClient;
@@ -36,44 +36,24 @@ impl AppConfigurationOffline {
     /// * `filepath` - The file with the configuration.
     /// * `environment_id` - ID of the environment to use from the configuration file.
     pub fn new(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
-        let file = std::fs::File::open(filepath).map_err(|_| {
-            Error::Other(format!(
-                "File '{}' doesn't exist or cannot be read",
-                filepath.display()
-            ))
-        })?;
-        let reader = std::io::BufReader::new(file);
-
-        let configuration: ConfigurationJson = serde_json::from_reader(reader).map_err(|e| {
-            Error::DeserializationError(DeserializationError {
-                string: format!(
-                    "Error deserializing Configuration from file '{}'",
-                    filepath.display()
-                ),
-                source: e.into(),
-            })
-        })?;
+        let configuration = ConfigurationJson::new(filepath)?;
         let config_snapshot = Configuration::new(environment_id, configuration)?;
-
         Ok(Self { config_snapshot })
     }
 }
 
 impl AppConfigurationClient for AppConfigurationOffline {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
-        Ok(self.config_snapshot.features.keys().cloned().collect())
+        Ok(self
+            .config_snapshot
+            .get_feature_ids()
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        // Get the feature from the snapshot
-        let feature = self.config_snapshot.get_feature(feature_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = self
-            .config_snapshot
-            .get_segments_for_segment_rules(&feature.segment_rules);
-
-        Ok(FeatureSnapshot::new(feature.clone(), segments))
+        self.config_snapshot.get_feature(feature_id)
     }
 
     fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
@@ -84,19 +64,16 @@ impl AppConfigurationClient for AppConfigurationOffline {
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
-        Ok(self.config_snapshot.properties.keys().cloned().collect())
+        Ok(self
+            .config_snapshot
+            .get_property_ids()
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        // Get the property from the snapshot
-        let property = self.config_snapshot.get_property(property_id)?;
-
-        // Get the segment rules that apply to this feature
-        let segments = self
-            .config_snapshot
-            .get_segments_for_segment_rules(&property.segment_rules);
-
-        Ok(PropertySnapshot::new(property.clone(), segments))
+        self.config_snapshot.get_property(property_id)
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
