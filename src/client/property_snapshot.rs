@@ -44,6 +44,13 @@ impl PropertySnapshot {
     }
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+        // TODO: For Metering, we need to record here a tuple:
+        // - guid
+        // - environmentid
+        // - collectionid
+        // - propertyid
+        // - entityid
+        // - segmentid
         if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
             // TODO: this makes only sense if there can be a rule which matches
             //       even on empty attributes
