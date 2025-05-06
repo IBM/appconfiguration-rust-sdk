@@ -56,8 +56,13 @@ impl FeatureSnapshot {
     }
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
-        // Need to record here a tuple:
-        // guid, environmentid, collectionid, feature/propertyid, entityid, segmentid
+        // TODO: For Metering, we need to record here a tuple:
+        // - guid
+        // - environmentid
+        // - collectionid
+        // - featureid
+        // - entityid
+        // - segmentid
         if !self.enabled {
             return Ok(self.disabled_value.clone());
         }

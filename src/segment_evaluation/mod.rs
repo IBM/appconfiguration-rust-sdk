@@ -50,9 +50,9 @@ impl SegmentRules {
         self.targeting_rules.is_empty()
     }
 
-    /// Find the segment rule which matches for a given entity.
-    /// Returns the matching SegmentRule and the Segment which the entity was
-    /// associated to. (A SegmentRule/TargetingRule can point to multiple Segments)
+    /// Finds the targeting rule (aka SegmentRule) and the Segment which a given entity can be associated to.
+    /// Note: A feature/property can have multiple TargetingRules (aka SegmentRules), which define a specific feature/property value. One SegmentRule/TargetingRule can point to multiple Segments. Rules and Segments are iterated in order and the first match is reported.
+    /// TODO: A TargetingRule can have Rules and Segments also have Rules. Those are easily confused. Especially, as TargetingRules are sometimes referred to as SegmentRules, which causes even greater confusion.
     pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
         entity: &impl Entity,
