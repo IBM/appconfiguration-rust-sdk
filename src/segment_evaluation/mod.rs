@@ -268,7 +268,8 @@ pub mod tests {
 
     #[fixture]
     fn segments() -> HashMap<String, Segment> {
-        HashMap::from([(
+        HashMap::from([
+        (
             "some_segment_id_1".into(),
             Segment {
                 _name: "".into(),
@@ -281,14 +282,29 @@ pub mod tests {
                     values: vec!["heinz".into()],
                 }],
             },
-        )])
+        ),
+        (
+            "some_segment_id_2".into(),
+            Segment {
+                _name: "".into(),
+                segment_id: "some_segment_id_2".into(),
+                _description: "".into(),
+                _tags: None,
+                rules: vec![SegmentRule {
+                    attribute_name: "name".into(),
+                    operator: "is".into(),
+                    values: vec!["peter".into()],
+                }],
+            },
+        )
+        ])
     }
 
     #[fixture]
     fn targeting_rules() -> Vec<TargetingRule> {
         vec![TargetingRule {
             rules: vec![Segments {
-                segments: vec!["some_segment_id_1".into()],
+                segments: vec!["some_segment_id_1".into(),"some_segment_id_2".into()],
             }],
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
@@ -297,21 +313,21 @@ pub mod tests {
     }
 
     #[rstest]
-    fn test_good_case(
+    fn test_targeting_rule_matches_and_correct_segment_reported_back(
         segments: HashMap<String, Segment>,
         targeting_rules: Vec<TargetingRule>,
     ) {
         let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
-            attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
+            attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
         };
         let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
         // Segment evaluation should succeed:
         let (rule, segment) = rule.unwrap().unwrap();
         // And we should get the correct rule and the matched segment
         assert!(rule.targeting_rule.order == 0);
-        assert!(segment.segment_id == "some_segment_id_1");
+        assert!(segment.segment_id == "some_segment_id_2");
     }
 
     // SCENARIO - If the SDK user fail to pass the “attributes” for evaluation of featureflag which is segmented - we have considered that evaluation as “does not belong to any segment” and we serve the enabled_value.
