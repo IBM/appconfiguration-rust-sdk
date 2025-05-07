@@ -55,6 +55,13 @@ impl FeatureSnapshot {
     }
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+        // TODO: For Metering, we need to record here a tuple:
+        // - guid
+        // - environmentid
+        // - collectionid
+        // - featureid
+        // - entityid
+        // - segmentid
         if !self.enabled {
             return Ok(self.disabled_value.clone());
         }
@@ -66,9 +73,9 @@ impl FeatureSnapshot {
 
         match self
             .segment_rules
-            .find_applicable_segment_rule_for_entity(entity)?
+            .find_applicable_targeting_rule_and_segment_for_entity(entity)?
         {
-            Some(segment_rule) => {
+            Some((segment_rule, _)) => {
                 // Get rollout percentage
                 let rollout_percentage =
                     segment_rule.rollout_percentage(self.rollout_percentage)?;

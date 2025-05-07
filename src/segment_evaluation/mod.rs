@@ -32,6 +32,7 @@ pub(crate) struct SegmentRules {
     kind: ValueKind,
 }
 
+// TODO: We should rename this to TargetingRules
 impl SegmentRules {
     pub(crate) fn new(
         segments: HashMap<String, Segment>,
@@ -49,22 +50,32 @@ impl SegmentRules {
         self.targeting_rules.is_empty()
     }
 
-    pub(crate) fn find_applicable_segment_rule_for_entity(
+    /// Finds the targeting rule (aka SegmentRule) and the Segment which a given entity can be associated to.
+    /// Note: A feature/property can have multiple TargetingRules (aka SegmentRules), which define a specific feature/property value. One SegmentRule/TargetingRule can point to multiple Segments. Rules and Segments are iterated in order and the first match is reported.
+    /// TODO: A TargetingRule can have Rules and Segments also have Rules. Those are easily confused. Especially, as TargetingRules are sometimes referred to as SegmentRules, which causes even greater confusion.
+    pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
         entity: &impl Entity,
-    ) -> Result<Option<SegmentRule>> {
+    ) -> Result<Option<(SegmentRule, &Segment)>> {
         for targeting_rule in self.targeting_rules.iter() {
-            if targeting_rule_applies_to_entity(&self.segments, targeting_rule, entity)? {
-                return Ok(Some(SegmentRule {
-                    targeting_rule,
-                    kind: self.kind,
-                }));
+            if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(&self.segments, targeting_rule, entity)? {
+                return Ok(Some(
+                    (
+                    SegmentRule {
+                        targeting_rule,
+                        kind: self.kind,
+                    },
+                    segment
+                    )
+                ));
             }
         }
         Ok(None)
     }
 }
 
+// TODO: We should rename this to TargetingRule, it is basically encapsulation one.
+// (need to avoid conflict with models::TargetingRule)
 #[derive(Debug)]
 pub(crate) struct SegmentRule<'a> {
     targeting_rule: &'a TargetingRule,
@@ -117,27 +128,27 @@ impl SegmentRule<'_> {
     }
 }
 
-fn targeting_rule_applies_to_entity(
-    segments: &HashMap<String, Segment>,
+// Finds out if a given TargetingRule (referring to multiple Segments) applies to a given entity.
+// Basically this means it returns true, if one of the segments referred to by
+// the targeting_rule matches the entity.
+fn find_segment_of_targeting_rule_which_applies_to_entity<'a>(
+    segments: &'a HashMap<String, Segment>,
     targeting_rule: &TargetingRule,
     entity: &impl Entity,
-) -> std::result::Result<bool, SegmentEvaluationError> {
-    // TODO: we need to get the naming correct here to distinguish between rules, segments, segment_ids, targeting_rules etc. correctly
-    let rules = &targeting_rule.rules;
-    for rule in rules.iter() {
-        let rule_applies = segment_applies_to_entity(segments, &rule.segments, entity)?;
-        if rule_applies {
-            return Ok(true);
-        }
+) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
+    // NOTE: In the JSON model the targeted segments (list of list) are called "rules" of a targeting rule.
+    let targeted_segment_list_of_list = &targeting_rule.rules;
+    for targeted_segment_list in targeted_segment_list_of_list.iter() {
+        return Ok(find_segment_which_applies_to_entity(segments, &targeted_segment_list.segments, entity)?);
     }
-    Ok(false)
+    Ok(None)
 }
 
-fn segment_applies_to_entity(
-    segments: &HashMap<String, Segment>,
+fn find_segment_which_applies_to_entity<'a>(
+    segments: &'a HashMap<String, Segment>,
     segment_ids: &[String],
     entity: &impl Entity,
-) -> std::result::Result<bool, SegmentEvaluationError> {
+) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
     for segment_id in segment_ids.iter() {
         let segment = segments
             .get(segment_id)
@@ -146,10 +157,10 @@ fn segment_applies_to_entity(
             ))?;
         let applies = belong_to_segment(segment, entity.get_attributes())?;
         if applies {
-            return Ok(true);
+            return Ok(Some(segment));
         }
     }
-    Ok(false)
+    Ok(None)
 }
 
 fn belong_to_segment(
@@ -258,7 +269,8 @@ pub mod tests {
 
     #[fixture]
     fn segments() -> HashMap<String, Segment> {
-        HashMap::from([(
+        HashMap::from([
+        (
             "some_segment_id_1".into(),
             Segment {
                 _name: "".into(),
@@ -271,19 +283,52 @@ pub mod tests {
                     values: vec!["heinz".into()],
                 }],
             },
-        )])
+        ),
+        (
+            "some_segment_id_2".into(),
+            Segment {
+                _name: "".into(),
+                segment_id: "some_segment_id_2".into(),
+                _description: "".into(),
+                _tags: None,
+                rules: vec![SegmentRule {
+                    attribute_name: "name".into(),
+                    operator: "is".into(),
+                    values: vec!["peter".into()],
+                }],
+            },
+        )
+        ])
     }
 
     #[fixture]
-    fn segment_rules() -> Vec<TargetingRule> {
+    fn targeting_rules() -> Vec<TargetingRule> {
         vec![TargetingRule {
             rules: vec![Segments {
-                segments: vec!["some_segment_id_1".into()],
+                segments: vec!["some_segment_id_1".into(),"some_segment_id_2".into()],
             }],
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
         }]
+    }
+
+    #[rstest]
+    fn test_targeting_rule_matches_and_correct_segment_reported_back(
+        segments: HashMap<String, Segment>,
+        targeting_rules: Vec<TargetingRule>,
+    ) {
+        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
+        let entity = crate::tests::GenericEntity {
+            id: "a2".into(),
+            attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
+        };
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+        // Segment evaluation should succeed:
+        let (rule, segment) = rule.unwrap().unwrap();
+        // And we should get the correct rule and the matched segment
+        assert!(rule.targeting_rule.order == 0);
+        assert!(segment.segment_id == "some_segment_id_2");
     }
 
     // SCENARIO - If the SDK user fail to pass the “attributes” for evaluation of featureflag which is segmented - we have considered that evaluation as “does not belong to any segment” and we serve the enabled_value.
@@ -292,14 +337,14 @@ pub mod tests {
     #[rstest]
     fn test_attribute_not_found(
         segments: HashMap<String, Segment>,
-        segment_rules: Vec<TargetingRule>,
+        targeting_rules: Vec<TargetingRule>,
     ) {
-        let segment_rules = SegmentRules::new(segments, segment_rules, ValueKind::String);
+        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Segment evaluation should not fail:
         let rule = rule.unwrap();
         // But no segment should be found:
@@ -326,7 +371,7 @@ pub mod tests {
             }];
             SegmentRules::new(segments, targeting_rules, ValueKind::String)
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Error message should look something like this:
         //  Failed to evaluate entity: Failed to evaluate entity 'a2' against targeting rule '0'.
         //  Caused by: Segment 'non_existing_segment_id' not found.
@@ -345,13 +390,13 @@ pub mod tests {
     // SCENARIO - evaluating an operator fails. Meaning, [for example] user has added a numeric value(int/float) in appconfig segment attribute, but in their application they pass the attribute with a boolean value.
     // We can mark this as failure and return error.
     #[rstest]
-    fn test_operator_failed(segments: HashMap<String, Segment>, segment_rules: Vec<TargetingRule>) {
-        let segment_rules = SegmentRules::new(segments, segment_rules, ValueKind::String);
+    fn test_operator_failed(segments: HashMap<String, Segment>, targeting_rules: Vec<TargetingRule>) {
+        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
-        let rule = segment_rules.find_applicable_segment_rule_for_entity(&entity);
+        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         let e = rule.unwrap_err();
         assert!(matches!(e, Error::EntityEvaluationError(_)));
         let Error::EntityEvaluationError(EntityEvaluationError(
