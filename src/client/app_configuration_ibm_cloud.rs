@@ -19,7 +19,7 @@ use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
-use crate::IBMCloudTokenProvider;
+use crate::{IBMCloudTokenProvider, OfflineMode};
 
 use super::AppConfigurationClientHttp;
 use super::{AppConfigurationClient, ConfigurationId};
@@ -41,7 +41,13 @@ impl AppConfigurationClientIBMCloud {
     /// * `apikey` - The encrypted API key.
     /// * `region` - Region name where the App Configuration service instance is created
     /// * `configuration_id` - Identifies the App Configuration configuration to use.
-    pub fn new(apikey: &str, region: &str, configuration_id: ConfigurationId) -> Result<Self> {
+    /// * `offline_mode` - Behavior when the configuration might not be synced with the server
+    pub fn new(
+        apikey: &str,
+        region: &str,
+        configuration_id: ConfigurationId,
+        offline_mode: OfflineMode,
+    ) -> Result<Self> {
         let service_address = Self::create_service_address(region);
         let token_provider = Box::new(IBMCloudTokenProvider::new(apikey));
         Ok(Self {
@@ -49,6 +55,7 @@ impl AppConfigurationClientIBMCloud {
                 service_address,
                 token_provider,
                 configuration_id,
+                offline_mode,
             )?,
         })
     }

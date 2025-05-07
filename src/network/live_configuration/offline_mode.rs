@@ -1,4 +1,4 @@
-// (C) Copyright IBM Corp. 2025.
+// (C) Copyright IBM Corp. 2024.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod current_mode;
-mod errors;
-mod live_configuration;
-mod offline_mode;
-mod update_thread_worker;
+use crate::AppConfigurationOffline;
 
-pub(crate) use current_mode::CurrentMode;
-pub(crate) use errors::{Error, Result};
-pub use live_configuration::{LiveConfiguration, LiveConfigurationImpl};
-pub use offline_mode::OfflineMode;
+/// Defines the behaviour of the client while the connection to the server
+/// is lost. In all cases the client will keep trying to reconnect forever.
+#[derive(Debug)]
+pub enum OfflineMode {
+    /// Returns errors when requesting features or evaluating them
+    Fail,
+
+    /// Return features and values from the latests configuration available
+    Cache,
+
+    /// Use the provided configuration.
+    FallbackData(AppConfigurationOffline),
+}

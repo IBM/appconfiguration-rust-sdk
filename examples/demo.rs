@@ -16,7 +16,7 @@ use std::{collections::HashMap, env, thread, time::Duration};
 
 use appconfiguration::{
     AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, Entity, Feature,
-    Property, Value,
+    OfflineMode, Property, Value,
 };
 use dotenvy::dotenv;
 use std::error::Error;
@@ -52,7 +52,8 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     let property_id = env::var("PROPERTY_ID").expect("PROPERTY_ID should be set.");
 
     let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-    let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration)?;
+    let client =
+        AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
 
     let entity = CustomerEntity {
         id: "user123".to_string(),

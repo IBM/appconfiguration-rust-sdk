@@ -1,5 +1,6 @@
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, ServiceAddress,
+    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, OfflineMode,
+    ServiceAddress,
 };
 
 use std::net::TcpListener;
@@ -56,9 +57,13 @@ fn main() {
         "dev".to_string(),
         "collection_id".to_string(),
     );
-    let client =
-        AppConfigurationClientHttp::new(address, Box::new(common::MockTokenProvider {}), config_id)
-            .unwrap();
+    let client = AppConfigurationClientHttp::new(
+        address,
+        Box::new(common::MockTokenProvider {}),
+        config_id,
+        OfflineMode::Fail,
+    )
+    .unwrap();
 
     common::wait_until_online(&client);
 
