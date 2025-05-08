@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{ConfigurationProvider, Result};
-
 use crate::client::feature_proxy::FeatureProxy;
-
+use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_proxy::PropertyProxy;
-
+use crate::client::property_snapshot::PropertySnapshot;
+use crate::Result;
 /// Identifies a configuration
 #[derive(Debug, Clone)]
 pub struct ConfigurationId {
@@ -37,6 +36,34 @@ impl ConfigurationId {
             collection_id,
         }
     }
+}
+
+pub trait ConfigurationProvider {
+    /// Returns the list of features.
+    ///
+    /// The list contains the `id`s that can be used in other methods to return
+    /// concrete features, like [`get_feature`](ConfigurationProvider::get_feature).
+    fn get_feature_ids(&self) -> Result<Vec<String>>;
+
+    /// Returns a snapshot for a [`Feature`](crate::Feature).
+    ///
+    /// The instance contains a snapshot with all the values and rules, so it
+    /// will always evaluate the same entities to the same values, no updates
+    /// will be received from the server.
+    fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot>;
+
+    /// Returns the list of properties.
+    ///
+    /// The list contains the `id`s that can be used in other methods to return
+    /// concrete properties, like [`get_property`](ConfigurationProvider::get_property).
+    fn get_property_ids(&self) -> Result<Vec<String>>;
+
+    /// Returns a snapshot for a [`Property`](crate::Property).
+    ///
+    /// The instance contains a snapshot with all the values and rules, so it
+    /// will always evaluate the same entities to the same values, no updates
+    /// will be received from the server
+    fn get_property(&self, property_id: &str) -> Result<PropertySnapshot>;
 }
 
 /// AppConfiguration client for browsing, and evaluating features and properties.

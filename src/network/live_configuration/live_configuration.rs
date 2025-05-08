@@ -22,6 +22,8 @@ use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus};
 use crate::{ConfigurationId, ConfigurationProvider};
 
+/// A [`ConfigurationProvider`] that keeps the configuration updated with some
+/// third-party source using an asyncronous mechanism.
 pub trait LiveConfiguration: ConfigurationProvider {
     /// Utility method to know the current status of the inner thread that keeps
     /// the configuration synced with the server.

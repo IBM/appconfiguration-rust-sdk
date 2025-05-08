@@ -88,14 +88,13 @@ mod feature;
 mod models;
 mod network;
 mod property;
-mod provider;
 mod segment_evaluation;
 pub(crate) mod utils;
 mod value;
 
 pub use client::{
     AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline,
-    ConfigurationId,
+    ConfigurationId, ConfigurationProvider,
 };
 pub use entity::Entity;
 pub use errors::{Error, Result};
@@ -103,7 +102,6 @@ pub use feature::Feature;
 pub use network::live_configuration::OfflineMode;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
 pub use property::Property;
-pub use provider::ConfigurationProvider;
 pub use value::Value;
 
 #[cfg(feature = "http_client")]
