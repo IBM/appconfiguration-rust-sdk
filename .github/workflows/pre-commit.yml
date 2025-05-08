@@ -14,5 +14,4 @@ jobs:
       - name: Run pre-commit
         run: |
           pip install pre-commit
-          pre-commit run -a
-          git diff
+          pre-commit run -a --show-diff-on-failure
