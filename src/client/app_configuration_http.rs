@@ -62,35 +62,19 @@ impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
 
 impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<T> {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .live_configuration
-            .get_configuration()?
-            .get_feature_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.live_configuration.get_feature_ids()
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        self.live_configuration
-            .get_configuration()?
-            .get_feature(feature_id)
+        self.live_configuration.get_feature(feature_id)
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .live_configuration
-            .get_configuration()?
-            .get_property_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.live_configuration.get_property_ids()
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        self.live_configuration
-            .get_configuration()?
-            .get_property(property_id)
+        self.live_configuration.get_property(property_id)
     }
 }
 
@@ -109,11 +93,24 @@ mod tests {
     struct LiveConfigurationMock {
         configuration: Configuration,
     }
-    impl LiveConfiguration for LiveConfigurationMock {
-        fn get_configuration(&self) -> crate::network::live_configuration::Result<Configuration> {
-            Ok(self.configuration.clone())
+    impl ConfigurationProvider for LiveConfigurationMock {
+        fn get_feature_ids(&self) -> Result<Vec<String>> {
+            todo!()
         }
 
+        fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
+            self.configuration.get_feature(feature_id)
+        }
+
+        fn get_property_ids(&self) -> Result<Vec<String>> {
+            todo!()
+        }
+
+        fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
+            self.configuration.get_property(property_id)
+        }
+    }
+    impl LiveConfiguration for LiveConfigurationMock {
         fn get_thread_status(
             &mut self,
         ) -> ThreadStatus<crate::network::live_configuration::Result<()>> {

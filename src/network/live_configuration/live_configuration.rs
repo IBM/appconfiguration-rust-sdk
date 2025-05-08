@@ -20,16 +20,9 @@ use super::{CurrentMode, Error, OfflineMode, Result};
 use crate::client::configuration::Configuration;
 use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus};
-use crate::ConfigurationId;
+use crate::{ConfigurationId, ConfigurationProvider};
 
-pub trait LiveConfiguration {
-    /// Returns the current configuration
-    ///
-    /// Depending on the current operation mode (see [`LiveConfiguration::get_current_mode`]) and
-    /// the configured offline behavior (see [`OfflineMode`]) for this object, this
-    /// configuration might come from different sources: server, cache or user-provided.
-    fn get_configuration(&self) -> Result<Configuration>;
-
+pub trait LiveConfiguration: ConfigurationProvider {
     /// Utility method to know the current status of the inner thread that keeps
     /// the configuration synced with the server.
     fn get_thread_status(&mut self) -> ThreadStatus<Result<()>>;
@@ -84,58 +77,82 @@ impl LiveConfigurationImpl {
             offline_mode,
         }
     }
-}
 
-impl LiveConfiguration for LiveConfigurationImpl {
     fn get_configuration(&self) -> Result<Configuration> {
+        // TODO: Can we return a reference instead?
         match &*self.current_mode.lock()? {
             CurrentMode::Online => {
                 match &*self.configuration.lock()? {
                     // We store the configuration retrieved from the server into the Arc<Mutex> before switching the flag to Online
                     None => unreachable!(),
-                    // TODO: we do not want to clone here
                     Some(configuration) => Ok(configuration.clone()),
                 }
             }
-            CurrentMode::Offline(current_mode_offline_reason) => {
-                match &self.offline_mode {
-                    OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason.clone())),
-                    OfflineMode::Cache => {
-                        match &*self.configuration.lock()? {
-                            None => Err(Error::ConfigurationNotYetAvailable),
-                            // TODO: we do not want to clone here
-                            Some(configuration) => Ok(configuration.clone()),
-                        }
-                    }
-                    OfflineMode::FallbackData(app_configuration_offline) => {
-                        // TODO: we do not want to clone here
-                        Ok(app_configuration_offline.config_snapshot.clone())
-                    }
+            CurrentMode::Offline(current_mode_offline_reason) => match &self.offline_mode {
+                OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason.clone())),
+                OfflineMode::Cache => match &*self.configuration.lock()? {
+                    None => Err(Error::ConfigurationNotYetAvailable),
+                    Some(configuration) => Ok(configuration.clone()),
+                },
+                OfflineMode::FallbackData(app_configuration_offline) => {
+                    Ok(app_configuration_offline.config_snapshot.clone())
                 }
-            }
+            },
             CurrentMode::Defunct(result) => match &self.offline_mode {
                 OfflineMode::Fail => Err(Error::ThreadInternalError(format!(
                     "Thread finished with status: {:?}",
                     result
                 ))),
-                OfflineMode::Cache => {
-                    match &*self.configuration.lock()? {
-                        None => Err(Error::UnrecoverableError(format!(
-                            "Initial configuration failed to retrieve: {:?}",
-                            result
-                        ))),
-                        // TODO: we do not want to clone here
-                        Some(configuration) => Ok(configuration.clone()),
-                    }
-                }
+                OfflineMode::Cache => match &*self.configuration.lock()? {
+                    None => Err(Error::UnrecoverableError(format!(
+                        "Initial configuration failed to retrieve: {:?}",
+                        result
+                    ))),
+                    Some(configuration) => Ok(configuration.clone()),
+                },
                 OfflineMode::FallbackData(app_configuration_offline) => {
-                    // TODO: we do not want to clone here
                     Ok(app_configuration_offline.config_snapshot.clone())
                 }
             },
         }
     }
+}
 
+impl ConfigurationProvider for LiveConfigurationImpl {
+    fn get_feature_ids(&self) -> crate::Result<Vec<String>> {
+        Ok(self
+            .get_configuration()?
+            .get_feature_ids()
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    fn get_feature(
+        &self,
+        feature_id: &str,
+    ) -> crate::Result<crate::client::feature_snapshot::FeatureSnapshot> {
+        self.get_configuration()?.get_feature(feature_id)
+    }
+
+    fn get_property_ids(&self) -> crate::Result<Vec<String>> {
+        Ok(self
+            .get_configuration()?
+            .get_property_ids()
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    fn get_property(
+        &self,
+        property_id: &str,
+    ) -> crate::Result<crate::client::property_snapshot::PropertySnapshot> {
+        self.get_configuration()?.get_property(property_id)
+    }
+}
+
+impl LiveConfiguration for LiveConfigurationImpl {
     fn get_thread_status(&mut self) -> ThreadStatus<Result<()>> {
         self.update_thread.get_thread_status()
     }
