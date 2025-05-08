@@ -147,6 +147,7 @@ fn find_segment_of_targeting_rule_which_applies_to_entity<'a>(
             return Ok(Some(segment));
         }
     }
+
     Ok(None)
 }
 
@@ -304,15 +305,34 @@ pub mod tests {
                     }],
                 },
             ),
+            (
+                "some_segment_id_3".into(),
+                Segment {
+                    _name: "".into(),
+                    segment_id: "some_segment_id_3".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: vec![SegmentRule {
+                        attribute_name: "name".into(),
+                        operator: "is".into(),
+                        values: vec!["jane".into()],
+                    }],
+                },
+            ),
         ])
     }
 
     #[fixture]
     fn targeting_rules() -> Vec<TargetingRule> {
         vec![TargetingRule {
-            rules: vec![Segments {
-                segments: vec!["some_segment_id_1".into(), "some_segment_id_2".into()],
-            }],
+            rules: vec![
+                Segments {
+                    segments: vec!["some_segment_id_1".into(), "some_segment_id_2".into()],
+                },
+                Segments {
+                    segments: vec!["some_segment_id_3".into()],
+                },
+            ],
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
@@ -329,12 +349,38 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
         };
-        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
-        // Segment evaluation should succeed:
-        let (rule, segment) = rule.unwrap().unwrap();
-        // And we should get the correct rule and the matched segment
-        assert!(rule.targeting_rule.order == 0);
-        assert!(segment.segment_id == "some_segment_id_2");
+
+        {
+            let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+            // Segment evaluation should succeed:
+            let (rule, segment) = rule.unwrap().unwrap();
+            // And we should get the correct rule and the matched segment
+            assert!(rule.targeting_rule.order == 0);
+            assert!(segment.segment_id == "some_segment_id_2");
+        }
+
+        let entity = crate::tests::GenericEntity {
+            id: "a3".into(),
+            attributes: HashMap::from([("name".into(), Value::from("jane".to_string()))]),
+        };
+        {
+            let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+            // Segment evaluation should succeed:
+            let (rule, segment) = rule.unwrap().unwrap();
+            // And we should get the correct rule and the matched segment
+            assert!(rule.targeting_rule.order == 0);
+            assert!(segment.segment_id == "some_segment_id_3");
+        }
+
+        let entity = crate::tests::GenericEntity {
+            id: "a3".into(),
+            attributes: HashMap::from([("name".into(), Value::from("noname".to_string()))]),
+        };
+        {
+            let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+            // Segment evaluation should succeed, but no rule is found:
+            assert!(rule.unwrap().is_none());
+        }
     }
 
     // SCENARIO - If the SDK user fail to pass the “attributes” for evaluation of featureflag which is segmented - we have considered that evaluation as “does not belong to any segment” and we serve the enabled_value.
