@@ -1,5 +1,5 @@
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientHttp, AppConfigurationOffline, ConfigurationId,
+    AppConfigurationClientHttp, AppConfigurationOffline, ConfigurationId, ConfigurationProvider,
     OfflineMode, ServiceAddress,
 };
 

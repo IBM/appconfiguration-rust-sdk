@@ -1,6 +1,5 @@
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientHttp, ConfigurationId, OfflineMode,
-    ServiceAddress,
+    AppConfigurationClientHttp, ConfigurationId, ConfigurationProvider, OfflineMode, ServiceAddress,
 };
 
 use std::net::TcpListener;

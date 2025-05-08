@@ -18,7 +18,7 @@ use crate::models::ConfigurationJson;
 
 use crate::client::configuration::Configuration;
 use crate::client::{AppConfigurationClient, AppConfigurationOffline};
-use crate::Value;
+use crate::{ConfigurationProvider, Value};
 use rstest::*;
 
 use super::client_enterprise;
