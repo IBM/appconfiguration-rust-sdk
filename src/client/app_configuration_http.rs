@@ -20,7 +20,7 @@ use crate::errors::Result;
 
 use crate::network::live_configuration::{CurrentMode, LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
-use crate::{OfflineMode, ServerClientImpl};
+use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
 use super::{AppConfigurationClient, ConfigurationId};
 
@@ -62,7 +62,7 @@ impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
     }
 }
 
-impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp<T> {
+impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<T> {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
         Ok(self
             .live_configuration
@@ -79,13 +79,6 @@ impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp
             .get_feature(feature_id)
     }
 
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
-    }
-
     fn get_property_ids(&self) -> Result<Vec<String>> {
         Ok(self
             .live_configuration
@@ -100,6 +93,15 @@ impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp
         self.live_configuration
             .get_configuration()?
             .get_property(property_id)
+    }
+}
+
+impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp<T> {
+    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
+        // FIXME: there is and was no validation happening if the feature exists.
+        // Comments and error messages in FeatureProxy suggest that this should happen here.
+        // same applies for properties.
+        Ok(FeatureProxy::new(self, feature_id.to_string()))
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {

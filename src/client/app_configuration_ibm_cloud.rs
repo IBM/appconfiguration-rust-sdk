@@ -19,7 +19,7 @@ use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
-use crate::{IBMCloudTokenProvider, OfflineMode};
+use crate::{ConfigurationProvider, IBMCloudTokenProvider, OfflineMode};
 
 use super::AppConfigurationClientHttp;
 use super::{AppConfigurationClient, ConfigurationId};
@@ -69,7 +69,7 @@ impl AppConfigurationClientIBMCloud {
     }
 }
 
-impl AppConfigurationClient for AppConfigurationClientIBMCloud {
+impl ConfigurationProvider for AppConfigurationClientIBMCloud {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
         self.client.get_feature_ids()
     }
@@ -78,16 +78,18 @@ impl AppConfigurationClient for AppConfigurationClientIBMCloud {
         self.client.get_feature(feature_id)
     }
 
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        self.client.get_feature_proxy(feature_id)
-    }
-
     fn get_property_ids(&self) -> Result<Vec<String>> {
         self.client.get_property_ids()
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.client.get_property(property_id)
+    }
+}
+
+impl AppConfigurationClient for AppConfigurationClientIBMCloud {
+    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
+        self.client.get_feature_proxy(feature_id)
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {

@@ -19,6 +19,7 @@ pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 use crate::models::ConfigurationJson;
+use crate::ConfigurationProvider;
 
 use super::AppConfigurationClient;
 
@@ -42,7 +43,7 @@ impl AppConfigurationOffline {
     }
 }
 
-impl AppConfigurationClient for AppConfigurationOffline {
+impl ConfigurationProvider for AppConfigurationOffline {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
         Ok(self
             .config_snapshot
@@ -56,13 +57,6 @@ impl AppConfigurationClient for AppConfigurationOffline {
         self.config_snapshot.get_feature(feature_id)
     }
 
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
-    }
-
     fn get_property_ids(&self) -> Result<Vec<String>> {
         Ok(self
             .config_snapshot
@@ -74,6 +68,15 @@ impl AppConfigurationClient for AppConfigurationOffline {
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.config_snapshot.get_property(property_id)
+    }
+}
+
+impl AppConfigurationClient for AppConfigurationOffline {
+    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
+        // FIXME: there is and was no validation happening if the feature exists.
+        // Comments and error messages in FeatureProxy suggest that this should happen here.
+        // same applies for properties.
+        Ok(FeatureProxy::new(self, feature_id.to_string()))
     }
 
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {

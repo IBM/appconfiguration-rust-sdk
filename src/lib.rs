@@ -40,7 +40,7 @@
 //!
 //! ```
 //! use appconfiguration::{
-//!     AppConfigurationClient, AppConfigurationClientIBMCloud,
+//!     ConfigurationProvider, AppConfigurationClientIBMCloud,
 //!     ConfigurationId, Entity, Result, Value, Feature, OfflineMode
 //! };
 //! # use std::collections::HashMap;
@@ -88,6 +88,7 @@ mod feature;
 mod models;
 mod network;
 mod property;
+mod provider;
 mod segment_evaluation;
 pub(crate) mod utils;
 mod value;
@@ -102,6 +103,7 @@ pub use feature::Feature;
 pub use network::live_configuration::OfflineMode;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
 pub use property::Property;
+pub use provider::ConfigurationProvider;
 pub use value::Value;
 
 #[cfg(feature = "http_client")]
