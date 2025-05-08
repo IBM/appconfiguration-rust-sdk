@@ -21,6 +21,7 @@ use crate::Error;
 
 use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
+use super::ConfigurationProvider;
 
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.
@@ -102,43 +103,6 @@ impl Configuration {
         })
     }
 
-    pub fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        // Get the feature from the snapshot
-        let (feature, segment_rules) = self.features.get(feature_id).ok_or_else(|| {
-            Error::ConfigurationAccessError(ConfigurationAccessError::FeatureNotFound {
-                feature_id: feature_id.to_string(),
-            })
-        })?;
-
-        let enabled_value = (feature.kind, feature.enabled_value.clone()).try_into()?;
-        let disabled_value = (feature.kind, feature.disabled_value.clone()).try_into()?;
-        Ok(FeatureSnapshot::new(
-            feature.enabled,
-            enabled_value,
-            disabled_value,
-            feature.rollout_percentage,
-            &feature.name,
-            feature_id,
-            segment_rules.clone(),
-        ))
-    }
-
-    pub fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        // Get the property from the snapshot
-        let (property, segment_rules) = self.properties.get(property_id).ok_or_else(|| {
-            Error::ConfigurationAccessError(ConfigurationAccessError::PropertyNotFound {
-                property_id: property_id.to_string(),
-            })
-        })?;
-
-        let value = (property.kind, property.value.clone()).try_into()?;
-        Ok(PropertySnapshot::new(
-            value,
-            segment_rules.clone(),
-            &property.name,
-        ))
-    }
-
     /// Returns a mapping of segment ID to `Segment` for all segments referenced
     /// by the given `segment_rules`.
     fn get_segments_for_segment_rules(
@@ -163,12 +127,59 @@ impl Configuration {
             .collect()
     }
 
-    pub(crate) fn get_feature_ids(&self) -> Vec<&String> {
+    pub(crate) fn get_feature_ids_refs(&self) -> Vec<&String> {
         self.features.keys().collect()
     }
 
-    pub(crate) fn get_property_ids(&self) -> Vec<&String> {
+    pub(crate) fn get_property_ids_refs(&self) -> Vec<&String> {
         self.properties.keys().collect()
+    }
+}
+
+impl ConfigurationProvider for Configuration {
+    fn get_feature_ids(&self) -> Result<Vec<String>> {
+        Ok(self.get_feature_ids_refs().into_iter().cloned().collect())
+    }
+
+    fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
+        // Get the feature from the snapshot
+        let (feature, segment_rules) = self.features.get(feature_id).ok_or_else(|| {
+            Error::ConfigurationAccessError(ConfigurationAccessError::FeatureNotFound {
+                feature_id: feature_id.to_string(),
+            })
+        })?;
+
+        let enabled_value = (feature.kind, feature.enabled_value.clone()).try_into()?;
+        let disabled_value = (feature.kind, feature.disabled_value.clone()).try_into()?;
+        Ok(FeatureSnapshot::new(
+            feature.enabled,
+            enabled_value,
+            disabled_value,
+            feature.rollout_percentage,
+            &feature.name,
+            feature_id,
+            segment_rules.clone(),
+        ))
+    }
+
+    fn get_property_ids(&self) -> Result<Vec<String>> {
+        Ok(self.get_property_ids_refs().into_iter().cloned().collect())
+    }
+
+    fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
+        // Get the property from the snapshot
+        let (property, segment_rules) = self.properties.get(property_id).ok_or_else(|| {
+            Error::ConfigurationAccessError(ConfigurationAccessError::PropertyNotFound {
+                property_id: property_id.to_string(),
+            })
+        })?;
+
+        let value = (property.kind, property.value.clone()).try_into()?;
+        Ok(PropertySnapshot::new(
+            value,
+            segment_rules.clone(),
+            &property.name,
+        ))
     }
 }
 

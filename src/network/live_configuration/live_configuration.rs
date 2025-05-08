@@ -122,12 +122,7 @@ impl LiveConfigurationImpl {
 
 impl ConfigurationProvider for LiveConfigurationImpl {
     fn get_feature_ids(&self) -> crate::Result<Vec<String>> {
-        Ok(self
-            .get_configuration()?
-            .get_feature_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.get_configuration()?.get_feature_ids()
     }
 
     fn get_feature(
@@ -138,12 +133,7 @@ impl ConfigurationProvider for LiveConfigurationImpl {
     }
 
     fn get_property_ids(&self) -> crate::Result<Vec<String>> {
-        Ok(self
-            .get_configuration()?
-            .get_property_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.get_configuration()?.get_property_ids()
     }
 
     fn get_property(
