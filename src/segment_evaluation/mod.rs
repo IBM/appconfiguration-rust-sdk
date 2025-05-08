@@ -58,16 +58,18 @@ impl SegmentRules {
         entity: &impl Entity,
     ) -> Result<Option<(SegmentRule, &Segment)>> {
         for targeting_rule in self.targeting_rules.iter() {
-            if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(&self.segments, targeting_rule, entity)? {
-                return Ok(Some(
-                    (
+            if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(
+                &self.segments,
+                targeting_rule,
+                entity,
+            )? {
+                return Ok(Some((
                     SegmentRule {
                         targeting_rule,
                         kind: self.kind,
                     },
-                    segment
-                    )
-                ));
+                    segment,
+                )));
             }
         }
         Ok(None)
@@ -139,8 +141,13 @@ fn find_segment_of_targeting_rule_which_applies_to_entity<'a>(
     // NOTE: In the JSON model the targeted segments (list of list) are called "rules" of a targeting rule.
     let targeted_segment_list_of_list = &targeting_rule.rules;
     for targeted_segment_list in targeted_segment_list_of_list.iter() {
-        return Ok(find_segment_which_applies_to_entity(segments, &targeted_segment_list.segments, entity)?);
+        if let Some(segment) =
+            find_segment_which_applies_to_entity(segments, &targeted_segment_list.segments, entity)?
+        {
+            return Ok(Some(segment));
+        }
     }
+
     Ok(None)
 }
 
@@ -270,43 +277,62 @@ pub mod tests {
     #[fixture]
     fn segments() -> HashMap<String, Segment> {
         HashMap::from([
-        (
-            "some_segment_id_1".into(),
-            Segment {
-                _name: "".into(),
-                segment_id: "some_segment_id_1".into(),
-                _description: "".into(),
-                _tags: None,
-                rules: vec![SegmentRule {
-                    attribute_name: "name".into(),
-                    operator: "is".into(),
-                    values: vec!["heinz".into()],
-                }],
-            },
-        ),
-        (
-            "some_segment_id_2".into(),
-            Segment {
-                _name: "".into(),
-                segment_id: "some_segment_id_2".into(),
-                _description: "".into(),
-                _tags: None,
-                rules: vec![SegmentRule {
-                    attribute_name: "name".into(),
-                    operator: "is".into(),
-                    values: vec!["peter".into()],
-                }],
-            },
-        )
+            (
+                "some_segment_id_1".into(),
+                Segment {
+                    _name: "".into(),
+                    segment_id: "some_segment_id_1".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: vec![SegmentRule {
+                        attribute_name: "name".into(),
+                        operator: "is".into(),
+                        values: vec!["heinz".into()],
+                    }],
+                },
+            ),
+            (
+                "some_segment_id_2".into(),
+                Segment {
+                    _name: "".into(),
+                    segment_id: "some_segment_id_2".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: vec![SegmentRule {
+                        attribute_name: "name".into(),
+                        operator: "is".into(),
+                        values: vec!["peter".into()],
+                    }],
+                },
+            ),
+            (
+                "some_segment_id_3".into(),
+                Segment {
+                    _name: "".into(),
+                    segment_id: "some_segment_id_3".into(),
+                    _description: "".into(),
+                    _tags: None,
+                    rules: vec![SegmentRule {
+                        attribute_name: "name".into(),
+                        operator: "is".into(),
+                        values: vec!["jane".into()],
+                    }],
+                },
+            ),
         ])
     }
 
     #[fixture]
     fn targeting_rules() -> Vec<TargetingRule> {
         vec![TargetingRule {
-            rules: vec![Segments {
-                segments: vec!["some_segment_id_1".into(),"some_segment_id_2".into()],
-            }],
+            rules: vec![
+                Segments {
+                    segments: vec!["some_segment_id_1".into(), "some_segment_id_2".into()],
+                },
+                Segments {
+                    segments: vec!["some_segment_id_3".into()],
+                },
+            ],
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
@@ -323,12 +349,38 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
         };
-        let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
-        // Segment evaluation should succeed:
-        let (rule, segment) = rule.unwrap().unwrap();
-        // And we should get the correct rule and the matched segment
-        assert!(rule.targeting_rule.order == 0);
-        assert!(segment.segment_id == "some_segment_id_2");
+
+        {
+            let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+            // Segment evaluation should succeed:
+            let (rule, segment) = rule.unwrap().unwrap();
+            // And we should get the correct rule and the matched segment
+            assert!(rule.targeting_rule.order == 0);
+            assert!(segment.segment_id == "some_segment_id_2");
+        }
+
+        let entity = crate::tests::GenericEntity {
+            id: "a3".into(),
+            attributes: HashMap::from([("name".into(), Value::from("jane".to_string()))]),
+        };
+        {
+            let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+            // Segment evaluation should succeed:
+            let (rule, segment) = rule.unwrap().unwrap();
+            // And we should get the correct rule and the matched segment
+            assert!(rule.targeting_rule.order == 0);
+            assert!(segment.segment_id == "some_segment_id_3");
+        }
+
+        let entity = crate::tests::GenericEntity {
+            id: "a3".into(),
+            attributes: HashMap::from([("name".into(), Value::from("noname".to_string()))]),
+        };
+        {
+            let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
+            // Segment evaluation should succeed, but no rule is found:
+            assert!(rule.unwrap().is_none());
+        }
     }
 
     // SCENARIO - If the SDK user fail to pass the “attributes” for evaluation of featureflag which is segmented - we have considered that evaluation as “does not belong to any segment” and we serve the enabled_value.
@@ -390,7 +442,10 @@ pub mod tests {
     // SCENARIO - evaluating an operator fails. Meaning, [for example] user has added a numeric value(int/float) in appconfig segment attribute, but in their application they pass the attribute with a boolean value.
     // We can mark this as failure and return error.
     #[rstest]
-    fn test_operator_failed(segments: HashMap<String, Segment>, targeting_rules: Vec<TargetingRule>) {
+    fn test_operator_failed(
+        segments: HashMap<String, Segment>,
+        targeting_rules: Vec<TargetingRule>,
+    ) {
         let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
