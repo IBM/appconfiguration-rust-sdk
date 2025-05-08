@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
-pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 use crate::network::live_configuration::LiveConfigurationImpl;
@@ -22,7 +20,7 @@ use crate::network::ServiceAddress;
 use crate::{ConfigurationProvider, IBMCloudTokenProvider, OfflineMode};
 
 use super::AppConfigurationClientHttp;
-use super::{AppConfigurationClient, ConfigurationId};
+use super::ConfigurationId;
 
 /// AppConfiguration client connection to IBM Cloud.
 #[derive(Debug)]
@@ -84,16 +82,6 @@ impl ConfigurationProvider for AppConfigurationClientIBMCloud {
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.client.get_property(property_id)
-    }
-}
-
-impl AppConfigurationClient for AppConfigurationClientIBMCloud {
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        self.client.get_feature_proxy(feature_id)
-    }
-
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        self.client.get_property_proxy(property_id)
     }
 }
 

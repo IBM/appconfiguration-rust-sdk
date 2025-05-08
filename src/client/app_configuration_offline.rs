@@ -13,15 +13,12 @@
 // limitations under the License.
 
 use crate::client::configuration::Configuration;
-pub use crate::client::feature_proxy::FeatureProxy;
+
 use crate::client::feature_snapshot::FeatureSnapshot;
-pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 use crate::models::ConfigurationJson;
 use crate::ConfigurationProvider;
-
-use super::AppConfigurationClient;
 
 /// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
@@ -68,18 +65,5 @@ impl ConfigurationProvider for AppConfigurationOffline {
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.config_snapshot.get_property(property_id)
-    }
-}
-
-impl AppConfigurationClient for AppConfigurationOffline {
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
-    }
-
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        Ok(PropertyProxy::new(self, property_id.to_string()))
     }
 }

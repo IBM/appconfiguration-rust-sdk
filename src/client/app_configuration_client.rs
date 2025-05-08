@@ -53,3 +53,16 @@ pub trait AppConfigurationClient: ConfigurationProvider {
     /// available if the client implementation support some kind of live-updates.
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy>;
 }
+
+impl<T: ConfigurationProvider> AppConfigurationClient for T {
+    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
+        // FIXME: there is and was no validation happening if the feature exists.
+        // Comments and error messages in FeatureProxy suggest that this should happen here.
+        // same applies for properties.
+        Ok(FeatureProxy::new(self, feature_id.to_string()))
+    }
+
+    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
+        Ok(PropertyProxy::new(self, property_id.to_string()))
+    }
+}

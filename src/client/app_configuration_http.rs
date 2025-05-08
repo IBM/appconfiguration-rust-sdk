@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
-pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
@@ -22,7 +20,7 @@ use crate::network::live_configuration::{CurrentMode, LiveConfiguration, LiveCon
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
-use super::{AppConfigurationClient, ConfigurationId};
+use super::ConfigurationId;
 
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
@@ -93,19 +91,6 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
         self.live_configuration
             .get_configuration()?
             .get_property(property_id)
-    }
-}
-
-impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp<T> {
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
-    }
-
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        Ok(PropertyProxy::new(self, property_id.to_string()))
     }
 }
 
