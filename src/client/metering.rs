@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::sync::mpsc;
-use network::ServerClient;
+use crate::network::ServerClient;
 use crate::ConfigurationId;
 
-pub fn start_metering<T: ServerClient>(config_id: ConfigurationId, transmit_interval: std::time::Duration, server_client: T) -> (MeteringTask, MeteringHandle){
+pub fn start_metering<T: ServerClient>(config_id: ConfigurationId, transmit_interval: std::time::Duration, server_client: T) -> (MeteringTask<T>, MeteringHandle){
     
     let (sender, receiver) = mpsc::channel();
 
@@ -27,7 +27,7 @@ pub struct MeteringTask<T: ServerClient>{
     server_client: T
 }
 
-pub(crate) struct EvaluationEvent{
+pub(crate) struct EvaluationEventData{
     /// ID if the subject being evaluated. E.g. feature ID.
     pub subject_id: String,
     // The ID of the Entity against which the subject was evaluated.
@@ -37,8 +37,8 @@ pub(crate) struct EvaluationEvent{
 }
 
 pub(crate) enum EvaluationEvent{
-    Feature(EvaluationEvent),
-    Property(EvaluationEvent)
+    Feature(EvaluationEventData),
+    Property(EvaluationEventData)
 }
 
 pub struct MeteringHandle{
@@ -54,13 +54,26 @@ impl MeteringHandle{
 #[cfg(test)]
 mod tests{
     use super::*;
+    use crate::NetworkResult;
+    use crate::models::ConfigurationJson;
+    use crate::models::MeteringDataJson;
+    use crate::network::http_client::WebsocketReader;
+
+    use std::intrinsics::unreachable;
 
     struct ServerClientMock{
-        metering_data_sender: mpsc::sender<()>
+        metering_data_sender: mpsc::Sender<()>
+    }
+    struct WebsocketMockReader {
+    }
+    impl WebsocketReader for WebsocketMockReader {
+        fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
+            unreachable!()
+        }
     }
 
     impl ServerClientMock{
-        fn new() -> (ServerClientMock, mpsc::receiver<()>){
+        fn new() -> (ServerClientMock, mpsc::Receiver<()>){
             let (sender, receiver) = mpsc::channel();
             (ServerClientMock{metering_data_sender: sender}, receiver)
         }
@@ -79,14 +92,14 @@ mod tests{
             &self,
             collection: &ConfigurationId,
         ) -> NetworkResult<impl WebsocketReader>{
-            unreachable!()
+            unreachable!() as crate::NetworkResult<WebsocketMockReader>
         }
 
         fn push_metering_data(
             &self,
             data: &MeteringDataJson
         ) -> NetworkResult<()>{
-            metering_data_sender.send(()).unwrap();
+            self.metering_data_sender.send(()).unwrap();
             Ok(())
         }
     }
@@ -94,11 +107,11 @@ mod tests{
     #[test]
     fn test_metrics_sent() {
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
-        let (_, metering_handle) = start_metering(ConfigurationId::new("","",""), std::time::Duration::ZERO, server_client);
+        let (_, metering_handle) = start_metering(ConfigurationId::new("".to_string(),"".to_string(), "".to_string()), std::time::Duration::ZERO, server_client);
         
-        metering_handle.record_evaluation("", "", None);
+        metering_handle.record_evaluation("".to_string(), "".to_string(), None);
 
-        data_sent = metering_data_sent_receiver.recv().unwrap();
+        let data_sent = metering_data_sent_receiver.recv().unwrap();
     }
 
 }

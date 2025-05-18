@@ -215,7 +215,7 @@ impl ServerClient for ServerClientImpl {
 
     fn push_metering_data(
         &self,
-        data: MeteringDataJson
+        data: &MeteringDataJson
     ) -> NetworkResult<()>{
         todo!()
     }

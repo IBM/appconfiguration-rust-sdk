@@ -22,6 +22,7 @@ pub(crate) mod feature_proxy;
 pub(crate) mod feature_snapshot;
 pub(crate) mod property_proxy;
 pub(crate) mod property_snapshot;
+pub(crate) mod metering;
 
 pub use app_configuration_client::{AppConfigurationClient, ConfigurationId};
 pub use app_configuration_http::AppConfigurationClientHttp;
