@@ -216,6 +216,14 @@ mod tests {
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
+
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
+            }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
@@ -254,6 +262,14 @@ mod tests {
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
             }
         }
         let configuration_id =
@@ -297,6 +313,14 @@ mod tests {
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -350,6 +374,14 @@ mod tests {
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
+            }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
@@ -386,6 +418,14 @@ mod tests {
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -464,6 +504,14 @@ mod tests {
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
+            }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
@@ -518,6 +566,14 @@ mod tests {
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 unreachable!() as crate::NetworkResult<WebsocketMockReader>
             }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
+            }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
@@ -570,6 +626,14 @@ mod tests {
                     .send("get_configuration_monitoring_websocket".to_string())
                     .unwrap();
                 Ok(WebsocketMockReader { message: None })
+            }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -628,6 +692,14 @@ mod tests {
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 Err::<WebsocketMockReader, _>(crate::NetworkError::InvalidHeaderValue("".into()))
             }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
+            }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
@@ -668,6 +740,14 @@ mod tests {
                     message: Some(Err(tungstenite::Error::AttackAttempt)),
                 })
             }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
+            }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
@@ -704,6 +784,14 @@ mod tests {
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 self.rx.recv().unwrap()
+            }
+            
+            #[allow(unreachable_code)]
+            fn push_metering_data(
+                &self,
+                data: &crate::models::MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());

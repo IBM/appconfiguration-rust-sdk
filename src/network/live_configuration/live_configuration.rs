@@ -149,7 +149,6 @@ impl LiveConfiguration for LiveConfigurationImpl {
 #[cfg(test)]
 mod tests {
 
-    use std::intrinsics::unreachable;
     use std::sync::mpsc::{self, RecvError};
 
     use rstest::rstest;

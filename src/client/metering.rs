@@ -46,8 +46,8 @@ pub struct MeteringHandle{
 }
 
 impl MeteringHandle{
-    pub fn record_evaluation(feature_id: String, entity_id: String, property_id: Option<String>){
-
+    pub fn record_evaluation(&self, feature_id: String, entity_id: String, property_id: Option<String>){
+        todo!()
     }
 }
 
@@ -58,8 +58,6 @@ mod tests{
     use crate::models::ConfigurationJson;
     use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
-
-    use std::intrinsics::unreachable;
 
     struct ServerClientMock{
         metering_data_sender: mpsc::Sender<()>
@@ -81,6 +79,7 @@ mod tests{
 
     impl ServerClient for ServerClientMock{
 
+        #[allow(unreachable_code)]
         fn get_configuration(
             &self,
             configuration_id: &ConfigurationId,
@@ -88,6 +87,7 @@ mod tests{
             unreachable!()
         }
 
+        #[allow(unreachable_code)]
         fn get_configuration_monitoring_websocket(
             &self,
             collection: &ConfigurationId,
