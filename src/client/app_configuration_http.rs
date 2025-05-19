@@ -95,7 +95,7 @@ mod tests {
     }
     impl ConfigurationProvider for LiveConfigurationMock {
         fn get_feature_ids(&self) -> Result<Vec<String>> {
-            todo!()
+            self.configuration.get_feature_ids()
         }
 
         fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
@@ -103,7 +103,7 @@ mod tests {
         }
 
         fn get_property_ids(&self) -> Result<Vec<String>> {
-            todo!()
+            self.configuration.get_property_ids()
         }
 
         fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {

@@ -80,6 +80,8 @@ impl LiveConfigurationImpl {
         }
     }
 
+    /// Returns the current [`Configuration`] after considering the [`CurrentMode`] and the [`OfflineMode`]
+    /// configured for this object.
     fn get_configuration(&self) -> Result<Configuration> {
         // TODO: Can we return a reference instead?
         match &*self.current_mode.lock()? {
