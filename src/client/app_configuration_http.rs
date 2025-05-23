@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
-pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
 use crate::network::live_configuration::{CurrentMode, LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
-use crate::{OfflineMode, ServerClientImpl};
+use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
-use super::{AppConfigurationClient, ConfigurationId};
+use super::ConfigurationId;
 
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
@@ -62,48 +60,21 @@ impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
     }
 }
 
-impl<T: LiveConfiguration> AppConfigurationClient for AppConfigurationClientHttp<T> {
+impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<T> {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .live_configuration
-            .get_configuration()?
-            .get_feature_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.live_configuration.get_feature_ids()
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        self.live_configuration
-            .get_configuration()?
-            .get_feature(feature_id)
-    }
-
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
+        self.live_configuration.get_feature(feature_id)
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .live_configuration
-            .get_configuration()?
-            .get_property_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.live_configuration.get_property_ids()
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        self.live_configuration
-            .get_configuration()?
-            .get_property(property_id)
-    }
-
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        Ok(PropertyProxy::new(self, property_id.to_string()))
+        self.live_configuration.get_property(property_id)
     }
 }
 
@@ -122,11 +93,24 @@ mod tests {
     struct LiveConfigurationMock {
         configuration: Configuration,
     }
-    impl LiveConfiguration for LiveConfigurationMock {
-        fn get_configuration(&self) -> crate::network::live_configuration::Result<Configuration> {
-            Ok(self.configuration.clone())
+    impl ConfigurationProvider for LiveConfigurationMock {
+        fn get_feature_ids(&self) -> Result<Vec<String>> {
+            self.configuration.get_feature_ids()
         }
 
+        fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
+            self.configuration.get_feature(feature_id)
+        }
+
+        fn get_property_ids(&self) -> Result<Vec<String>> {
+            self.configuration.get_property_ids()
+        }
+
+        fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
+            self.configuration.get_property(property_id)
+        }
+    }
+    impl LiveConfiguration for LiveConfigurationMock {
         fn get_thread_status(
             &mut self,
         ) -> ThreadStatus<crate::network::live_configuration::Result<()>> {

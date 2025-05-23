@@ -23,7 +23,9 @@ pub(crate) mod feature_snapshot;
 pub(crate) mod property_proxy;
 pub(crate) mod property_snapshot;
 
-pub use app_configuration_client::{AppConfigurationClient, ConfigurationId};
+pub use app_configuration_client::{
+    AppConfigurationClient, ConfigurationId, ConfigurationProvider,
+};
 pub use app_configuration_http::AppConfigurationClientHttp;
 pub use app_configuration_ibm_cloud::AppConfigurationClientIBMCloud;
 pub use app_configuration_offline::AppConfigurationOffline;

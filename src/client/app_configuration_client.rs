@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Result;
-
 use crate::client::feature_proxy::FeatureProxy;
 use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
-
+use crate::Result;
 /// Identifies a configuration
 #[derive(Debug, Clone)]
 pub struct ConfigurationId {
@@ -40,12 +38,11 @@ impl ConfigurationId {
     }
 }
 
-/// AppConfiguration client for browsing, and evaluating features and properties.
-pub trait AppConfigurationClient {
+pub trait ConfigurationProvider {
     /// Returns the list of features.
     ///
-    /// The list contains the `id`s that can be used in [`get_feature`](AppConfigurationClient::get_feature)
-    /// or [`get_feature_proxy`](AppConfigurationClient::get_feature_proxy) to retrieve the actual features.
+    /// The list contains the `id`s that can be used in other methods to return
+    /// concrete features, like [`get_feature`](ConfigurationProvider::get_feature).
     fn get_feature_ids(&self) -> Result<Vec<String>>;
 
     /// Returns a snapshot for a [`Feature`](crate::Feature).
@@ -55,16 +52,10 @@ pub trait AppConfigurationClient {
     /// will be received from the server.
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot>;
 
-    /// Returns a proxied [`Feature`](crate::Feature).
-    ///
-    /// This proxied feature will envaluate entities using the latest information
-    /// available if the client implementation support some kind of live-updates.
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>>;
-
     /// Returns the list of properties.
     ///
-    /// The list contains the `id`s that can be used in [`get_property`](AppConfigurationClient::get_property)
-    /// or [`get_property_proxy`](AppConfigurationClient::get_property_proxy) to retrieve the actual features.
+    /// The list contains the `id`s that can be used in other methods to return
+    /// concrete properties, like [`get_property`](ConfigurationProvider::get_property).
     fn get_property_ids(&self) -> Result<Vec<String>>;
 
     /// Returns a snapshot for a [`Property`](crate::Property).
@@ -73,10 +64,32 @@ pub trait AppConfigurationClient {
     /// will always evaluate the same entities to the same values, no updates
     /// will be received from the server
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot>;
+}
+
+/// AppConfiguration client for browsing, and evaluating features and properties.
+pub trait AppConfigurationClient: ConfigurationProvider {
+    /// Returns a proxied [`Feature`](crate::Feature).
+    ///
+    /// This proxied feature will envaluate entities using the latest information
+    /// available if the client implementation support some kind of live-updates.
+    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>>;
 
     /// Returns a proxied [`Property`](crate::Property).
     ///
     /// This proxied property will envaluate entities using the latest information
     /// available if the client implementation support some kind of live-updates.
     fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy>;
+}
+
+impl<T: ConfigurationProvider> AppConfigurationClient for T {
+    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
+        // FIXME: there is and was no validation happening if the feature exists.
+        // Comments and error messages in FeatureProxy suggest that this should happen here.
+        // same applies for properties.
+        Ok(FeatureProxy::new(self, feature_id.to_string()))
+    }
+
+    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
+        Ok(PropertyProxy::new(self, property_id.to_string()))
+    }
 }

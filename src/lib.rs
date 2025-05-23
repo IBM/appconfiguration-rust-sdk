@@ -40,7 +40,7 @@
 //!
 //! ```
 //! use appconfiguration::{
-//!     AppConfigurationClient, AppConfigurationClientIBMCloud,
+//!     ConfigurationProvider, AppConfigurationClientIBMCloud,
 //!     ConfigurationId, Entity, Result, Value, Feature, OfflineMode
 //! };
 //! # use std::collections::HashMap;
@@ -94,7 +94,7 @@ mod value;
 
 pub use client::{
     AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline,
-    ConfigurationId,
+    ConfigurationId, ConfigurationProvider,
 };
 pub use entity::Entity;
 pub use errors::{Error, Result};

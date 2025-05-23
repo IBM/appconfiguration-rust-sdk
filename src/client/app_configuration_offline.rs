@@ -13,14 +13,12 @@
 // limitations under the License.
 
 use crate::client::configuration::Configuration;
-pub use crate::client::feature_proxy::FeatureProxy;
+
 use crate::client::feature_snapshot::FeatureSnapshot;
-pub use crate::client::property_proxy::PropertyProxy;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 use crate::models::ConfigurationJson;
-
-use super::AppConfigurationClient;
+use crate::ConfigurationProvider;
 
 /// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
@@ -42,41 +40,20 @@ impl AppConfigurationOffline {
     }
 }
 
-impl AppConfigurationClient for AppConfigurationOffline {
+impl ConfigurationProvider for AppConfigurationOffline {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .config_snapshot
-            .get_feature_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.config_snapshot.get_feature_ids()
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
         self.config_snapshot.get_feature(feature_id)
     }
 
-    fn get_feature_proxy<'a>(&'a self, feature_id: &str) -> Result<FeatureProxy<'a>> {
-        // FIXME: there is and was no validation happening if the feature exists.
-        // Comments and error messages in FeatureProxy suggest that this should happen here.
-        // same applies for properties.
-        Ok(FeatureProxy::new(self, feature_id.to_string()))
-    }
-
     fn get_property_ids(&self) -> Result<Vec<String>> {
-        Ok(self
-            .config_snapshot
-            .get_property_ids()
-            .into_iter()
-            .cloned()
-            .collect())
+        self.config_snapshot.get_property_ids()
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.config_snapshot.get_property(property_id)
-    }
-
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
-        Ok(PropertyProxy::new(self, property_id.to_string()))
     }
 }

@@ -30,7 +30,7 @@ Create your client with the context (environment and collection) you want to con
 
 ```rust
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientIBMCloud,
+    ConfigurationProvider, AppConfigurationClientIBMCloud,
     ConfigurationId, Entity, Result, Value, Feature, OfflineMode
 };
 
