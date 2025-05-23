@@ -271,7 +271,7 @@ fn check_operator(
 pub mod tests {
     use super::*;
     use crate::errors::{EntityEvaluationError, Error};
-    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule};
+    use crate::models::{ConfigValue, Rule, Segment, Segments, TargetingRule};
     use rstest::*;
 
     #[fixture]
@@ -284,7 +284,7 @@ pub mod tests {
                     segment_id: "some_segment_id_1".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
@@ -298,7 +298,7 @@ pub mod tests {
                     segment_id: "some_segment_id_2".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["peter".into()],
@@ -312,7 +312,7 @@ pub mod tests {
                     segment_id: "some_segment_id_3".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["jane".into()],

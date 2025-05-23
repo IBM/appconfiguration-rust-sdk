@@ -65,7 +65,7 @@ pub struct Segment {
     pub segment_id: String,
     pub description: String,
     pub tags: Option<String>,
-    pub rules: Vec<SegmentRule>,
+    pub rules: Vec<Rule>,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -192,7 +192,7 @@ impl TryFrom<(ValueType, ConfigValue)> for Value {
 /// NOTE: This is easily confused with `TargetingRule`, which is
 /// sometimes also called "SegmentRule".
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub struct SegmentRule {
+pub struct Rule {
     pub attribute_name: String,
     pub operator: String,
     pub values: Vec<String>,
@@ -340,7 +340,7 @@ pub(crate) mod tests {
                     segment_id: "some_segment_id_1".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
@@ -351,7 +351,7 @@ pub(crate) mod tests {
                     segment_id: "some_segment_id_2".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],

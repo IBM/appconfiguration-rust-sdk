@@ -83,7 +83,7 @@ impl Property for PropertySnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueType};
+    use crate::models::{ConfigValue, Rule, Segment, Segments, TargetingRule, ValueType};
     use std::collections::HashMap;
 
     #[test]
@@ -96,7 +96,7 @@ pub mod tests {
                     segment_id: "".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],

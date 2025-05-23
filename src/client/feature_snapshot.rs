@@ -135,7 +135,7 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueType};
+    use crate::models::{ConfigValue, Rule, Segment, Segments, TargetingRule, ValueType};
     use rstest::rstest;
     use std::collections::HashMap;
 
@@ -246,7 +246,7 @@ pub mod tests {
                     segment_id: "".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
@@ -316,7 +316,7 @@ pub mod tests {
                     segment_id: "".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
@@ -368,7 +368,7 @@ pub mod tests {
                     segment_id: "".into(),
                     description: "".into(),
                     tags: None,
-                    rules: vec![SegmentRule {
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
