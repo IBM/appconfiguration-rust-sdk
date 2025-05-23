@@ -65,7 +65,7 @@ impl Configuration {
                 }
 
                 let segment_rules =
-                    SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
+                    SegmentRules::new(segments, feature.segment_rules.clone(), feature.r#type);
 
                 Ok((feature.feature_id.clone(), (feature, segment_rules)))
             })
@@ -92,7 +92,7 @@ impl Configuration {
                 }
 
                 let segment_rules =
-                    SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
+                    SegmentRules::new(segments, property.segment_rules.clone(), property.r#type);
                 Ok((property.property_id.clone(), (property, segment_rules)))
             })
             .collect::<Result<_>>()?;
@@ -149,8 +149,8 @@ impl ConfigurationProvider for Configuration {
             })
         })?;
 
-        let enabled_value = (feature.kind, feature.enabled_value.clone()).try_into()?;
-        let disabled_value = (feature.kind, feature.disabled_value.clone()).try_into()?;
+        let enabled_value = (feature.r#type, feature.enabled_value.clone()).try_into()?;
+        let disabled_value = (feature.r#type, feature.disabled_value.clone()).try_into()?;
         Ok(FeatureSnapshot::new(
             feature.enabled,
             enabled_value,
@@ -174,7 +174,7 @@ impl ConfigurationProvider for Configuration {
             })
         })?;
 
-        let value = (property.kind, property.value.clone()).try_into()?;
+        let value = (property.r#type, property.value.clone()).try_into()?;
         Ok(PropertySnapshot::new(
             value,
             segment_rules.clone(),

@@ -21,7 +21,7 @@ use crate::errors::Error;
 use crate::errors::Result;
 use crate::models::Segment;
 use crate::models::TargetingRule;
-use crate::models::ValueKind;
+use crate::models::ValueType;
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
@@ -29,7 +29,7 @@ use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 pub(crate) struct SegmentRules {
     targeting_rules: Vec<TargetingRule>,
     segments: HashMap<String, Segment>,
-    kind: ValueKind,
+    kind: ValueType,
 }
 
 // TODO: We should rename this to TargetingRules
@@ -37,7 +37,7 @@ impl SegmentRules {
     pub(crate) fn new(
         segments: HashMap<String, Segment>,
         targeting_rules: Vec<TargetingRule>,
-        kind: ValueKind,
+        kind: ValueType,
     ) -> Self {
         Self {
             segments,
@@ -81,7 +81,7 @@ impl SegmentRules {
 #[derive(Debug)]
 pub(crate) struct SegmentRule<'a> {
     targeting_rule: &'a TargetingRule,
-    kind: ValueKind,
+    kind: ValueType,
 }
 
 impl SegmentRule<'_> {
@@ -280,10 +280,10 @@ pub mod tests {
             (
                 "some_segment_id_1".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_1".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -294,10 +294,10 @@ pub mod tests {
             (
                 "some_segment_id_2".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_2".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -308,10 +308,10 @@ pub mod tests {
             (
                 "some_segment_id_3".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_3".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -344,7 +344,7 @@ pub mod tests {
         segments: HashMap<String, Segment>,
         targeting_rules: Vec<TargetingRule>,
     ) {
-        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
+        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
@@ -391,7 +391,7 @@ pub mod tests {
         segments: HashMap<String, Segment>,
         targeting_rules: Vec<TargetingRule>,
     ) {
-        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
+        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
@@ -421,7 +421,7 @@ pub mod tests {
                 order: 0,
                 rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
             }];
-            SegmentRules::new(segments, targeting_rules, ValueKind::String)
+            SegmentRules::new(segments, targeting_rules, ValueType::String)
         };
         let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Error message should look something like this:
@@ -446,7 +446,7 @@ pub mod tests {
         segments: HashMap<String, Segment>,
         targeting_rules: Vec<TargetingRule>,
     ) {
-        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueKind::String);
+        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),

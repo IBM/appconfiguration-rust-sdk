@@ -83,7 +83,7 @@ impl Property for PropertySnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind};
+    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueType};
     use std::collections::HashMap;
 
     #[test]
@@ -92,10 +92,10 @@ pub mod tests {
             let segments = HashMap::from([(
                 "some_segment_id_1".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -113,7 +113,7 @@ pub mod tests {
                     order: 1,
                     rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
                 }],
-                ValueKind::Numeric,
+                ValueType::Numeric,
             );
             PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1")
         };

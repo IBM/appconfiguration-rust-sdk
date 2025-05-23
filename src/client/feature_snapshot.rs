@@ -135,7 +135,7 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueKind};
+    use crate::models::{ConfigValue, Segment, SegmentRule, Segments, TargetingRule, ValueType};
     use rstest::rstest;
     use std::collections::HashMap;
 
@@ -176,7 +176,7 @@ pub mod tests {
     ) {
         let feature = {
             let segment_rules =
-                SegmentRules::new(HashMap::new(), segment_rules, ValueKind::Numeric);
+                SegmentRules::new(HashMap::new(), segment_rules, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),
@@ -217,7 +217,7 @@ pub mod tests {
     #[test]
     fn test_get_value_disabled_feature() {
         let feature = {
-            let segment_rules = SegmentRules::new(HashMap::new(), Vec::new(), ValueKind::Numeric);
+            let segment_rules = SegmentRules::new(HashMap::new(), Vec::new(), ValueType::Numeric);
             FeatureSnapshot::new(
                 false,
                 Value::Int64(-42),
@@ -242,10 +242,10 @@ pub mod tests {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -263,7 +263,7 @@ pub mod tests {
                     order: 0,
                     rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
                 }],
-                ValueKind::Numeric,
+                ValueType::Numeric,
             );
             FeatureSnapshot::new(
                 true,
@@ -312,10 +312,10 @@ pub mod tests {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -333,7 +333,7 @@ pub mod tests {
                     order: 0,
                     rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
                 }],
-                ValueKind::Numeric,
+                ValueType::Numeric,
             );
             FeatureSnapshot::new(
                 true,
@@ -364,10 +364,10 @@ pub mod tests {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -387,7 +387,7 @@ pub mod tests {
                         "$default".into(),
                     ))),
                 }],
-                ValueKind::Numeric,
+                ValueType::Numeric,
             );
             FeatureSnapshot::new(
                 true,

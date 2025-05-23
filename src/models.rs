@@ -54,8 +54,6 @@ impl ConfigurationJson {
 
 #[derive(Debug, Deserialize)]
 pub struct Environment {
-    #[serde(rename = "name")]
-    pub(crate) _name: String,
     pub environment_id: String,
     pub features: Vec<Feature>,
     pub properties: Vec<Property>,
@@ -63,13 +61,10 @@ pub struct Environment {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Segment {
-    #[serde(rename = "name")]
-    pub _name: String,
+    pub name: String,
     pub segment_id: String,
-    #[serde(rename = "description")]
-    pub _description: String,
-    #[serde(rename = "tags")]
-    pub _tags: Option<String>,
+    pub description: String,
+    pub tags: Option<String>,
     pub rules: Vec<SegmentRule>,
 }
 
@@ -77,10 +72,8 @@ pub struct Segment {
 pub struct Feature {
     pub name: String,
     pub feature_id: String,
-    #[serde(rename = "type")]
-    pub kind: ValueKind,
-    #[serde(rename = "format")]
-    pub _format: Option<String>,
+    pub r#type: ValueType,
+    pub format: Option<String>,
     pub enabled_value: ConfigValue,
     pub disabled_value: ConfigValue,
     // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
@@ -94,12 +87,9 @@ pub struct Feature {
 pub struct Property {
     pub name: String,
     pub property_id: String,
-    #[serde(rename = "type")]
-    pub kind: ValueKind,
-    #[serde(rename = "tags")]
-    pub _tags: Option<String>,
-    #[serde(rename = "format")]
-    pub _format: Option<String>,
+    pub r#type: ValueType,
+    pub tags: Option<String>,
+    pub format: Option<String>,
     pub value: ConfigValue,
     // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
     // This causes quite som ambiguity with SegmentRule vs TargetingRule.
@@ -107,7 +97,7 @@ pub struct Property {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
-pub enum ValueKind {
+pub enum ValueType {
     #[serde(rename(deserialize = "NUMERIC"))]
     Numeric,
     #[serde(rename(deserialize = "BOOLEAN"))]
@@ -116,7 +106,7 @@ pub enum ValueKind {
     String,
 }
 
-impl Display for ValueKind {
+impl Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = match self {
             Self::Numeric => "NUMERIC",
@@ -166,13 +156,13 @@ impl Display for ConfigValue {
     }
 }
 
-impl TryFrom<(ValueKind, ConfigValue)> for Value {
+impl TryFrom<(ValueType, ConfigValue)> for Value {
     type Error = crate::Error;
 
-    fn try_from(value: (ValueKind, ConfigValue)) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: (ValueType, ConfigValue)) -> std::result::Result<Self, Self::Error> {
         let (kind, value) = value;
         match kind {
-            ValueKind::Numeric => {
+            ValueType::Numeric => {
                 if let Some(n) = value.as_i64() {
                     Ok(Value::Int64(n))
                 } else if let Some(n) = value.as_u64() {
@@ -185,11 +175,11 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
                     ))
                 }
             }
-            ValueKind::Boolean => value
+            ValueType::Boolean => value
                 .as_boolean()
                 .map(Value::Boolean)
                 .ok_or(crate::Error::MismatchType),
-            ValueKind::String => value
+            ValueType::String => value
                 .as_string()
                 .map(Value::String)
                 .ok_or(crate::Error::MismatchType),
@@ -260,13 +250,12 @@ pub(crate) mod tests {
     pub(crate) fn configuration_feature1_enabled() -> ConfigurationJson {
         ConfigurationJson {
             environments: vec![Environment {
-                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     enabled_value: ConfigValue(serde_json::Value::Number(42.into())),
                     disabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
                     segment_rules: Vec::new(),
@@ -283,16 +272,15 @@ pub(crate) mod tests {
     pub(crate) fn configuration_property1_enabled() -> ConfigurationJson {
         ConfigurationJson {
             environments: vec![Environment {
-                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 properties: vec![Property {
                     name: "P1".to_string(),
                     property_id: "p1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     value: ConfigValue(serde_json::Value::Number(42.into())),
                     segment_rules: Vec::new(),
-                    _tags: None,
+                    tags: None,
                 }],
                 features: Vec::new(),
             }],
@@ -324,13 +312,12 @@ pub(crate) mod tests {
 
         ConfigurationJson {
             environments: vec![Environment {
-                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
                     disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
                     segment_rules: segment_rules.clone(),
@@ -340,19 +327,19 @@ pub(crate) mod tests {
                 properties: vec![Property {
                     name: "P1".to_string(),
                     property_id: "f1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     value: ConfigValue(serde_json::Value::Number((-42).into())),
                     segment_rules,
-                    _tags: None,
+                    tags: None,
                 }],
             }],
             segments: vec![
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_1".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
@@ -360,10 +347,10 @@ pub(crate) mod tests {
                     }],
                 },
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_2".into(),
-                    _description: "".into(),
-                    _tags: None,
+                    description: "".into(),
+                    tags: None,
                     rules: vec![SegmentRule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
