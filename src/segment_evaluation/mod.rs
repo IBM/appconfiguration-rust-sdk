@@ -27,27 +27,27 @@ use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetingRules {
-    targeting_rules: Vec<SegmentRule>,
+    segment_rules: Vec<SegmentRule>,
     segments: HashMap<String, Segment>,
-    kind: ValueType,
+    r#type: ValueType,
 }
 
 // TODO: We should rename this to TargetingRules
 impl TargetingRules {
     pub(crate) fn new(
         segments: HashMap<String, Segment>,
-        targeting_rules: Vec<SegmentRule>,
-        kind: ValueType,
+        segment_rules: Vec<SegmentRule>,
+        r#type: ValueType,
     ) -> Self {
         Self {
             segments,
-            targeting_rules,
-            kind,
+            segment_rules,
+            r#type,
         }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.targeting_rules.is_empty()
+        self.segment_rules.is_empty()
     }
 
     /// Finds the targeting rule (aka SegmentRule) and the Segment which a given entity can be associated to.
@@ -57,16 +57,16 @@ impl TargetingRules {
         &self,
         entity: &impl Entity,
     ) -> Result<Option<(TargetingRule, &Segment)>> {
-        for targeting_rule in self.targeting_rules.iter() {
+        for segment_rule in self.segment_rules.iter() {
             if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(
                 &self.segments,
-                targeting_rule,
+                segment_rule,
                 entity,
             )? {
                 return Ok(Some((
                     TargetingRule {
-                        targeting_rule,
-                        kind: self.kind,
+                        segment_rule,
+                        r#type: self.r#type,
                     },
                     segment,
                 )));
@@ -80,13 +80,13 @@ impl TargetingRules {
 // (need to avoid conflict with models::TargetingRule)
 #[derive(Debug)]
 pub(crate) struct TargetingRule<'a> {
-    targeting_rule: &'a SegmentRule,
-    kind: ValueType,
+    segment_rule: &'a SegmentRule,
+    r#type: ValueType,
 }
 
 impl TargetingRule<'_> {
     fn is_default(&self) -> bool {
-        self.targeting_rule.value.is_default()
+        self.segment_rule.value.is_default()
     }
 
     /// Returns the rollout percentage using the following logic:
@@ -95,7 +95,7 @@ impl TargetingRule<'_> {
     ///   the given `default` argument.
     /// * Otherwise it will return the rollout value from the [`TargetingRule`] converted to u32
     pub(crate) fn rollout_percentage(&self, default: u32) -> Result<u32> {
-        self.targeting_rule
+        self.segment_rule
             .rollout_percentage
             .as_ref()
             .map(|v| {
@@ -125,7 +125,7 @@ impl TargetingRule<'_> {
         if self.is_default() {
             Ok(default.clone())
         } else {
-            (self.kind, self.targeting_rule.value.clone()).try_into()
+            (self.r#type, self.segment_rule.value.clone()).try_into()
         }
     }
 }
@@ -135,11 +135,11 @@ impl TargetingRule<'_> {
 // the targeting_rule matches the entity.
 fn find_segment_of_targeting_rule_which_applies_to_entity<'a>(
     segments: &'a HashMap<String, Segment>,
-    targeting_rule: &SegmentRule,
+    segment_rule: &SegmentRule,
     entity: &impl Entity,
 ) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
     // NOTE: In the JSON model the targeted segments (list of list) are called "rules" of a targeting rule.
-    let targeted_segment_list_of_list = &targeting_rule.rules;
+    let targeted_segment_list_of_list = &segment_rule.rules;
     for targeted_segment_list in targeted_segment_list_of_list.iter() {
         if let Some(segment) =
             find_segment_which_applies_to_entity(segments, &targeted_segment_list.segments, entity)?
@@ -355,7 +355,7 @@ pub mod tests {
             // Segment evaluation should succeed:
             let (rule, segment) = rule.unwrap().unwrap();
             // And we should get the correct rule and the matched segment
-            assert!(rule.targeting_rule.order == 0);
+            assert!(rule.segment_rule.order == 0);
             assert!(segment.segment_id == "some_segment_id_2");
         }
 
@@ -368,7 +368,7 @@ pub mod tests {
             // Segment evaluation should succeed:
             let (rule, segment) = rule.unwrap().unwrap();
             // And we should get the correct rule and the matched segment
-            assert!(rule.targeting_rule.order == 0);
+            assert!(rule.segment_rule.order == 0);
             assert!(segment.segment_id == "some_segment_id_3");
         }
 
