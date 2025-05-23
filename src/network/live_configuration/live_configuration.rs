@@ -21,6 +21,7 @@ use crate::client::configuration::Configuration;
 use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus};
 use crate::ConfigurationId;
+use crate::models::MeteringDataJson;
 
 pub trait LiveConfiguration {
     /// Returns the current configuration
@@ -191,6 +192,13 @@ mod tests {
                 _collection: &ConfigurationId,
             ) -> crate::NetworkResult<impl WebsocketReader> {
                 Ok(self.websocket_rx.recv().unwrap())
+            }
+
+            fn push_metering_data(
+                &self,
+                data: &MeteringDataJson
+            ) -> crate::NetworkResult<()>{
+                unreachable!()
             }
         }
 
