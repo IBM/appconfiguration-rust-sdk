@@ -20,23 +20,23 @@ use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::models::Segment;
-use crate::models::TargetingRule;
+use crate::models::SegmentRule;
 use crate::models::ValueType;
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SegmentRules {
-    targeting_rules: Vec<TargetingRule>,
+pub(crate) struct TargetingRules {
+    targeting_rules: Vec<SegmentRule>,
     segments: HashMap<String, Segment>,
     kind: ValueType,
 }
 
 // TODO: We should rename this to TargetingRules
-impl SegmentRules {
+impl TargetingRules {
     pub(crate) fn new(
         segments: HashMap<String, Segment>,
-        targeting_rules: Vec<TargetingRule>,
+        targeting_rules: Vec<SegmentRule>,
         kind: ValueType,
     ) -> Self {
         Self {
@@ -56,7 +56,7 @@ impl SegmentRules {
     pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
         entity: &impl Entity,
-    ) -> Result<Option<(SegmentRule, &Segment)>> {
+    ) -> Result<Option<(TargetingRule, &Segment)>> {
         for targeting_rule in self.targeting_rules.iter() {
             if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(
                 &self.segments,
@@ -64,7 +64,7 @@ impl SegmentRules {
                 entity,
             )? {
                 return Ok(Some((
-                    SegmentRule {
+                    TargetingRule {
                         targeting_rule,
                         kind: self.kind,
                     },
@@ -79,12 +79,12 @@ impl SegmentRules {
 // TODO: We should rename this to TargetingRule, it is basically encapsulation one.
 // (need to avoid conflict with models::TargetingRule)
 #[derive(Debug)]
-pub(crate) struct SegmentRule<'a> {
-    targeting_rule: &'a TargetingRule,
+pub(crate) struct TargetingRule<'a> {
+    targeting_rule: &'a SegmentRule,
     kind: ValueType,
 }
 
-impl SegmentRule<'_> {
+impl TargetingRule<'_> {
     fn is_default(&self) -> bool {
         self.targeting_rule.value.is_default()
     }
@@ -135,7 +135,7 @@ impl SegmentRule<'_> {
 // the targeting_rule matches the entity.
 fn find_segment_of_targeting_rule_which_applies_to_entity<'a>(
     segments: &'a HashMap<String, Segment>,
-    targeting_rule: &TargetingRule,
+    targeting_rule: &SegmentRule,
     entity: &impl Entity,
 ) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
     // NOTE: In the JSON model the targeted segments (list of list) are called "rules" of a targeting rule.
@@ -271,7 +271,7 @@ fn check_operator(
 pub mod tests {
     use super::*;
     use crate::errors::{EntityEvaluationError, Error};
-    use crate::models::{ConfigValue, Rule, Segment, Segments, TargetingRule};
+    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments};
     use rstest::*;
 
     #[fixture]
@@ -323,8 +323,8 @@ pub mod tests {
     }
 
     #[fixture]
-    fn targeting_rules() -> Vec<TargetingRule> {
-        vec![TargetingRule {
+    fn targeting_rules() -> Vec<SegmentRule> {
+        vec![SegmentRule {
             rules: vec![
                 Segments {
                     segments: vec!["some_segment_id_1".into(), "some_segment_id_2".into()],
@@ -342,9 +342,9 @@ pub mod tests {
     #[rstest]
     fn test_targeting_rule_matches_and_correct_segment_reported_back(
         segments: HashMap<String, Segment>,
-        targeting_rules: Vec<TargetingRule>,
+        targeting_rules: Vec<SegmentRule>,
     ) {
-        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueType::String);
+        let segment_rules = TargetingRules::new(segments, targeting_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
@@ -389,9 +389,9 @@ pub mod tests {
     #[rstest]
     fn test_attribute_not_found(
         segments: HashMap<String, Segment>,
-        targeting_rules: Vec<TargetingRule>,
+        targeting_rules: Vec<SegmentRule>,
     ) {
-        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueType::String);
+        let segment_rules = TargetingRules::new(segments, targeting_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
@@ -413,7 +413,7 @@ pub mod tests {
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
         let segment_rules = {
-            let targeting_rules = vec![TargetingRule {
+            let targeting_rules = vec![SegmentRule {
                 rules: vec![Segments {
                     segments: vec!["non_existing_segment_id".into()],
                 }],
@@ -421,7 +421,7 @@ pub mod tests {
                 order: 0,
                 rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
             }];
-            SegmentRules::new(segments, targeting_rules, ValueType::String)
+            TargetingRules::new(segments, targeting_rules, ValueType::String)
         };
         let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Error message should look something like this:
@@ -442,11 +442,8 @@ pub mod tests {
     // SCENARIO - evaluating an operator fails. Meaning, [for example] user has added a numeric value(int/float) in appconfig segment attribute, but in their application they pass the attribute with a boolean value.
     // We can mark this as failure and return error.
     #[rstest]
-    fn test_operator_failed(
-        segments: HashMap<String, Segment>,
-        targeting_rules: Vec<TargetingRule>,
-    ) {
-        let segment_rules = SegmentRules::new(segments, targeting_rules, ValueType::String);
+    fn test_operator_failed(segments: HashMap<String, Segment>, targeting_rules: Vec<SegmentRule>) {
+        let segment_rules = TargetingRules::new(segments, targeting_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),

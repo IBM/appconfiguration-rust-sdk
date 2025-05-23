@@ -15,8 +15,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
-use crate::models::{ConfigurationJson, Feature, Property, Segment, TargetingRule};
-use crate::segment_evaluation::SegmentRules;
+use crate::models::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
+use crate::segment_evaluation::TargetingRules;
 use crate::Error;
 
 use super::feature_snapshot::FeatureSnapshot;
@@ -28,8 +28,8 @@ use super::ConfigurationProvider;
 /// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Configuration {
-    pub(crate) features: HashMap<String, (Feature, SegmentRules)>,
-    pub(crate) properties: HashMap<String, (Property, SegmentRules)>,
+    pub(crate) features: HashMap<String, (Feature, TargetingRules)>,
+    pub(crate) properties: HashMap<String, (Property, TargetingRules)>,
 }
 
 impl Configuration {
@@ -65,7 +65,7 @@ impl Configuration {
                 }
 
                 let segment_rules =
-                    SegmentRules::new(segments, feature.segment_rules.clone(), feature.r#type);
+                    TargetingRules::new(segments, feature.segment_rules.clone(), feature.r#type);
 
                 Ok((feature.feature_id.clone(), (feature, segment_rules)))
             })
@@ -92,7 +92,7 @@ impl Configuration {
                 }
 
                 let segment_rules =
-                    SegmentRules::new(segments, property.segment_rules.clone(), property.r#type);
+                    TargetingRules::new(segments, property.segment_rules.clone(), property.r#type);
                 Ok((property.property_id.clone(), (property, segment_rules)))
             })
             .collect::<Result<_>>()?;
@@ -107,7 +107,7 @@ impl Configuration {
     /// by the given `segment_rules`.
     fn get_segments_for_segment_rules(
         segments: &[Segment],
-        segment_rules: &[TargetingRule],
+        segment_rules: &[SegmentRule],
     ) -> HashMap<String, Segment> {
         let referenced_segment_ids = segment_rules
             .iter()

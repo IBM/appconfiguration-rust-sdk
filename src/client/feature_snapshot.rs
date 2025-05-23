@@ -17,7 +17,7 @@ use crate::value::Value;
 use crate::Feature;
 
 use super::feature_proxy::random_value;
-use crate::segment_evaluation::SegmentRules;
+use crate::segment_evaluation::TargetingRules;
 
 use crate::errors::Result;
 
@@ -30,7 +30,7 @@ pub struct FeatureSnapshot {
     rollout_percentage: u32,
     name: String,
     feature_id: String,
-    segment_rules: SegmentRules,
+    segment_rules: TargetingRules,
 }
 
 impl FeatureSnapshot {
@@ -41,7 +41,7 @@ impl FeatureSnapshot {
         rollout_percentage: u32,
         name: &str,
         feature_id: &str,
-        segment_rules: SegmentRules,
+        segment_rules: TargetingRules,
     ) -> Self {
         Self {
             enabled,
@@ -135,7 +135,7 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Rule, Segment, Segments, TargetingRule, ValueType};
+    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
     use rstest::rstest;
     use std::collections::HashMap;
 
@@ -169,14 +169,14 @@ pub mod tests {
     // attrs but no segment rules
     #[case([].into(), [("key".into(), Value::from("value".to_string()))].into())]
     // no attrs but segment rules
-    #[case([TargetingRule{rules: Vec::new(), value: ConfigValue(serde_json::json!("")), order: 0, rollout_percentage: None}].into(), [].into())]
+    #[case([SegmentRule{rules: Vec::new(), value: ConfigValue(serde_json::json!("")), order: 0, rollout_percentage: None}].into(), [].into())]
     fn test_get_value_no_match_50_50_rollout(
-        #[case] segment_rules: Vec<TargetingRule>,
+        #[case] segment_rules: Vec<SegmentRule>,
         #[case] entity_attributes: HashMap<String, Value>,
     ) {
         let feature = {
             let segment_rules =
-                SegmentRules::new(HashMap::new(), segment_rules, ValueType::Numeric);
+                TargetingRules::new(HashMap::new(), segment_rules, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),
@@ -217,7 +217,7 @@ pub mod tests {
     #[test]
     fn test_get_value_disabled_feature() {
         let feature = {
-            let segment_rules = SegmentRules::new(HashMap::new(), Vec::new(), ValueType::Numeric);
+            let segment_rules = TargetingRules::new(HashMap::new(), Vec::new(), ValueType::Numeric);
             FeatureSnapshot::new(
                 false,
                 Value::Int64(-42),
@@ -253,9 +253,9 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = SegmentRules::new(
+            let segment_rules = TargetingRules::new(
                 segments,
-                vec![TargetingRule {
+                vec![SegmentRule {
                     rules: vec![Segments {
                         segments: vec!["some_segment_id".into()],
                     }],
@@ -323,9 +323,9 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = SegmentRules::new(
+            let segment_rules = TargetingRules::new(
                 segments,
-                vec![TargetingRule {
+                vec![SegmentRule {
                     rules: vec![Segments {
                         segments: vec!["some_segment_id".into()],
                     }],
@@ -375,9 +375,9 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = SegmentRules::new(
+            let segment_rules = TargetingRules::new(
                 segments,
-                vec![TargetingRule {
+                vec![SegmentRule {
                     rules: vec![Segments {
                         segments: vec!["some_segment_id".into()],
                     }],

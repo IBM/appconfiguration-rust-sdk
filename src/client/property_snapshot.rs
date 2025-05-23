@@ -17,18 +17,18 @@ use crate::value::Value;
 use crate::Property;
 
 use crate::errors::Result;
-use crate::segment_evaluation::SegmentRules;
+use crate::segment_evaluation::TargetingRules;
 
 /// Provides a snapshot of a [`Property`].
 #[derive(Debug)]
 pub struct PropertySnapshot {
     value: Value,
-    segment_rules: SegmentRules,
+    segment_rules: TargetingRules,
     name: String,
 }
 
 impl PropertySnapshot {
-    pub(crate) fn new(value: Value, segment_rules: SegmentRules, name: &str) -> Self {
+    pub(crate) fn new(value: Value, segment_rules: TargetingRules, name: &str) -> Self {
         Self {
             value,
             segment_rules,
@@ -83,7 +83,7 @@ impl Property for PropertySnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Rule, Segment, Segments, TargetingRule, ValueType};
+    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
     use std::collections::HashMap;
 
     #[test]
@@ -103,9 +103,9 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = SegmentRules::new(
+            let segment_rules = TargetingRules::new(
                 segments,
-                vec![TargetingRule {
+                vec![SegmentRule {
                     rules: vec![Segments {
                         segments: vec!["some_segment_id_1".into()],
                     }],

@@ -78,7 +78,7 @@ pub struct Feature {
     pub disabled_value: ConfigValue,
     // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
     // This causes quite som ambiguity with SegmentRule vs TargetingRule.
-    pub segment_rules: Vec<TargetingRule>,
+    pub segment_rules: Vec<SegmentRule>,
     pub enabled: bool,
     pub rollout_percentage: u32,
 }
@@ -93,7 +93,7 @@ pub struct Property {
     pub value: ConfigValue,
     // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
     // This causes quite som ambiguity with SegmentRule vs TargetingRule.
-    pub segment_rules: Vec<TargetingRule>,
+    pub segment_rules: Vec<SegmentRule>,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -202,7 +202,7 @@ pub struct Rule {
 /// NOTE: This is easily confused with `SegmentRule`, as the field name in
 /// Features containing TargetingRules is called `segment_rules`
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub struct TargetingRule {
+pub struct SegmentRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
     /// NOTE: why list of lists?
@@ -291,7 +291,7 @@ pub(crate) mod tests {
     #[fixture]
     pub(crate) fn configuration_unordered_segment_rules() -> ConfigurationJson {
         let segment_rules = vec![
-            TargetingRule {
+            SegmentRule {
                 rules: vec![Segments {
                     segments: vec!["some_segment_id_1".into()],
                 }],
@@ -299,7 +299,7 @@ pub(crate) mod tests {
                 order: 1,
                 rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
             },
-            TargetingRule {
+            SegmentRule {
                 rules: vec![Segments {
                     segments: vec!["some_segment_id_2".into()],
                 }],
