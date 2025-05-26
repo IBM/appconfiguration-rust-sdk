@@ -76,8 +76,6 @@ pub struct Feature {
     pub format: Option<String>,
     pub enabled_value: ConfigValue,
     pub disabled_value: ConfigValue,
-    // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
-    // This causes quite som ambiguity with SegmentRule vs TargetingRule.
     pub segment_rules: Vec<SegmentRule>,
     pub enabled: bool,
     pub rollout_percentage: u32,
@@ -91,8 +89,6 @@ pub struct Property {
     pub tags: Option<String>,
     pub format: Option<String>,
     pub value: ConfigValue,
-    // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
-    // This causes quite som ambiguity with SegmentRule vs TargetingRule.
     pub segment_rules: Vec<SegmentRule>,
 }
 
@@ -189,8 +185,6 @@ impl TryFrom<(ValueType, ConfigValue)> for Value {
 
 /// Represents a Rule of a Segment.
 /// Those are the rules to check if an entity belongs to a segment.
-/// NOTE: This is easily confused with `TargetingRule`, which is
-/// sometimes also called "SegmentRule".
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Rule {
     pub attribute_name: String,
@@ -199,8 +193,6 @@ pub struct Rule {
 }
 
 /// Associates a Feature/Property to one or more Segments
-/// NOTE: This is easily confused with `SegmentRule`, as the field name in
-/// Features containing TargetingRules is called `segment_rules`
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct SegmentRule {
     /// The list of targeted segments

@@ -32,7 +32,6 @@ pub(crate) struct TargetingRules {
     r#type: ValueType,
 }
 
-// TODO: We should rename this to TargetingRules
 impl TargetingRules {
     pub(crate) fn new(
         segments: HashMap<String, Segment>,
@@ -50,8 +49,8 @@ impl TargetingRules {
         self.segment_rules.is_empty()
     }
 
-    /// Finds the targeting rule (aka SegmentRule) and the Segment which a given entity can be associated to.
-    /// Note: A feature/property can have multiple TargetingRules (aka SegmentRules), which define a specific feature/property value. One SegmentRule/TargetingRule can point to multiple Segments. Rules and Segments are iterated in order and the first match is reported.
+    /// Finds the [`TargetingRule`] and the [`Segment`] which a given entity can be associated to.
+    /// Note: A feature/property can have multiple TargetingRules, which define a specific feature/property value. One TargetingRule can point to multiple Segments. Rules and Segments are iterated in order and the first match is reported.
     /// TODO: A TargetingRule can have Rules and Segments also have Rules. Those are easily confused. Especially, as TargetingRules are sometimes referred to as SegmentRules, which causes even greater confusion.
     pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
@@ -76,8 +75,6 @@ impl TargetingRules {
     }
 }
 
-// TODO: We should rename this to TargetingRule, it is basically encapsulation one.
-// (need to avoid conflict with models::TargetingRule)
 #[derive(Debug)]
 pub(crate) struct TargetingRule<'a> {
     segment_rule: &'a SegmentRule,
