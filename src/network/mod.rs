@@ -16,6 +16,7 @@ pub mod errors;
 pub(crate) mod http_client;
 mod token_provider;
 
+pub(crate) use http_client::ServerClient;
 pub(crate) use http_client::ServerClientImpl;
 pub use http_client::ServiceAddress;
 pub(crate) use token_provider::IBMCloudTokenProvider;
