@@ -14,7 +14,7 @@
 
 use thiserror::Error;
 
-use crate::models::{Segment, SegmentRule};
+use crate::models::{Rule, Segment};
 
 #[derive(Debug, Error)]
 pub(crate) enum SegmentEvaluationError {
@@ -41,8 +41,8 @@ pub(crate) struct SegmentEvaluationErrorKind {
     pub(crate) source: CheckOperatorErrorDetail,
 }
 
-impl From<(CheckOperatorErrorDetail, &Segment, &SegmentRule, &String)> for SegmentEvaluationError {
-    fn from(value: (CheckOperatorErrorDetail, &Segment, &SegmentRule, &String)) -> Self {
+impl From<(CheckOperatorErrorDetail, &Segment, &Rule, &String)> for SegmentEvaluationError {
+    fn from(value: (CheckOperatorErrorDetail, &Segment, &Rule, &String)) -> Self {
         let (source, segment, segment_rule, value) = value;
         Self::SegmentEvaluationFailed(SegmentEvaluationErrorKind {
             segment_id: segment.segment_id.clone(),

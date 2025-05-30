@@ -15,8 +15,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
-use crate::models::{ConfigurationJson, Feature, Property, Segment, TargetingRule};
-use crate::segment_evaluation::SegmentRules;
+use crate::models::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
+use crate::segment_evaluation::TargetingRules;
 use crate::Error;
 
 use super::feature_snapshot::FeatureSnapshot;
@@ -28,8 +28,8 @@ use super::ConfigurationProvider;
 /// It contains a subset of models::ConfigurationJson, adding indexing.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Configuration {
-    pub(crate) features: HashMap<String, (Feature, SegmentRules)>,
-    pub(crate) properties: HashMap<String, (Property, SegmentRules)>,
+    pub(crate) features: HashMap<String, (Feature, TargetingRules)>,
+    pub(crate) properties: HashMap<String, (Property, TargetingRules)>,
 }
 
 impl Configuration {
@@ -65,7 +65,7 @@ impl Configuration {
                 }
 
                 let segment_rules =
-                    SegmentRules::new(segments, feature.segment_rules.clone(), feature.kind);
+                    TargetingRules::new(segments, feature.segment_rules.clone(), feature.r#type);
 
                 Ok((feature.feature_id.clone(), (feature, segment_rules)))
             })
@@ -92,7 +92,7 @@ impl Configuration {
                 }
 
                 let segment_rules =
-                    SegmentRules::new(segments, property.segment_rules.clone(), property.kind);
+                    TargetingRules::new(segments, property.segment_rules.clone(), property.r#type);
                 Ok((property.property_id.clone(), (property, segment_rules)))
             })
             .collect::<Result<_>>()?;
@@ -107,7 +107,7 @@ impl Configuration {
     /// by the given `segment_rules`.
     fn get_segments_for_segment_rules(
         segments: &[Segment],
-        segment_rules: &[TargetingRule],
+        segment_rules: &[SegmentRule],
     ) -> HashMap<String, Segment> {
         let referenced_segment_ids = segment_rules
             .iter()
@@ -149,8 +149,8 @@ impl ConfigurationProvider for Configuration {
             })
         })?;
 
-        let enabled_value = (feature.kind, feature.enabled_value.clone()).try_into()?;
-        let disabled_value = (feature.kind, feature.disabled_value.clone()).try_into()?;
+        let enabled_value = (feature.r#type, feature.enabled_value.clone()).try_into()?;
+        let disabled_value = (feature.r#type, feature.disabled_value.clone()).try_into()?;
         Ok(FeatureSnapshot::new(
             feature.enabled,
             enabled_value,
@@ -174,7 +174,7 @@ impl ConfigurationProvider for Configuration {
             })
         })?;
 
-        let value = (property.kind, property.value.clone()).try_into()?;
+        let value = (property.r#type, property.value.clone()).try_into()?;
         Ok(PropertySnapshot::new(
             value,
             segment_rules.clone(),

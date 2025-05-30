@@ -54,8 +54,6 @@ impl ConfigurationJson {
 
 #[derive(Debug, Deserialize)]
 pub struct Environment {
-    #[serde(rename = "name")]
-    pub(crate) _name: String,
     pub environment_id: String,
     pub features: Vec<Feature>,
     pub properties: Vec<Property>,
@@ -63,29 +61,22 @@ pub struct Environment {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Segment {
-    #[serde(rename = "name")]
-    pub _name: String,
+    pub name: String,
     pub segment_id: String,
-    #[serde(rename = "description")]
-    pub _description: String,
-    #[serde(rename = "tags")]
-    pub _tags: Option<String>,
-    pub rules: Vec<SegmentRule>,
+    pub description: String,
+    pub tags: Option<String>,
+    pub rules: Vec<Rule>,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Feature {
     pub name: String,
     pub feature_id: String,
-    #[serde(rename = "type")]
-    pub kind: ValueKind,
-    #[serde(rename = "format")]
-    pub _format: Option<String>,
+    pub r#type: ValueType,
+    pub format: Option<String>,
     pub enabled_value: ConfigValue,
     pub disabled_value: ConfigValue,
-    // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
-    // This causes quite som ambiguity with SegmentRule vs TargetingRule.
-    pub segment_rules: Vec<TargetingRule>,
+    pub segment_rules: Vec<SegmentRule>,
     pub enabled: bool,
     pub rollout_percentage: u32,
 }
@@ -94,20 +85,15 @@ pub struct Feature {
 pub struct Property {
     pub name: String,
     pub property_id: String,
-    #[serde(rename = "type")]
-    pub kind: ValueKind,
-    #[serde(rename = "tags")]
-    pub _tags: Option<String>,
-    #[serde(rename = "format")]
-    pub _format: Option<String>,
+    pub r#type: ValueType,
+    pub tags: Option<String>,
+    pub format: Option<String>,
     pub value: ConfigValue,
-    // NOTE: why is this field called `segment_rules` and not `targeting_rules`?
-    // This causes quite som ambiguity with SegmentRule vs TargetingRule.
-    pub segment_rules: Vec<TargetingRule>,
+    pub segment_rules: Vec<SegmentRule>,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
-pub enum ValueKind {
+pub enum ValueType {
     #[serde(rename(deserialize = "NUMERIC"))]
     Numeric,
     #[serde(rename(deserialize = "BOOLEAN"))]
@@ -116,7 +102,7 @@ pub enum ValueKind {
     String,
 }
 
-impl Display for ValueKind {
+impl Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = match self {
             Self::Numeric => "NUMERIC",
@@ -166,13 +152,13 @@ impl Display for ConfigValue {
     }
 }
 
-impl TryFrom<(ValueKind, ConfigValue)> for Value {
+impl TryFrom<(ValueType, ConfigValue)> for Value {
     type Error = crate::Error;
 
-    fn try_from(value: (ValueKind, ConfigValue)) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: (ValueType, ConfigValue)) -> std::result::Result<Self, Self::Error> {
         let (kind, value) = value;
         match kind {
-            ValueKind::Numeric => {
+            ValueType::Numeric => {
                 if let Some(n) = value.as_i64() {
                     Ok(Value::Int64(n))
                 } else if let Some(n) = value.as_u64() {
@@ -185,11 +171,11 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
                     ))
                 }
             }
-            ValueKind::Boolean => value
+            ValueType::Boolean => value
                 .as_boolean()
                 .map(Value::Boolean)
                 .ok_or(crate::Error::MismatchType),
-            ValueKind::String => value
+            ValueType::String => value
                 .as_string()
                 .map(Value::String)
                 .ok_or(crate::Error::MismatchType),
@@ -199,20 +185,16 @@ impl TryFrom<(ValueKind, ConfigValue)> for Value {
 
 /// Represents a Rule of a Segment.
 /// Those are the rules to check if an entity belongs to a segment.
-/// NOTE: This is easily confused with `TargetingRule`, which is
-/// sometimes also called "SegmentRule".
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub struct SegmentRule {
+pub struct Rule {
     pub attribute_name: String,
     pub operator: String,
     pub values: Vec<String>,
 }
 
 /// Associates a Feature/Property to one or more Segments
-/// NOTE: This is easily confused with `SegmentRule`, as the field name in
-/// Features containing TargetingRules is called `segment_rules`
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub struct TargetingRule {
+pub struct SegmentRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
     /// NOTE: why list of lists?
@@ -260,13 +242,12 @@ pub(crate) mod tests {
     pub(crate) fn configuration_feature1_enabled() -> ConfigurationJson {
         ConfigurationJson {
             environments: vec![Environment {
-                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     enabled_value: ConfigValue(serde_json::Value::Number(42.into())),
                     disabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
                     segment_rules: Vec::new(),
@@ -283,16 +264,15 @@ pub(crate) mod tests {
     pub(crate) fn configuration_property1_enabled() -> ConfigurationJson {
         ConfigurationJson {
             environments: vec![Environment {
-                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 properties: vec![Property {
                     name: "P1".to_string(),
                     property_id: "p1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     value: ConfigValue(serde_json::Value::Number(42.into())),
                     segment_rules: Vec::new(),
-                    _tags: None,
+                    tags: None,
                 }],
                 features: Vec::new(),
             }],
@@ -303,7 +283,7 @@ pub(crate) mod tests {
     #[fixture]
     pub(crate) fn configuration_unordered_segment_rules() -> ConfigurationJson {
         let segment_rules = vec![
-            TargetingRule {
+            SegmentRule {
                 rules: vec![Segments {
                     segments: vec!["some_segment_id_1".into()],
                 }],
@@ -311,7 +291,7 @@ pub(crate) mod tests {
                 order: 1,
                 rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
             },
-            TargetingRule {
+            SegmentRule {
                 rules: vec![Segments {
                     segments: vec!["some_segment_id_2".into()],
                 }],
@@ -324,13 +304,12 @@ pub(crate) mod tests {
 
         ConfigurationJson {
             environments: vec![Environment {
-                _name: "name".to_string(),
                 environment_id: "environment_id".to_string(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     enabled_value: ConfigValue(serde_json::Value::Number((-42).into())),
                     disabled_value: ConfigValue(serde_json::Value::Number((2).into())),
                     segment_rules: segment_rules.clone(),
@@ -340,31 +319,31 @@ pub(crate) mod tests {
                 properties: vec![Property {
                     name: "P1".to_string(),
                     property_id: "f1".to_string(),
-                    kind: ValueKind::Numeric,
-                    _format: None,
+                    r#type: ValueType::Numeric,
+                    format: None,
                     value: ConfigValue(serde_json::Value::Number((-42).into())),
                     segment_rules,
-                    _tags: None,
+                    tags: None,
                 }],
             }],
             segments: vec![
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_1".into(),
-                    _description: "".into(),
-                    _tags: None,
-                    rules: vec![SegmentRule {
+                    description: "".into(),
+                    tags: None,
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
                     }],
                 },
                 Segment {
-                    _name: "".into(),
+                    name: "".into(),
                     segment_id: "some_segment_id_2".into(),
-                    _description: "".into(),
-                    _tags: None,
-                    rules: vec![SegmentRule {
+                    description: "".into(),
+                    tags: None,
+                    rules: vec![Rule {
                         attribute_name: "name".into(),
                         operator: "is".into(),
                         values: vec!["heinz".into()],
