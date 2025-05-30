@@ -18,6 +18,11 @@ use serde::Deserialize;
 
 use crate::{errors::DeserializationError, Error, Result, Value};
 
+/// Represents Metering data in a structure for data exchange used for
+/// sending to the server.
+#[derive(Debug, Deserialize)]
+pub struct MeteringDataJson {}
+
 /// Represents AppConfig data in a structure intended for data exchange
 /// (typically JSON encoded) used by
 /// - AppConfig Server REST API (/config endpoint)
