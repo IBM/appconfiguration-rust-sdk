@@ -181,6 +181,10 @@ impl ConfigurationProvider for Configuration {
             &property.name,
         ))
     }
+
+    fn is_online(&self) -> Result<bool> {
+        Ok(false)
+    }
 }
 
 #[cfg(test)]

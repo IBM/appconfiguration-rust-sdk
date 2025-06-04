@@ -64,6 +64,10 @@ pub trait ConfigurationProvider {
     /// will always evaluate the same entities to the same values, no updates
     /// will be received from the server
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot>;
+
+    /// For remote configurations, it returns whether it's connected to the
+    /// remote or not
+    fn is_online(&self) -> Result<bool>;
 }
 
 /// AppConfiguration client for browsing, and evaluating features and properties.

@@ -188,6 +188,8 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::network::NetworkResult;
+
     use super::*;
 
     struct WebsocketMockReader {
@@ -205,7 +207,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -213,8 +215,8 @@ mod tests {
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -244,7 +246,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -252,8 +254,8 @@ mod tests {
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id =
@@ -287,16 +289,16 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
-                Err(crate::NetworkError::ProtocolError)
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
+                Err(NetworkError::ProtocolError)
             }
 
             #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -339,16 +341,16 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
-                Err(crate::NetworkError::CannotAcquireLock)
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
+                Err(NetworkError::CannotAcquireLock)
             }
 
             #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -376,7 +378,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -384,8 +386,8 @@ mod tests {
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -453,16 +455,16 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
-                Err(crate::NetworkError::UrlParseError("".to_string()))
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
+                Err(NetworkError::UrlParseError("".to_string()))
             }
 
             #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -507,7 +509,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 unreachable!()
             }
 
@@ -515,8 +517,8 @@ mod tests {
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            ) -> NetworkResult<impl WebsocketReader> {
+                unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -556,16 +558,16 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 self.tx.send("get_configuration".to_string()).unwrap();
-                Err(crate::NetworkError::UrlParseError("".to_string()))
+                Err(NetworkError::UrlParseError("".to_string()))
             }
 
             #[allow(unreachable_code)]
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
+            ) -> NetworkResult<impl WebsocketReader> {
                 self.tx
                     .send("get_configuration_monitoring_websocket".to_string())
                     .unwrap();
@@ -618,15 +620,15 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
-                Err::<WebsocketMockReader, _>(crate::NetworkError::InvalidHeaderValue("".into()))
+            ) -> NetworkResult<impl WebsocketReader> {
+                Err::<WebsocketMockReader, _>(NetworkError::InvalidHeaderValue("".into()))
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
@@ -656,14 +658,14 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
+            ) -> NetworkResult<impl WebsocketReader> {
                 Ok(WebsocketMockReader {
                     message: Some(Err(tungstenite::Error::AttackAttempt)),
                 })
@@ -689,20 +691,20 @@ mod tests {
     #[test]
     fn test_run_websocket_reconnect() {
         struct ServerClientMock {
-            rx: std::sync::mpsc::Receiver<crate::NetworkResult<WebsocketMockReader>>,
+            rx: std::sync::mpsc::Receiver<NetworkResult<WebsocketMockReader>>,
         }
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
+            ) -> NetworkResult<impl WebsocketReader> {
                 self.rx.recv().unwrap()
             }
         }
