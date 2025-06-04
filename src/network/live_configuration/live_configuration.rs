@@ -34,7 +34,7 @@ pub trait LiveConfiguration: ConfigurationProvider {
 }
 
 #[derive(Debug)]
-pub struct LiveConfigurationImpl {
+pub(crate) struct LiveConfigurationImpl {
     /// Configuration object that will be returned to consumers. This is also the object
     /// that the thread in the backend will be updating.
     configuration: Arc<Mutex<Option<Configuration>>>,
@@ -144,6 +144,10 @@ impl ConfigurationProvider for LiveConfigurationImpl {
     ) -> crate::Result<crate::client::property_snapshot::PropertySnapshot> {
         self.get_configuration()?.get_property(property_id)
     }
+
+    fn is_online(&self) -> crate::Result<bool> {
+        Ok(self.get_current_mode()? == CurrentMode::Online)
+    }
 }
 
 impl LiveConfiguration for LiveConfigurationImpl {
@@ -169,6 +173,7 @@ mod tests {
 
     use crate::network::http_client::WebsocketReader;
     use crate::network::live_configuration::update_thread_worker::SERVER_HEARTBEAT;
+    use crate::network::NetworkResult;
     use crate::AppConfigurationOffline;
 
     use super::*;
@@ -193,14 +198,14 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> crate::NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::models::ConfigurationJson> {
                 Ok(self.rx.recv().unwrap())
             }
 
             fn get_configuration_monitoring_websocket(
                 &self,
                 _collection: &ConfigurationId,
-            ) -> crate::NetworkResult<impl WebsocketReader> {
+            ) -> NetworkResult<impl WebsocketReader> {
                 Ok(self.websocket_rx.recv().unwrap())
             }
         }

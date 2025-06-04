@@ -19,8 +19,8 @@ use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
 use crate::{ConfigurationProvider, IBMCloudTokenProvider, OfflineMode};
 
-use super::AppConfigurationClientHttp;
 use super::ConfigurationId;
+use crate::client::app_configuration_http::AppConfigurationClientHttp;
 
 /// AppConfiguration client connection to IBM Cloud.
 #[derive(Debug)]
@@ -82,6 +82,10 @@ impl ConfigurationProvider for AppConfigurationClientIBMCloud {
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.client.get_property(property_id)
+    }
+
+    fn is_online(&self) -> Result<bool> {
+        self.client.is_online()
     }
 }
 

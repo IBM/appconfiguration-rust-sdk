@@ -1,4 +1,4 @@
-use appconfiguration::{AppConfigurationClientHttp, LiveConfiguration, TokenProvider};
+use appconfiguration::AppConfigurationClient;
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
@@ -8,14 +8,14 @@ use std::thread::sleep;
 use std::time::Duration;
 use tungstenite::WebSocket;
 
-#[derive(Debug)]
-pub struct MockTokenProvider {}
+// #[derive(Debug)]
+// pub struct MockTokenProvider {}
 
-impl TokenProvider for MockTokenProvider {
-    fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
-        Ok("mock_token".into())
-    }
-}
+// impl TokenProvider for MockTokenProvider {
+//     fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
+//         Ok("mock_token".into())
+//     }
+// }
 
 pub fn handle_config_request_trivial_config(server: &TcpListener) {
     let json_payload = serde_json::json!({
@@ -68,7 +68,7 @@ pub fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
     websocket
 }
 
-pub fn wait_until_online<T: LiveConfiguration>(client: &AppConfigurationClientHttp<T>) {
+pub fn wait_until_online(client: &Box<dyn AppConfigurationClient>) {
     loop {
         if client.is_online().unwrap() {
             break;
