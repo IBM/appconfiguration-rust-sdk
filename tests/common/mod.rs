@@ -8,15 +8,6 @@ use std::thread::sleep;
 use std::time::Duration;
 use tungstenite::WebSocket;
 
-// #[derive(Debug)]
-// pub struct MockTokenProvider {}
-
-// impl TokenProvider for MockTokenProvider {
-//     fn get_access_token(&self) -> appconfiguration::NetworkResult<String> {
-//         Ok("mock_token".into())
-//     }
-// }
-
 pub fn handle_config_request_trivial_config(server: &TcpListener) {
     let json_payload = serde_json::json!({
         "environments": [
