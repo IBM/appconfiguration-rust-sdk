@@ -26,13 +26,13 @@ use std::sync::mpsc;
 ///
 /// # Return values
 ///
-/// * MeteringTask<T> - Object representing the thread. Metrics will be sent as long as this object is alive.
+/// * MeteringThreadHandle<T> - Object representing the thread. Metrics will be sent as long as this object is alive.
 /// * MeteringRecorder - Use this to record all evaluations, which will eventually be sent to the server.
 pub(crate) fn start_metering<T: ServerClient>(
     _config_id: ConfigurationId,
     _transmit_interval: std::time::Duration,
     server_client: T,
-) -> (MeteringTask, MeteringRecorder) {
+) -> (MeteringThreadHandle, MeteringRecorder) {
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
@@ -47,7 +47,7 @@ pub(crate) fn start_metering<T: ServerClient>(
     });
 
     (
-        MeteringTask {
+        MeteringThreadHandle {
             _thread_handle: thread,
         },
         MeteringRecorder {
@@ -57,52 +57,42 @@ pub(crate) fn start_metering<T: ServerClient>(
 }
 
 /// Allows recording of evaluation events.
-/// Communicates with the MeteringTask, which leads to eventual transmission of recorded evaluations to the server.
+/// Communicates with the MeteringThreadHandle, which leads to eventual transmission of recorded evaluations to the server.
 pub(crate) struct MeteringRecorder {
     evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
 }
 
 impl MeteringRecorder {
-    /// Record the evaluation of a feature, for eventual transmission to the server.
-    pub fn record_feature_evaluation(
+    /// Record the evaluation of a feature or property, for eventual transmission to the server.
+    pub fn record_evaluation(
         &self,
-        feature_id: String,
+        subject_id: SubjectId,
         entity_id: String,
         segment_id: Option<String>,
     ) -> crate::errors::Result<()> {
         self.evaluation_event_sender
             .send(EvaluationEvent::Feature(EvaluationEventData {
-                subject_id: feature_id,
+                subject_id: subject_id,
                 entity_id: entity_id,
                 segment_id: segment_id,
             }))
             .map_err(|_| crate::errors::Error::MeteringError {})
     }
 
-    /// Record the evaluation of a property, for eventual transmission to the server.
-    pub fn record_property_evaluation(
-        &self,
-        property_id: String,
-        entity_id: String,
-        segment_id: Option<String>,
-    ) -> crate::errors::Result<()> {
-        self.evaluation_event_sender
-            .send(EvaluationEvent::Property(EvaluationEventData {
-                subject_id: property_id,
-                entity_id: entity_id,
-                segment_id: segment_id,
-            }))
-            .map_err(|_| crate::errors::Error::MeteringError {})
-    }
 }
 
-pub(crate) struct MeteringTask {
+pub(crate) struct MeteringThreadHandle {
     _thread_handle: crate::utils::ThreadHandle<()>,
+}
+
+pub(crate) enum SubjectId {
+    Feature(String),
+    Property(String),
 }
 
 pub(crate) struct EvaluationEventData {
     /// ID if the subject being evaluated. E.g. feature ID.
-    pub subject_id: String,
+    pub subject_id: SubjectId,
     /// The ID of the Entity against which the subject was evaluated.
     pub entity_id: String,
     /// If applicable, the segment the subject was associated to during evaluation.
@@ -177,23 +167,7 @@ mod tests {
         );
 
         metering_handle
-            .record_feature_evaluation("".to_string(), "".to_string(), None)
-            .unwrap();
-
-        let data_sent = metering_data_sent_receiver.recv().unwrap();
-    }
-
-    #[test]
-    fn test_metrics_sent_property() {
-        let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
-        let (_, metering_handle) = start_metering(
-            ConfigurationId::new("".to_string(), "".to_string(), "".to_string()),
-            std::time::Duration::ZERO,
-            server_client,
-        );
-
-        metering_handle
-            .record_property_evaluation("".to_string(), "".to_string(), None)
+            .record_evaluation(SubjectId::Feature("".to_string()), "".to_string(), None)
             .unwrap();
 
         let _ = metering_data_sent_receiver.recv().unwrap();
