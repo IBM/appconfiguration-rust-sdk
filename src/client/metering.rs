@@ -78,7 +78,6 @@ impl MeteringRecorder {
             }))
             .map_err(|_| crate::errors::Error::MeteringError {})
     }
-
 }
 
 pub(crate) struct MeteringThreadHandle {
