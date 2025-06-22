@@ -39,9 +39,30 @@ pub(crate) fn start_metering<T: ServerClient>(
         // TODO: termination handling
         loop {
             // TODO: error handling
-            let _ = receiver.recv().unwrap();
-            // TODO: actually process the event
-            let json_data = crate::models::MeteringDataJson {};
+            let event = receiver.recv().unwrap();
+            // Actually process the event
+            let (feature_id, property_id, entity_id, segment_id) = match event {
+                EvaluationEvent::Feature(data) => {
+                    (match data.subject_id {
+                        SubjectId::Feature(ref id) => Some(id.clone()),
+                        _ => None,
+                    }, None, data.entity_id, data.segment_id)
+                },
+                EvaluationEvent::Property(data) => {
+                    (None, match data.subject_id {
+                        SubjectId::Property(ref id) => Some(id.clone()),
+                        _ => None,
+                    }, data.entity_id, data.segment_id)
+                },
+            };
+            let json_data = crate::models::MeteringDataJson {
+                feature_id,
+                property_id,
+                entity_id,
+                segment_id,
+                evaluation_time: chrono::Utc::now(),
+                count: 1,
+            };
             // TODO: error handling
             let _ = server_client.push_metering_data(&json_data);
         }
@@ -189,7 +210,7 @@ mod tests {
                     .unwrap();
 
                 let metering_data = metering_data_sent_receiver.recv().unwrap();
-                assert_eq!(metering_data.feature_id, Some("entity1".to_string()));
+                assert_eq!(metering_data.feature_id, Some("feature1".to_string()));
                 assert_eq!(metering_data.property_id, None); // TODO: property_id should not be set in json serialization output.
                 assert_eq!(metering_data.entity_id, "entity1".to_string());
                 assert_eq!(metering_data.segment_id, None); // TODO: segment id should be set in json serialization output, but value should be "nil"
