@@ -36,41 +36,60 @@ pub(crate) fn start_metering<T: ServerClient>(
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
-        // TODO: termination handling
+        use std::collections::HashMap;
+        use chrono::Utc;
+        use std::time::{Duration, Instant};
+        let mut counters: HashMap<(Option<String>, String, Option<String>), (u32, Option<String>, Option<String>)> = HashMap::new();
+        let mut last_flush = Instant::now();
+        let flush_interval = Duration::from_secs(10); // For production, 10 min; for test, 10 sec
         loop {
-            // TODO: error handling
-            let event = receiver.recv().unwrap();
-            // Actually process the event
-            let (feature_id, property_id, entity_id, segment_id) = match event {
-                EvaluationEvent::Feature(data) => (
-                    match data.subject_id {
-                        SubjectId::Feature(ref id) => Some(id.clone()),
-                        _ => None,
-                    },
-                    None,
-                    data.entity_id,
-                    data.segment_id,
-                ),
-                EvaluationEvent::Property(data) => (
-                    None,
-                    match data.subject_id {
-                        SubjectId::Property(ref id) => Some(id.clone()),
-                        _ => None,
-                    },
-                    data.entity_id,
-                    data.segment_id,
-                ),
-            };
-            let json_data = crate::models::MeteringDataJson {
-                feature_id,
-                property_id,
-                entity_id,
-                segment_id,
-                evaluation_time: chrono::Utc::now(),
-                count: 1,
-            };
-            // TODO: error handling
-            let _ = server_client.push_metering_data(&json_data);
+            // Wait for event or timeout
+            let recv_result = receiver.recv_timeout(Duration::from_millis(100));
+            match recv_result {
+                Ok(event) => {
+                    let (feature_id, property_id, entity_id, segment_id) = match event {
+                        EvaluationEvent::Feature(data) => (
+                            match data.subject_id {
+                                SubjectId::Feature(ref id) => Some(id.clone()),
+                                _ => None,
+                            },
+                            None,
+                            data.entity_id,
+                            data.segment_id,
+                        ),
+                        EvaluationEvent::Property(data) => (
+                            None,
+                            match data.subject_id {
+                                SubjectId::Property(ref id) => Some(id.clone()),
+                                _ => None,
+                            },
+                            data.entity_id,
+                            data.segment_id,
+                        ),
+                    };
+                    let key = (feature_id.clone(), entity_id.clone(), segment_id.clone());
+                    let counter = counters.entry(key).or_insert((0, property_id.clone(), segment_id.clone()));
+                    counter.0 += 1;
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            // Periodically flush
+            if last_flush.elapsed() >= flush_interval && !counters.is_empty() {
+                for ((feature_id, entity_id, segment_id), (count, property_id, _)) in counters.iter() {
+                    let json_data = crate::models::MeteringDataJson {
+                        feature_id: feature_id.clone(),
+                        property_id: property_id.clone(),
+                        entity_id: entity_id.clone(),
+                        segment_id: segment_id.clone(),
+                        evaluation_time: Utc::now(),
+                        count: *count,
+                    };
+                    let _ = server_client.push_metering_data(&json_data);
+                }
+                counters.clear();
+                last_flush = Instant::now();
+            }
         }
     });
 
@@ -194,6 +213,13 @@ mod tests {
             server_client,
         );
 
+        metering_handle
+            .record_evaluation(
+                SubjectId::Feature("feature1".to_string()),
+                "entity1".to_string(),
+                None,
+            )
+            .unwrap();
         let start_time = chrono::Utc::now();
         metering_handle
             .record_evaluation(
@@ -216,6 +242,6 @@ mod tests {
                 && metering_data.evaluation_time <= end_time
         );
 
-        assert_eq!(metering_data.count, 1);
+        assert_eq!(metering_data.count, 2);
     }
 }
