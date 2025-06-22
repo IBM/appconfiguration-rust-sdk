@@ -194,22 +194,6 @@ mod tests {
             server_client,
         );
 
-        metering_handle
-            .record_evaluation(SubjectId::Feature("".to_string()), "".to_string(), None)
-            .unwrap();
-
-        let _ = metering_data_sent_receiver.recv().unwrap();
-    }
-
-    #[test]
-    fn test_metrics_sent_feature2() {
-        let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
-        let (_, metering_handle) = start_metering(
-            ConfigurationId::new("".to_string(), "".to_string(), "".to_string()),
-            std::time::Duration::ZERO,
-            server_client,
-        );
-
         let start_time = chrono::Utc::now();
         metering_handle
             .record_evaluation(
