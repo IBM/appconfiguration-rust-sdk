@@ -36,62 +36,18 @@ pub(crate) fn start_metering<T: ServerClient>(
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
-        use std::collections::HashMap;
-        use chrono::Utc;
-        use std::time::Instant;
-        let mut counters: HashMap<MeteringKey, u32> = HashMap::new();
-        let mut last_flush = Instant::now();
+        let mut batcher = MeteringBatcher::new(transmit_interval, server_client);
         loop {
             let recv_result = receiver.recv_timeout(std::time::Duration::from_millis(100));
             match recv_result {
-                Ok(event) => {
-                    let (feature_id, property_id, entity_id, segment_id) = match event {
-                        EvaluationEvent::Feature(data) => (
-                            match data.subject_id {
-                                SubjectId::Feature(ref id) => Some(id.clone()),
-                                _ => None,
-                            },
-                            None,
-                            data.entity_id,
-                            data.segment_id,
-                        ),
-                        EvaluationEvent::Property(data) => (
-                            None,
-                            match data.subject_id {
-                                SubjectId::Property(ref id) => Some(id.clone()),
-                                _ => None,
-                            },
-                            data.entity_id,
-                            data.segment_id,
-                        ),
-                    };
-                    let key = MeteringKey {
-                        feature_id: feature_id.clone(),
-                        property_id: property_id.clone(),
-                        entity_id: entity_id.clone(),
-                        segment_id: segment_id.clone(),
-                    };
-                    let counter = counters.entry(key).or_insert(0);
-                    *counter += 1;
-                },
+                // Actually received an event, sort it in using the batcher:
+                Ok(event) => batcher.handle_event(event),
+                // Hit the timeout, do nothing here, but give the batcher a chance to flush:
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
+                // All senders have been dropped, exit the thread:
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
-            if last_flush.elapsed() >= transmit_interval && !counters.is_empty() {
-                for (key, count) in counters.iter() {
-                    let json_data = crate::models::MeteringDataJson {
-                        feature_id: key.feature_id.clone(),
-                        property_id: key.property_id.clone(),
-                        entity_id: key.entity_id.clone(),
-                        segment_id: key.segment_id.clone(),
-                        evaluation_time: Utc::now(),
-                        count: *count,
-                    };
-                    let _ = server_client.push_metering_data(&json_data);
-                }
-                counters.clear();
-                last_flush = Instant::now();
-            }
+            batcher.maybe_flush();
         }
     });
 
@@ -158,6 +114,74 @@ pub(crate) struct EvaluationEventData {
 pub(crate) enum EvaluationEvent {
     Feature(EvaluationEventData),
     Property(EvaluationEventData),
+}
+
+struct MeteringBatcher<T: ServerClient> {
+    counters: std::collections::HashMap<MeteringKey, u32>,
+    last_flush: std::time::Instant,
+    transmit_interval: std::time::Duration,
+    server_client: T,
+}
+
+impl<T: ServerClient> MeteringBatcher<T> {
+    fn new(transmit_interval: std::time::Duration, server_client: T) -> Self {
+        Self {
+            counters: std::collections::HashMap::new(),
+            last_flush: std::time::Instant::now(),
+            transmit_interval,
+            server_client,
+        }
+    }
+
+    fn handle_event(&mut self, event: EvaluationEvent) {
+        let (feature_id, property_id, entity_id, segment_id) = match event {
+            EvaluationEvent::Feature(data) => (
+                match data.subject_id {
+                    SubjectId::Feature(ref id) => Some(id.clone()),
+                    _ => None,
+                },
+                None,
+                data.entity_id,
+                data.segment_id,
+            ),
+            EvaluationEvent::Property(data) => (
+                None,
+                match data.subject_id {
+                    SubjectId::Property(ref id) => Some(id.clone()),
+                    _ => None,
+                },
+                data.entity_id,
+                data.segment_id,
+            ),
+        };
+        let key = MeteringKey {
+            feature_id: feature_id.clone(),
+            property_id: property_id.clone(),
+            entity_id: entity_id.clone(),
+            segment_id: segment_id.clone(),
+        };
+        let counter = self.counters.entry(key).or_insert(0);
+        *counter += 1;
+    }
+
+    fn maybe_flush(&mut self) {
+        if self.last_flush.elapsed() >= self.transmit_interval && !self.counters.is_empty() {
+            use chrono::Utc;
+            for (key, count) in self.counters.iter() {
+                let json_data = crate::models::MeteringDataJson {
+                    feature_id: key.feature_id.clone(),
+                    property_id: key.property_id.clone(),
+                    entity_id: key.entity_id.clone(),
+                    segment_id: key.segment_id.clone(),
+                    evaluation_time: Utc::now(),
+                    count: *count,
+                };
+                let _ = self.server_client.push_metering_data(&json_data);
+            }
+            self.counters.clear();
+            self.last_flush = std::time::Instant::now();
+        }
+    }
 }
 
 #[cfg(test)]
