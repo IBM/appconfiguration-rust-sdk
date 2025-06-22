@@ -14,14 +14,23 @@
 
 use std::fmt::Display;
 
-use serde::Deserialize;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::{errors::DeserializationError, Error, Result, Value};
 
 /// Represents Metering data in a structure for data exchange used for
 /// sending to the server.
-#[derive(Debug, Deserialize, Clone)]
-pub struct MeteringDataJson {}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MeteringDataJson {
+    pub feature_id: Option<String>,
+    pub property_id: Option<String>,
+    pub entity_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub segment_id: Option<String>, // Serialized as "nil" when None
+    pub evaluation_time: DateTime<Utc>, // Use chrono for time handling
+    pub count: u32,
+}
 
 /// Represents AppConfig data in a structure intended for data exchange
 /// (typically JSON encoded) used by

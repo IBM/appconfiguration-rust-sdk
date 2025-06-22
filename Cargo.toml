@@ -29,7 +29,7 @@ murmur3 = "0.5.2"
 tungstenite = { version = "0.26.0", features = ["native-tls"] }
 url = "2.5.4"
 thiserror = "2.0.7"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 appconfiguration = {path = ".", features = ["http_client"]}
