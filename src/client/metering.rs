@@ -30,7 +30,7 @@ use std::sync::mpsc;
 /// * MeteringRecorder - Use this to record all evaluations, which will eventually be sent to the server.
 pub(crate) fn start_metering<T: ServerClient>(
     _config_id: ConfigurationId,
-    _transmit_interval: std::time::Duration,
+    transmit_interval: std::time::Duration,
     server_client: T,
 ) -> (MeteringThreadHandle, MeteringRecorder) {
     let (sender, receiver) = mpsc::channel();
@@ -38,13 +38,11 @@ pub(crate) fn start_metering<T: ServerClient>(
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
         use std::collections::HashMap;
         use chrono::Utc;
-        use std::time::{Duration, Instant};
-        let mut counters: HashMap<(Option<String>, String, Option<String>), (u32, Option<String>, Option<String>)> = HashMap::new();
+        use std::time::Instant;
+        let mut counters: HashMap<MeteringKey, u32> = HashMap::new();
         let mut last_flush = Instant::now();
-        let flush_interval = Duration::from_secs(10); // For production, 10 min; for test, 10 sec
         loop {
-            // Wait for event or timeout
-            let recv_result = receiver.recv_timeout(Duration::from_millis(100));
+            let recv_result = receiver.recv_timeout(std::time::Duration::from_millis(100));
             match recv_result {
                 Ok(event) => {
                     let (feature_id, property_id, entity_id, segment_id) = match event {
@@ -67,21 +65,25 @@ pub(crate) fn start_metering<T: ServerClient>(
                             data.segment_id,
                         ),
                     };
-                    let key = (feature_id.clone(), entity_id.clone(), segment_id.clone());
-                    let counter = counters.entry(key).or_insert((0, property_id.clone(), segment_id.clone()));
-                    counter.0 += 1;
-                },
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-            // Periodically flush
-            if last_flush.elapsed() >= flush_interval && !counters.is_empty() {
-                for ((feature_id, entity_id, segment_id), (count, property_id, _)) in counters.iter() {
-                    let json_data = crate::models::MeteringDataJson {
+                    let key = MeteringKey {
                         feature_id: feature_id.clone(),
                         property_id: property_id.clone(),
                         entity_id: entity_id.clone(),
                         segment_id: segment_id.clone(),
+                    };
+                    let counter = counters.entry(key).or_insert(0);
+                    *counter += 1;
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            if last_flush.elapsed() >= transmit_interval && !counters.is_empty() {
+                for (key, count) in counters.iter() {
+                    let json_data = crate::models::MeteringDataJson {
+                        feature_id: key.feature_id.clone(),
+                        property_id: key.property_id.clone(),
+                        entity_id: key.entity_id.clone(),
+                        segment_id: key.segment_id.clone(),
                         evaluation_time: Utc::now(),
                         count: *count,
                     };
@@ -129,6 +131,14 @@ impl MeteringRecorder {
 
 pub(crate) struct MeteringThreadHandle {
     _thread_handle: crate::utils::ThreadHandle<()>,
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+struct MeteringKey {
+    feature_id: Option<String>,
+    property_id: Option<String>,
+    entity_id: String,
+    segment_id: Option<String>,
 }
 
 pub(crate) enum SubjectId {
@@ -209,7 +219,7 @@ mod tests {
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
         let (_, metering_handle) = start_metering(
             ConfigurationId::new("".to_string(), "".to_string(), "".to_string()),
-            std::time::Duration::ZERO,
+            std::time::Duration::from_millis(200), // Use 200ms for test batching
             server_client,
         );
 
@@ -220,7 +230,7 @@ mod tests {
                 None,
             )
             .unwrap();
-        let start_time = chrono::Utc::now();
+        let time_second_record = chrono::Utc::now();
         metering_handle
             .record_evaluation(
                 SubjectId::Feature("feature1".to_string()),
@@ -230,18 +240,22 @@ mod tests {
             .unwrap();
 
         let metering_data = metering_data_sent_receiver.recv().unwrap();
-        assert_eq!(metering_data.feature_id, Some("feature1".to_string()));
-        assert_eq!(metering_data.property_id, None); // TODO: property_id should not be set in json serialization output.
-        assert_eq!(metering_data.entity_id, "entity1".to_string());
-        assert_eq!(metering_data.segment_id, None); // TODO: segment id should be set in json serialization output, but value should be "nil"
-        let end_time = chrono::Utc::now();
+        let time_data_sent_to_server = chrono::Utc::now();
 
-        // evaluation_time should be realistic:
+        assert_eq!(metering_data.feature_id, Some("feature1".to_string()));
+        assert_eq!(metering_data.property_id, None);
+        // TODO (for models.rs tests): property_id should not be set in json serialization output.
+        assert_eq!(metering_data.entity_id, "entity1".to_string());
+        assert_eq!(metering_data.segment_id, None);
+        // TODO (for models.rs tests): segment id should be set in json serialization output, but value should be "nil"
+
+        // evaluation_time should be after first record_evaluation:
         assert!(
-            metering_data.evaluation_time >= start_time
-                && metering_data.evaluation_time <= end_time
+            metering_data.evaluation_time >= time_second_record
+                && metering_data.evaluation_time <= time_data_sent_to_server
         );
 
+        // we expect both evaluations to be batched into one transmission to the server, accumulating the count:
         assert_eq!(metering_data.count, 2);
     }
 }
