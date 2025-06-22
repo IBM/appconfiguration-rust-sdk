@@ -42,7 +42,8 @@ pub(crate) fn start_metering<T: ServerClient>(
             let _ = receiver.recv().unwrap();
             // TODO: actually process the event
             let json_data = crate::models::MeteringDataJson {};
-            server_client.push_metering_data(&json_data);
+            // TODO: error handling
+            let _ = server_client.push_metering_data(&json_data);
         }
     });
 
@@ -110,9 +111,10 @@ mod tests {
     use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
     use crate::NetworkResult;
+    use chrono;
 
     struct ServerClientMock {
-        metering_data_sender: mpsc::Sender<()>,
+        metering_data_sender: mpsc::Sender<MeteringDataJson>,
     }
     struct WebsocketMockReader {}
     impl WebsocketReader for WebsocketMockReader {
@@ -122,8 +124,8 @@ mod tests {
     }
 
     impl ServerClientMock {
-        fn new() -> (ServerClientMock, mpsc::Receiver<()>) {
-            let (sender, receiver) = mpsc::channel();
+        fn new() -> (ServerClientMock, mpsc::Receiver<MeteringDataJson>) {
+            let (sender, receiver) = mpsc::channel::<MeteringDataJson>();
             (
                 ServerClientMock {
                     metering_data_sender: sender,
@@ -150,8 +152,8 @@ mod tests {
             unreachable!() as crate::NetworkResult<WebsocketMockReader>
         }
 
-        fn push_metering_data(&self, _data: &MeteringDataJson) -> NetworkResult<()> {
-            self.metering_data_sender.send(()).unwrap();
+        fn push_metering_data(&self, data: &MeteringDataJson) -> NetworkResult<()> {
+            self.metering_data_sender.send(data.clone()).unwrap();
             Ok(())
         }
     }
@@ -170,5 +172,32 @@ mod tests {
             .unwrap();
 
         let _ = metering_data_sent_receiver.recv().unwrap();
+    }
+
+    #[test]
+    fn test_metrics_sent_feature2() {
+        let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
+        let (_, metering_handle) = start_metering(
+            ConfigurationId::new("".to_string(), "".to_string(), "".to_string()),
+            std::time::Duration::ZERO,
+            server_client,
+        );
+
+        let start_time = chrono::Utc::now();
+                metering_handle
+                    .record_evaluation(SubjectId::Feature("feature1".to_string()), "entity1".to_string(), None)
+                    .unwrap();
+
+                let metering_data = metering_data_sent_receiver.recv().unwrap();
+                assert_eq!(metering_data.feature_id, Some("entity1".to_string()));
+                assert_eq!(metering_data.property_id, None); // TODO: property_id should not be set in json serialization output.
+                assert_eq!(metering_data.entity_id, "entity1".to_string());
+                assert_eq!(metering_data.segment_id, None); // TODO: segment id should be set in json serialization output, but value should be "nil"
+                let end_time = chrono::Utc::now();
+                
+                // evaluation_time should be realistic:
+                assert!(metering_data.evaluation_time >= start_time && metering_data.evaluation_time <= end_time);
+
+                assert_eq!(metering_data.count, 1);
     }
 }
