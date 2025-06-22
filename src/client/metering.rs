@@ -42,18 +42,24 @@ pub(crate) fn start_metering<T: ServerClient>(
             let event = receiver.recv().unwrap();
             // Actually process the event
             let (feature_id, property_id, entity_id, segment_id) = match event {
-                EvaluationEvent::Feature(data) => {
-                    (match data.subject_id {
+                EvaluationEvent::Feature(data) => (
+                    match data.subject_id {
                         SubjectId::Feature(ref id) => Some(id.clone()),
                         _ => None,
-                    }, None, data.entity_id, data.segment_id)
-                },
-                EvaluationEvent::Property(data) => {
-                    (None, match data.subject_id {
+                    },
+                    None,
+                    data.entity_id,
+                    data.segment_id,
+                ),
+                EvaluationEvent::Property(data) => (
+                    None,
+                    match data.subject_id {
                         SubjectId::Property(ref id) => Some(id.clone()),
                         _ => None,
-                    }, data.entity_id, data.segment_id)
-                },
+                    },
+                    data.entity_id,
+                    data.segment_id,
+                ),
             };
             let json_data = crate::models::MeteringDataJson {
                 feature_id,
@@ -205,20 +211,27 @@ mod tests {
         );
 
         let start_time = chrono::Utc::now();
-                metering_handle
-                    .record_evaluation(SubjectId::Feature("feature1".to_string()), "entity1".to_string(), None)
-                    .unwrap();
+        metering_handle
+            .record_evaluation(
+                SubjectId::Feature("feature1".to_string()),
+                "entity1".to_string(),
+                None,
+            )
+            .unwrap();
 
-                let metering_data = metering_data_sent_receiver.recv().unwrap();
-                assert_eq!(metering_data.feature_id, Some("feature1".to_string()));
-                assert_eq!(metering_data.property_id, None); // TODO: property_id should not be set in json serialization output.
-                assert_eq!(metering_data.entity_id, "entity1".to_string());
-                assert_eq!(metering_data.segment_id, None); // TODO: segment id should be set in json serialization output, but value should be "nil"
-                let end_time = chrono::Utc::now();
-                
-                // evaluation_time should be realistic:
-                assert!(metering_data.evaluation_time >= start_time && metering_data.evaluation_time <= end_time);
+        let metering_data = metering_data_sent_receiver.recv().unwrap();
+        assert_eq!(metering_data.feature_id, Some("feature1".to_string()));
+        assert_eq!(metering_data.property_id, None); // TODO: property_id should not be set in json serialization output.
+        assert_eq!(metering_data.entity_id, "entity1".to_string());
+        assert_eq!(metering_data.segment_id, None); // TODO: segment id should be set in json serialization output, but value should be "nil"
+        let end_time = chrono::Utc::now();
 
-                assert_eq!(metering_data.count, 1);
+        // evaluation_time should be realistic:
+        assert!(
+            metering_data.evaluation_time >= start_time
+                && metering_data.evaluation_time <= end_time
+        );
+
+        assert_eq!(metering_data.count, 1);
     }
 }
