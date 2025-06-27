@@ -48,6 +48,7 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
     ) -> Result<Self> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
 
+        // TODO: start metering + figure out a way to share / duplicate server_client
         let live_configuration =
             LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
         Ok(Self { live_configuration })

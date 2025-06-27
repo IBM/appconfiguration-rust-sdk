@@ -53,6 +53,9 @@ pub enum Error {
     #[error(transparent)]
     LiveConfigurationError(#[from] LiveConfigurationError),
 
+    #[error("Failed to record evaluation event for metering")]
+    MeteringError,
+
     #[error("{0}")]
     Other(String),
 }
