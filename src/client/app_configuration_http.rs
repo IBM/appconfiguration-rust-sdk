@@ -16,7 +16,7 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
-use crate::network::live_configuration::{CurrentMode, LiveConfiguration, LiveConfigurationImpl};
+use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
@@ -24,7 +24,7 @@ use super::ConfigurationId;
 
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
-pub struct AppConfigurationClientHttp<T: LiveConfiguration> {
+pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
 }
 
@@ -55,12 +55,6 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
     }
 }
 
-impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
-    pub fn is_online(&self) -> Result<bool> {
-        Ok(self.live_configuration.get_current_mode()? == CurrentMode::Online)
-    }
-}
-
 impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<T> {
     fn get_feature_ids(&self) -> Result<Vec<String>> {
         self.live_configuration.get_feature_ids()
@@ -77,6 +71,10 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.live_configuration.get_property(property_id)
     }
+
+    fn is_online(&self) -> Result<bool> {
+        self.live_configuration.is_online()
+    }
 }
 
 #[cfg(test)]
@@ -87,6 +85,7 @@ mod tests {
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
     };
+    use crate::network::live_configuration::CurrentMode;
     use crate::utils::ThreadStatus;
     use crate::{models::ConfigurationJson, Feature, Property};
     use rstest::rstest;
@@ -109,6 +108,10 @@ mod tests {
 
         fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
             self.configuration.get_property(property_id)
+        }
+
+        fn is_online(&self) -> Result<bool> {
+            todo!()
         }
     }
     impl LiveConfiguration for LiveConfigurationMock {

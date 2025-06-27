@@ -1,7 +1,4 @@
-use appconfiguration::{
-    AppConfigurationClientHttp, AppConfigurationOffline, ConfigurationId, ConfigurationProvider,
-    OfflineMode, ServiceAddress,
-};
+use appconfiguration::{AppConfigurationOffline, ConfigurationId, OfflineMode, ServiceAddress};
 
 use std::net::TcpListener;
 
@@ -33,9 +30,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             "collection_id".to_string(),
         );
 
-        AppConfigurationClientHttp::new(
+        appconfiguration::test_utils::create_app_configuration_client_live(
             address,
-            Box::new(common::MockTokenProvider {}),
             config_id,
             OfflineMode::FallbackData(offline_data),
         )

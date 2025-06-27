@@ -29,7 +29,7 @@ pub struct MeteringDataJson {}
 /// - AppConfig database dumps (via Web GUI)
 /// - Offline configuration files used in offline-mode
 #[derive(Debug, Deserialize)]
-pub struct ConfigurationJson {
+pub(crate) struct ConfigurationJson {
     pub environments: Vec<Environment>,
     pub segments: Vec<Segment>,
 }
@@ -58,14 +58,14 @@ impl ConfigurationJson {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Environment {
+pub(crate) struct Environment {
     pub environment_id: String,
     pub features: Vec<Feature>,
     pub properties: Vec<Property>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub struct Segment {
+pub(crate) struct Segment {
     pub name: String,
     pub segment_id: String,
     pub description: String,
@@ -74,7 +74,7 @@ pub struct Segment {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub struct Feature {
+pub(crate) struct Feature {
     pub name: String,
     pub feature_id: String,
     pub r#type: ValueType,
@@ -87,7 +87,7 @@ pub struct Feature {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub struct Property {
+pub(crate) struct Property {
     pub name: String,
     pub property_id: String,
     pub r#type: ValueType,
@@ -98,7 +98,7 @@ pub struct Property {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
-pub enum ValueType {
+pub(crate) enum ValueType {
     #[serde(rename(deserialize = "NUMERIC"))]
     Numeric,
     #[serde(rename(deserialize = "BOOLEAN"))]
@@ -119,7 +119,7 @@ impl Display for ValueType {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct ConfigValue(pub(crate) serde_json::Value);
+pub(crate) struct ConfigValue(pub(crate) serde_json::Value);
 
 impl ConfigValue {
     pub fn as_i64(&self) -> Option<i64> {
@@ -191,7 +191,7 @@ impl TryFrom<(ValueType, ConfigValue)> for Value {
 /// Represents a Rule of a Segment.
 /// Those are the rules to check if an entity belongs to a segment.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub struct Rule {
+pub(crate) struct Rule {
     pub attribute_name: String,
     pub operator: String,
     pub values: Vec<String>,
@@ -199,7 +199,7 @@ pub struct Rule {
 
 /// Associates a Feature/Property to one or more Segments
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub struct SegmentRule {
+pub(crate) struct SegmentRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
     /// NOTE: why list of lists?
@@ -211,7 +211,7 @@ pub struct SegmentRule {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub struct Segments {
+pub(crate) struct Segments {
     pub segments: Vec<String>,
 }
 

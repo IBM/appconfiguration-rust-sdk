@@ -56,4 +56,8 @@ impl ConfigurationProvider for AppConfigurationOffline {
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         self.config_snapshot.get_property(property_id)
     }
+
+    fn is_online(&self) -> Result<bool> {
+        Ok(false)
+    }
 }
