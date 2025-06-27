@@ -1,8 +1,7 @@
-use crate::client::AppConfigurationClientHttp;
+use crate::client::app_configuration_http::AppConfigurationClientHttp;
 use crate::network::{NetworkResult, ServiceAddress, TokenProvider};
 use crate::{AppConfigurationClient, Result};
 use crate::{ConfigurationId, OfflineMode};
-
 #[derive(Debug)]
 struct MockTokenProvider {}
 

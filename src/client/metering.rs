@@ -109,7 +109,7 @@ mod tests {
     use crate::models::ConfigurationJson;
     use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
-    use crate::NetworkResult;
+    use crate::network::NetworkResult;
 
     struct ServerClientMock {
         metering_data_sender: mpsc::Sender<()>,
@@ -147,7 +147,7 @@ mod tests {
             &self,
             _collection: &ConfigurationId,
         ) -> NetworkResult<impl WebsocketReader> {
-            unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            unreachable!() as NetworkResult<WebsocketMockReader>
         }
 
         fn push_metering_data(&self, _data: &MeteringDataJson) -> NetworkResult<()> {
