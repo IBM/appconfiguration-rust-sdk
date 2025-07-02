@@ -257,10 +257,10 @@ mod tests {
     }
 
     #[test]
-    fn test_metrics_queue_handling() {
+    fn test_record_evaluation_leads_to_metering_data_sent() {
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
         let (_, metering_handle) = start_metering(
-            ConfigurationId::new("".to_string(), "".to_string(), "".to_string()),
+            ConfigurationId::new("test_guid".to_string(), "test_env_id".to_string(), "test_collection_id".to_string()),
             std::time::Duration::from_millis(200), // Use 200ms for test flushing
             server_client,
         );
@@ -278,11 +278,14 @@ mod tests {
         let metering_data = metering_data_sent_receiver.recv().unwrap();
         assert!(chrono::Utc::now() - time_record_evaluation >= chrono::Duration::milliseconds(200));
 
-        assert_eq!(metering_data.feature_id, Some("feature1".to_string()));
-        assert_eq!(metering_data.property_id, None);
-        assert_eq!(metering_data.entity_id, "entity1".to_string());
-        assert_eq!(metering_data.segment_id, None);
-        assert_eq!(metering_data.count, 1);
+        assert_eq!(metering_data.collection_id, Some("test_collection_id".to_string()));
+        assert_eq!(metering_data.environment_id, Some("test_env_id".to_string()));
+        let usage = &metering_data.usage[0];
+        assert_eq!(usage.feature_id, Some("feature1".to_string()));
+        assert_eq!(usage.property_id, None);
+        assert_eq!(usage.entity_id, "entity1".to_string());
+        assert_eq!(usage.segment_id, None);
+        assert_eq!(usage.count, 1);
         // Evaluation time should be close to when we called record_evaluation.
         assert!(
             metering_data.evaluation_time >= time_record_evaluation
@@ -291,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    fn test_metrics_batching() {
+    fn test_metrics_multiple_same_evaluation_events_are_batched_to_one_entry() {
         // Directly test MeteringBatcher logic (unit test)
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
         let mut batcher = MeteringBatcher::new(std::time::Duration::from_millis(200), server_client);
