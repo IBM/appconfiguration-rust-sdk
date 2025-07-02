@@ -14,6 +14,7 @@
 use crate::network::ServerClient;
 use crate::utils::ThreadHandle;
 use crate::ConfigurationId;
+use chrono::Utc;
 use std::sync::mpsc;
 
 /// Starts periodic metering transmission to the server.
@@ -43,7 +44,7 @@ pub(crate) fn start_metering<T: ServerClient>(
                 // Actually received an event, sort it in using the batcher:
                 Ok(event) => batcher.handle_event(event),
                 // Hit the timeout, do nothing here, but give the batcher a chance to flush:
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {},
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 // All senders have been dropped, exit the thread:
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
@@ -166,7 +167,6 @@ impl<T: ServerClient> MeteringBatcher<T> {
 
     fn maybe_flush(&mut self) {
         if self.last_flush.elapsed() >= self.transmit_interval && !self.counters.is_empty() {
-            use chrono::Utc;
             for (key, count) in self.counters.iter() {
                 let json_data = crate::models::MeteringDataJson {
                     feature_id: key.feature_id.clone(),

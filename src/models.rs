@@ -21,7 +21,7 @@ use crate::{errors::DeserializationError, Error, Result, Value};
 
 /// Represents Metering data in a structure for data exchange used for
 /// sending to the server.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MeteringDataJson {
     pub feature_id: Option<String>,
     pub property_id: Option<String>,
