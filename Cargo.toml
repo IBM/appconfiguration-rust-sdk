@@ -19,7 +19,7 @@ exclude = [
 ]
 
 [features]
-http_client = []
+test_utils = []
 
 [dependencies]
 reqwest = { version = "0.12.9", features = ["json", "blocking"] }
@@ -32,7 +32,7 @@ thiserror = "2.0.7"
 chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
-appconfiguration = {path = ".", features = ["http_client"]}
+appconfiguration = {path = ".", features = ["test_utils"]}
 dotenvy = "0.15.7"
 rstest = "0.25.0"
 

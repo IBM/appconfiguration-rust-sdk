@@ -14,7 +14,6 @@
 use crate::network::ServerClient;
 use crate::utils::ThreadHandle;
 use crate::ConfigurationId;
-use chrono::Utc;
 use std::sync::mpsc;
 
 /// Starts periodic metering transmission to the server.
@@ -219,7 +218,7 @@ mod tests {
     use crate::models::ConfigurationJson;
     use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
-    use crate::NetworkResult;
+    use crate::network::NetworkResult;
     use chrono;
 
     struct ServerClientMock {
@@ -258,7 +257,7 @@ mod tests {
             &self,
             _collection: &ConfigurationId,
         ) -> NetworkResult<impl WebsocketReader> {
-            unreachable!() as crate::NetworkResult<WebsocketMockReader>
+            unreachable!() as NetworkResult<WebsocketMockReader>
         }
 
         fn push_metering_data(&self, data: &MeteringDataJson) -> NetworkResult<()> {

@@ -1,6 +1,4 @@
-use appconfiguration::{
-    AppConfigurationClientHttp, ConfigurationId, ConfigurationProvider, OfflineMode, ServiceAddress,
-};
+use appconfiguration::{ConfigurationId, OfflineMode, ServiceAddress};
 
 use std::net::TcpListener;
 use std::sync::mpsc::channel;
@@ -62,9 +60,8 @@ fn main() {
         "dev".to_string(),
         "collection_id".to_string(),
     );
-    let client = AppConfigurationClientHttp::new(
+    let client = appconfiguration::test_utils::create_app_configuration_client_live(
         address,
-        Box::new(common::MockTokenProvider {}),
         config_id,
         OfflineMode::Fail,
     )

@@ -104,11 +104,9 @@ pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
 pub use property::Property;
 pub use value::Value;
 
-#[cfg(feature = "http_client")]
-pub use client::AppConfigurationClientHttp;
-#[cfg(feature = "http_client")]
-pub use network::live_configuration::LiveConfiguration;
-#[cfg(feature = "http_client")]
-pub use network::{NetworkError, NetworkResult, ServiceAddress, TokenProvider};
+pub use network::ServiceAddress;
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "test_utils")]
+pub mod test_utils;
