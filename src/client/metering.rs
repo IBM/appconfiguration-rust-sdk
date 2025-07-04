@@ -130,7 +130,11 @@ struct MeteringBatcher<T: ServerClient> {
 }
 
 impl<T: ServerClient> MeteringBatcher<T> {
-    fn new(transmit_interval: std::time::Duration, server_client: T, config_id: ConfigurationId) -> Self {
+    fn new(
+        transmit_interval: std::time::Duration,
+        server_client: T,
+        config_id: ConfigurationId,
+    ) -> Self {
         Self {
             evaluations: std::collections::HashMap::new(),
             last_flush: std::time::Instant::now(),
@@ -190,16 +194,18 @@ impl<T: ServerClient> MeteringBatcher<T> {
         if self.evaluations.is_empty() {
             return;
         }
-        let usages: Vec<crate::models::MeteringDataUsageJson> = self.evaluations.iter().map(|(key, value)| {
-            crate::models::MeteringDataUsageJson {
+        let usages: Vec<crate::models::MeteringDataUsageJson> = self
+            .evaluations
+            .iter()
+            .map(|(key, value)| crate::models::MeteringDataUsageJson {
                 feature_id: key.feature_id.clone(),
                 property_id: key.property_id.clone(),
                 entity_id: key.entity_id.clone(),
                 segment_id: key.segment_id.clone(),
                 evaluation_time: value.time_of_last_evaluation,
                 count: value.number_of_evaluations,
-            }
-        }).collect();
+            })
+            .collect();
 
         let json_data = crate::models::MeteringDataJson {
             collection_id: self.config_id.collection_id.to_string(),
@@ -266,11 +272,16 @@ mod tests {
         }
     }
 
+    /// Tests the propagation of evaluation events through the batcher to the server client and the timings of the flush.
     #[test]
     fn test_record_evaluation_leads_to_metering_data_sent() {
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
         let (_, metering_handle) = start_metering(
-            ConfigurationId::new("test_guid".to_string(), "test_env_id".to_string(), "test_collection_id".to_string()),
+            ConfigurationId::new(
+                "test_guid".to_string(),
+                "test_env_id".to_string(),
+                "test_collection_id".to_string(),
+            ),
             std::time::Duration::from_millis(200), // Use 200ms for test flushing
             server_client,
         );
@@ -288,7 +299,10 @@ mod tests {
         let metering_data = metering_data_sent_receiver.recv().unwrap();
         assert!(chrono::Utc::now() - time_record_evaluation >= chrono::Duration::milliseconds(200));
 
-        assert_eq!(metering_data.collection_id, "test_collection_id".to_string());
+        assert_eq!(
+            metering_data.collection_id,
+            "test_collection_id".to_string()
+        );
         assert_eq!(metering_data.environment_id, "test_env_id".to_string());
         let usage = &metering_data.usages[0];
         assert_eq!(usage.feature_id, Some("feature1".to_string()));
@@ -299,13 +313,14 @@ mod tests {
         // Evaluation time should be close to when we called record_evaluation.
         assert!(
             usage.evaluation_time >= time_record_evaluation
-                && usage.evaluation_time < time_record_evaluation + chrono::Duration::milliseconds(50)
+                && usage.evaluation_time
+                    < time_record_evaluation + chrono::Duration::milliseconds(50)
         );
     }
 
+    /// Tests the correct sorting and batching of evaluation events.
     #[test]
     fn test_metrics_multiple_same_evaluation_events_are_batched_to_one_entry() {
-        // Directly test MeteringBatcher logic (unit test)
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
         let mut batcher = MeteringBatcher::new(
             std::time::Duration::from_millis(200),
@@ -329,21 +344,34 @@ mod tests {
             entity_id: "entity1".to_string(),
             segment_id: None,
         }));
+        let time_third_record = chrono::Utc::now();
+        batcher.handle_event(EvaluationEvent::Property(EvaluationEventData {
+            subject_id: SubjectId::Property("property1".to_string()),
+            entity_id: "entity1".to_string(),
+            segment_id: Some("some_segment".to_string()),
+        }));
 
         // Force flush
         batcher.flush();
 
         let metering_data = metering_data_sent_receiver.recv().unwrap();
 
+        // The two feature evaluations should be batched into one entry:
         let usage = &metering_data.usages[0];
         assert_eq!(usage.feature_id, Some("feature1".to_string()));
         assert_eq!(usage.property_id, None);
         assert_eq!(usage.entity_id, "entity1".to_string());
         assert_eq!(usage.segment_id, None);
-        // The second event should be responsible for the evaluation_time:
-        assert!(
-            usage.evaluation_time >= time_second_record
-        );
+        assert!(usage.evaluation_time >= time_second_record);
         assert_eq!(usage.count, 2);
+
+        // The property evaluation should be a separate entry:
+        let usage = &metering_data.usages[1];
+        assert_eq!(usage.feature_id, None);
+        assert_eq!(usage.property_id, Some("property1".to_string()));
+        assert_eq!(usage.entity_id, "entity1".to_string());
+        assert_eq!(usage.segment_id, Some("some_segment".to_string()));
+        assert!(usage.evaluation_time >= time_third_record);
+        assert_eq!(usage.count, 1);
     }
 }
