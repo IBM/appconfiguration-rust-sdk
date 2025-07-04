@@ -346,21 +346,27 @@ mod tests {
         let metering_data = metering_data_sent_receiver.recv().unwrap();
 
         // The two feature evaluations should be batched into one entry:
-        let usage = &metering_data.usages[1];
-        assert_eq!(usage.feature_id, Some("feature1".to_string()));
-        assert_eq!(usage.property_id, None);
-        assert_eq!(usage.entity_id, "entity1".to_string());
-        assert_eq!(usage.segment_id, None);
-        assert!(usage.evaluation_time >= time_second_record);
-        assert_eq!(usage.count, 2);
+        let feature_usage = metering_data
+            .usages
+            .iter()
+            .find(|u| u.feature_id == Some("feature1".to_string()))
+            .unwrap();
+        assert_eq!(feature_usage.property_id, None);
+        assert_eq!(feature_usage.entity_id, "entity1".to_string());
+        assert_eq!(feature_usage.segment_id, None);
+        assert!(feature_usage.evaluation_time >= time_second_record);
+        assert_eq!(feature_usage.count, 2);
 
         // The property evaluation should be a separate entry:
-        let usage = &metering_data.usages[0];
-        assert_eq!(usage.feature_id, None);
-        assert_eq!(usage.property_id, Some("property1".to_string()));
-        assert_eq!(usage.entity_id, "entity1".to_string());
-        assert_eq!(usage.segment_id, Some("some_segment".to_string()));
-        assert!(usage.evaluation_time >= time_third_record);
-        assert_eq!(usage.count, 1);
+        let property_usage = metering_data
+            .usages
+            .iter()
+            .find(|u| u.property_id == Some("property1".to_string()))
+            .unwrap();
+        assert_eq!(property_usage.feature_id, None);
+        assert_eq!(property_usage.entity_id, "entity1".to_string());
+        assert_eq!(property_usage.segment_id, Some("some_segment".to_string()));
+        assert!(property_usage.evaluation_time >= time_third_record);
+        assert_eq!(property_usage.count, 1);
     }
 }
