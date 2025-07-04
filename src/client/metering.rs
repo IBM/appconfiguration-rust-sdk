@@ -36,7 +36,8 @@ pub(crate) fn start_metering<T: ServerClient>(
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
-        let mut batcher = MeteringBatcher::new(transmit_interval, server_client, config_id);
+        let mut batcher = MeteringBatcher::new(server_client, config_id);
+        let mut last_flush = std::time::Instant::now();
         loop {
             let recv_result = receiver.recv_timeout(std::time::Duration::from_millis(100));
             match recv_result {
@@ -47,7 +48,10 @@ pub(crate) fn start_metering<T: ServerClient>(
                 // All senders have been dropped, exit the thread:
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
-            batcher.maybe_flush();
+            if last_flush.elapsed() >= transmit_interval {
+                batcher.flush();
+                last_flush = std::time::Instant::now();
+            }
         }
     });
 
@@ -121,24 +125,17 @@ struct EvaluationMetadata {
     time_of_last_evaluation: chrono::DateTime<chrono::Utc>,
 }
 
+/// The responsibility of the MeteringBatcher is to aggregate evaluation events and batch them for transmission to the server.
 struct MeteringBatcher<T: ServerClient> {
     evaluations: std::collections::HashMap<MeteringKey, EvaluationMetadata>,
-    last_flush: std::time::Instant,
-    transmit_interval: std::time::Duration,
     server_client: T,
     config_id: ConfigurationId,
 }
 
 impl<T: ServerClient> MeteringBatcher<T> {
-    fn new(
-        transmit_interval: std::time::Duration,
-        server_client: T,
-        config_id: ConfigurationId,
-    ) -> Self {
+    fn new(server_client: T, config_id: ConfigurationId) -> Self {
         Self {
             evaluations: std::collections::HashMap::new(),
-            last_flush: std::time::Instant::now(),
-            transmit_interval,
             server_client,
             config_id,
         }
@@ -184,12 +181,6 @@ impl<T: ServerClient> MeteringBatcher<T> {
             });
     }
 
-    fn maybe_flush(&mut self) {
-        if self.last_flush.elapsed() >= self.transmit_interval && !self.evaluations.is_empty() {
-            self.flush();
-        }
-    }
-
     fn flush(&mut self) {
         if self.evaluations.is_empty() {
             return;
@@ -214,7 +205,6 @@ impl<T: ServerClient> MeteringBatcher<T> {
         };
         let _ = self.server_client.push_metering_data(&json_data);
         self.evaluations.clear();
-        self.last_flush = std::time::Instant::now();
     }
 }
 
@@ -323,7 +313,6 @@ mod tests {
     fn test_metrics_multiple_same_evaluation_events_are_batched_to_one_entry() {
         let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
         let mut batcher = MeteringBatcher::new(
-            std::time::Duration::from_millis(200),
             server_client,
             ConfigurationId::new(
                 "test_guid".to_string(),
@@ -357,7 +346,7 @@ mod tests {
         let metering_data = metering_data_sent_receiver.recv().unwrap();
 
         // The two feature evaluations should be batched into one entry:
-        let usage = &metering_data.usages[0];
+        let usage = &metering_data.usages[1];
         assert_eq!(usage.feature_id, Some("feature1".to_string()));
         assert_eq!(usage.property_id, None);
         assert_eq!(usage.entity_id, "entity1".to_string());
@@ -366,7 +355,7 @@ mod tests {
         assert_eq!(usage.count, 2);
 
         // The property evaluation should be a separate entry:
-        let usage = &metering_data.usages[1];
+        let usage = &metering_data.usages[0];
         assert_eq!(usage.feature_id, None);
         assert_eq!(usage.property_id, Some("property1".to_string()));
         assert_eq!(usage.entity_id, "entity1".to_string());
