@@ -120,14 +120,14 @@ struct MeteringKey {
     segment_id: Option<String>,
 }
 
-struct EvaluationMetadata {
+struct EvaluationData {
     number_of_evaluations: u32,
     time_of_last_evaluation: chrono::DateTime<chrono::Utc>,
 }
 
 /// The responsibility of the MeteringBatcher is to aggregate evaluation events and batch them for transmission to the server.
 struct MeteringBatcher<T: ServerClient> {
-    evaluations: std::collections::HashMap<MeteringKey, EvaluationMetadata>,
+    evaluations: std::collections::HashMap<MeteringKey, EvaluationData>,
     server_client: T,
     config_id: ConfigurationId,
 }
@@ -175,7 +175,7 @@ impl<T: ServerClient> MeteringBatcher<T> {
                 v.number_of_evaluations += 1;
                 v.time_of_last_evaluation = now;
             })
-            .or_insert(EvaluationMetadata {
+            .or_insert(EvaluationData {
                 number_of_evaluations: 1,
                 time_of_last_evaluation: now,
             });
