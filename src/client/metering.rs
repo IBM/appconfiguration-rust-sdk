@@ -89,14 +89,6 @@ pub(crate) struct MeteringThreadHandle {
     _thread_handle: crate::utils::ThreadHandle<()>,
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
-struct MeteringKey {
-    feature_id: Option<String>,
-    property_id: Option<String>,
-    entity_id: String,
-    segment_id: Option<String>,
-}
-
 pub(crate) enum SubjectId {
     Feature(String),
     Property(String),
@@ -114,6 +106,14 @@ pub(crate) struct EvaluationEventData {
 pub(crate) enum EvaluationEvent {
     Feature(EvaluationEventData),
     Property(EvaluationEventData),
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+struct MeteringKey {
+    feature_id: Option<String>,
+    property_id: Option<String>,
+    entity_id: String,
+    segment_id: Option<String>,
 }
 
 struct EvaluationMetadata {
