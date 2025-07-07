@@ -19,9 +19,7 @@ use std::collections::HashMap;
 use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
-use crate::models::Segment;
-use crate::models::SegmentRule;
-use crate::models::ValueType;
+use crate::network::models::{Segment, SegmentRule, ValueType};
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
@@ -268,7 +266,7 @@ fn check_operator(
 pub mod tests {
     use super::*;
     use crate::errors::{EntityEvaluationError, Error};
-    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments};
+    use crate::network::models::{ConfigValue, Rule, Segment, SegmentRule, Segments};
     use rstest::*;
 
     #[fixture]

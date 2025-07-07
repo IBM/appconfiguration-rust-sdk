@@ -185,20 +185,22 @@ impl<T: ServerClient> MeteringBatcher<T> {
         if self.evaluations.is_empty() {
             return;
         }
-        let usages: Vec<crate::models::MeteringDataUsageJson> = self
+        let usages: Vec<crate::network::models::MeteringDataUsageJson> = self
             .evaluations
             .iter()
-            .map(|(key, value)| crate::models::MeteringDataUsageJson {
-                feature_id: key.feature_id.clone(),
-                property_id: key.property_id.clone(),
-                entity_id: key.entity_id.clone(),
-                segment_id: key.segment_id.clone(),
-                evaluation_time: value.time_of_last_evaluation,
-                count: value.number_of_evaluations,
-            })
+            .map(
+                |(key, value)| crate::network::models::MeteringDataUsageJson {
+                    feature_id: key.feature_id.clone(),
+                    property_id: key.property_id.clone(),
+                    entity_id: key.entity_id.clone(),
+                    segment_id: key.segment_id.clone(),
+                    evaluation_time: value.time_of_last_evaluation,
+                    count: value.number_of_evaluations,
+                },
+            )
             .collect();
 
-        let json_data = crate::models::MeteringDataJson {
+        let json_data = crate::network::models::MeteringDataJson {
             collection_id: self.config_id.collection_id.to_string(),
             environment_id: self.config_id.environment_id.to_string(),
             usages,
@@ -211,11 +213,10 @@ impl<T: ServerClient> MeteringBatcher<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::ConfigurationJson;
-    use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
+    use crate::network::models::ConfigurationJson;
+    use crate::network::models::MeteringDataJson;
     use crate::network::NetworkResult;
-    use chrono;
 
     struct ServerClientMock {
         metering_data_sender: mpsc::Sender<MeteringDataJson>,

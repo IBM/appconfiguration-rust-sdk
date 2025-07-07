@@ -85,7 +85,6 @@ mod client;
 mod entity;
 mod errors;
 mod feature;
-mod models;
 mod network;
 mod property;
 mod segment_evaluation;

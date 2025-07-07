@@ -135,7 +135,7 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
+    use crate::network::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
     use rstest::rstest;
     use std::collections::HashMap;
 

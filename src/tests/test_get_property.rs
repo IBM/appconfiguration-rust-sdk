@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use crate::models::ConfigurationJson;
+use crate::network::models::ConfigurationJson;
 
 use crate::client::configuration::Configuration;
 use crate::client::{AppConfigurationClient, AppConfigurationOffline};
@@ -22,7 +22,7 @@ use crate::{ConfigurationProvider, Value};
 use rstest::*;
 
 use super::client_enterprise;
-use crate::models::tests::configuration_unordered_segment_rules;
+use crate::network::models::tests::configuration_unordered_segment_rules;
 use crate::property::Property;
 
 #[rstest]
