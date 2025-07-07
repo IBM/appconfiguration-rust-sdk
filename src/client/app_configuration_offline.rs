@@ -17,7 +17,7 @@ use crate::client::configuration::Configuration;
 use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
-use crate::models::ConfigurationJson;
+use crate::network::models::ConfigurationJson;
 use crate::ConfigurationProvider;
 
 /// AppConfiguration client using a local file with a configuration snapshot

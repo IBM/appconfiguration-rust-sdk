@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::models::{ConfigurationJson, MeteringDataJson};
 use super::{NetworkError, NetworkResult, TokenProvider};
-use crate::models::ConfigurationJson;
-use crate::models::MeteringDataJson;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;

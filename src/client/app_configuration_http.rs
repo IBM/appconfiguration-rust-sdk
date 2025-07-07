@@ -81,13 +81,13 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 mod tests {
     use super::*;
     use crate::client::configuration::Configuration;
-    use crate::models::tests::{
+    use crate::network::live_configuration::CurrentMode;
+    use crate::network::models::tests::{
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
     };
-    use crate::network::live_configuration::CurrentMode;
     use crate::utils::ThreadStatus;
-    use crate::{models::ConfigurationJson, Feature, Property};
+    use crate::{network::models::ConfigurationJson, Feature, Property};
     use rstest::rstest;
 
     struct LiveConfigurationMock {

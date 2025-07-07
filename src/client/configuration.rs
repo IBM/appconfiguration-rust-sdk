@@ -15,7 +15,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::{ConfigurationAccessError, Result};
-use crate::models::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
+use crate::network::models::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
 use crate::segment_evaluation::TargetingRules;
 use crate::Error;
 
@@ -191,8 +191,8 @@ impl ConfigurationProvider for Configuration {
 mod tests {
     use super::*;
     use crate::errors::Error;
-    use crate::models::tests::example_configuration_enterprise;
-    use crate::models::ConfigurationJson;
+    use crate::network::models::tests::example_configuration_enterprise;
+    use crate::network::models::ConfigurationJson;
 
     use rstest::*;
 

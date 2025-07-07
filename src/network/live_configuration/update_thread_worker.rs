@@ -207,8 +207,8 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
+                Ok(crate::network::models::tests::configuration_feature1_enabled())
             }
 
             #[allow(unreachable_code)]
@@ -246,8 +246,8 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
+                Ok(crate::network::models::tests::configuration_feature1_enabled())
             }
 
             #[allow(unreachable_code)]
@@ -289,7 +289,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
                 Err(NetworkError::ProtocolError)
             }
 
@@ -341,7 +341,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
                 Err(NetworkError::CannotAcquireLock)
             }
 
@@ -378,8 +378,8 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
+                Ok(crate::network::models::tests::configuration_feature1_enabled())
             }
 
             #[allow(unreachable_code)]
@@ -455,7 +455,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
                 Err(NetworkError::UrlParseError("".to_string()))
             }
 
@@ -509,7 +509,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
                 unreachable!()
             }
 
@@ -558,7 +558,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
                 self.tx.send("get_configuration".to_string()).unwrap();
                 Err(NetworkError::UrlParseError("".to_string()))
             }
@@ -620,8 +620,8 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
+                Ok(crate::network::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
@@ -658,8 +658,8 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
+                Ok(crate::network::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
@@ -697,8 +697,8 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
+                Ok(crate::network::models::tests::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(

@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Error;
+use crate::{
+    network::models::{ConfigValue, ValueType},
+    Error,
+};
 
 /// A wrapper on top of the primitive types acepted by the library.
 #[derive(PartialEq, Debug, Clone)]
@@ -107,6 +110,37 @@ impl TryFrom<Value> for bool {
         match value {
             Value::Boolean(f) => Ok(f),
             _ => Err(Error::MismatchType),
+        }
+    }
+}
+
+impl TryFrom<(ValueType, ConfigValue)> for Value {
+    type Error = crate::Error;
+
+    fn try_from(value: (ValueType, ConfigValue)) -> std::result::Result<Self, Self::Error> {
+        let (kind, value) = value;
+        match kind {
+            ValueType::Numeric => {
+                if let Some(n) = value.as_i64() {
+                    Ok(Value::Int64(n))
+                } else if let Some(n) = value.as_u64() {
+                    Ok(Value::UInt64(n))
+                } else if let Some(n) = value.as_f64() {
+                    Ok(Value::Float64(n))
+                } else {
+                    Err(crate::Error::ProtocolError(
+                        "Cannot convert numeric type".to_string(),
+                    ))
+                }
+            }
+            ValueType::Boolean => value
+                .as_boolean()
+                .map(Value::Boolean)
+                .ok_or(crate::Error::MismatchType),
+            ValueType::String => value
+                .as_string()
+                .map(Value::String)
+                .ok_or(crate::Error::MismatchType),
         }
     }
 }

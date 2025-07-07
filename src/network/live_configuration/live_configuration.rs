@@ -167,7 +167,7 @@ mod tests {
 
     use rstest::rstest;
 
-    use crate::models::tests::{
+    use crate::network::models::tests::{
         configuration_property1_enabled, example_configuration_enterprise_path,
     };
 
@@ -191,14 +191,14 @@ mod tests {
             }
         }
         struct ServerClientMock {
-            rx: mpsc::Receiver<crate::models::ConfigurationJson>,
+            rx: mpsc::Receiver<crate::network::models::ConfigurationJson>,
             websocket_rx: mpsc::Receiver<WebsocketReaderMock>,
         }
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<crate::network::models::ConfigurationJson> {
                 Ok(self.rx.recv().unwrap())
             }
 
@@ -245,7 +245,7 @@ mod tests {
 
         let (read_msg_tx, read_msg_rx) = mpsc::channel();
         let (read_msg_ping_tx, read_msg_ping_rx) = mpsc::channel();
-        let configuration = crate::models::tests::configuration_feature1_enabled();
+        let configuration = crate::network::models::tests::configuration_feature1_enabled();
         let config = {
             // allow thread to start (unblock)
             get_configuration_tx.send(configuration).unwrap();
