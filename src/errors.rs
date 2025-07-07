@@ -44,6 +44,9 @@ pub enum Error {
     #[error(transparent)]
     ConfigurationAccessError(#[from] ConfigurationAccessError),
 
+    #[error(transparent)]
+    ConfigurationDataError(#[from] ConfigurationDataError),
+
     #[error("Failed to evaluate entity: {0}")]
     EntityEvaluationError(EntityEvaluationError),
 
@@ -92,23 +95,24 @@ pub enum DeserializationErrorKind {
 }
 
 #[derive(Debug, Error)]
+pub enum ConfigurationDataError {
+    #[error("Environment '{0}' not found")]
+    EnvironmentNotFound(String),
+
+    #[error("Feature `{0}` not found.")]
+    FeatureNotFound(String),
+
+    #[error("Property `{0}` not found.")]
+    PropertyNotFound(String),
+
+    #[error("Missing segments for resource '{0}'")]
+    MissingSegments(String),
+}
+
+#[derive(Debug, Error)]
 pub enum ConfigurationAccessError {
     #[error("Error acquiring index cache lock")]
     LockAcquisitionError,
-
-    #[error(
-        "Environment '{environment_id}' indicated as key not found in the configuration instance"
-    )]
-    EnvironmentNotFound { environment_id: String },
-
-    #[error("Feature `{feature_id}` not found.")]
-    FeatureNotFound { feature_id: String },
-
-    #[error("Property `{property_id}` not found.")]
-    PropertyNotFound { property_id: String },
-
-    #[error("Missing segments for resource '{resource_id}'")]
-    MissingSegments { resource_id: String },
 }
 
 impl<T> From<PoisonError<T>> for ConfigurationAccessError {

@@ -102,28 +102,15 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     /// accordingly.
     fn update_configuration_from_server_and_current_mode(&self) -> Result<()> {
         match self.server_client.get_configuration(&self.configuration_id) {
-            Ok(config_json) => {
-                match Configuration::new(&self.configuration_id.environment_id, config_json) {
-                    Ok(config) => {
-                        *self.configuration.lock()? = Some(config);
-                        *self.current_mode.lock()? = CurrentMode::Online;
-                    }
-                    Err(_) => {
-                        *self.current_mode.lock()? = CurrentMode::Offline(
-                            CurrentModeOfflineReason::ConfigurationDataInvalid,
-                        );
-                    }
-                };
+            Ok(config) => {
+                *self.configuration.lock()? = Some(config);
+                *self.current_mode.lock()? = CurrentMode::Online;
                 Ok(())
             }
             Err(e) => {
                 Self::recoverable_error(e)?;
-                let current_mode = self.current_mode.lock()?.clone();
-                if let CurrentMode::Offline(_) = current_mode {
-                } else {
-                    *self.current_mode.lock()? =
-                        CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration);
-                }
+                *self.current_mode.lock()? =
+                    CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration);
                 Ok(())
             }
         }
@@ -182,13 +169,14 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
             NetworkError::UrlParseError(e) => Err(Error::UnrecoverableError(e)),
             NetworkError::InvalidHeaderValue(e) => Err(Error::UnrecoverableError(e)),
             NetworkError::CannotAcquireLock => Err(Error::CannotAcquireLock),
+            NetworkError::ConfigurationDataError(_) => Ok(()),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::network::NetworkResult;
+    use crate::{network::NetworkResult, ConfigurationDataError};
 
     use super::*;
 
@@ -207,7 +195,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -246,8 +234,12 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+            ) -> NetworkResult<Configuration> {
+                Err(ConfigurationDataError::EnvironmentNotFound(
+                    "environment not in response".to_string(),
+                )
+                .into())
+                // Err(network::errors::NetworkError::ConfigurationDataError(ConfigurationDataError::EnvironmentNotFound("environment not in response")))
             }
 
             #[allow(unreachable_code)]
@@ -258,8 +250,7 @@ mod tests {
                 unreachable!() as NetworkResult<WebsocketMockReader>
             }
         }
-        let configuration_id =
-            ConfigurationId::new("".into(), "non_existing_environment_id".into(), "".into());
+        let configuration_id = ConfigurationId::new("".into(), "not used".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
             CurrentModeOfflineReason::Initializing,
@@ -278,7 +269,7 @@ mod tests {
         assert!(configuration.lock().unwrap().is_none());
         assert_eq!(
             *current_mode.lock().unwrap(),
-            CurrentMode::Offline(CurrentModeOfflineReason::ConfigurationDataInvalid)
+            CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
         );
     }
 
@@ -289,7 +280,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Err(NetworkError::ProtocolError)
             }
 
@@ -321,17 +312,6 @@ mod tests {
             *current_mode.lock().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
         );
-
-        // Test if offline mode is preserved:
-        *current_mode.lock().unwrap() =
-            CurrentMode::Offline(CurrentModeOfflineReason::Initializing);
-        let r = worker.update_configuration_from_server_and_current_mode();
-        assert!(r.is_ok());
-        assert!(configuration.lock().unwrap().is_none());
-        assert_eq!(
-            *current_mode.lock().unwrap(),
-            CurrentMode::Offline(CurrentModeOfflineReason::Initializing)
-        );
     }
 
     #[test]
@@ -341,7 +321,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Err(NetworkError::CannotAcquireLock)
             }
 
@@ -378,7 +358,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -455,7 +435,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Err(NetworkError::UrlParseError("".to_string()))
             }
 
@@ -509,7 +489,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 unreachable!()
             }
 
@@ -558,7 +538,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 self.tx.send("get_configuration".to_string()).unwrap();
                 Err(NetworkError::UrlParseError("".to_string()))
             }
@@ -620,7 +600,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -658,7 +638,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 
@@ -697,7 +677,7 @@ mod tests {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Ok(crate::models::tests::configuration_feature1_enabled())
             }
 

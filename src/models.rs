@@ -237,6 +237,8 @@ pub(crate) struct Segments {
 #[cfg(test)]
 pub(crate) mod tests {
 
+    use crate::client::configuration::Configuration;
+
     use super::*;
     use rstest::*;
     use std::{fs, path::PathBuf};
@@ -254,19 +256,20 @@ pub(crate) mod tests {
     // Creates a [`ConfigurationJson`] object from the data files
     pub(crate) fn example_configuration_enterprise(
         example_configuration_enterprise_path: PathBuf,
-    ) -> ConfigurationJson {
+    ) -> Configuration {
         let content = fs::File::open(example_configuration_enterprise_path)
             .expect("file should open read only");
-        let configuration: ConfigurationJson =
+        let config_json: ConfigurationJson =
             serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
-        configuration
+        Configuration::new("dev", config_json).unwrap()
     }
 
     #[fixture]
-    pub(crate) fn configuration_feature1_enabled() -> ConfigurationJson {
-        ConfigurationJson {
+    pub(crate) fn configuration_feature1_enabled() -> Configuration {
+        let environment_id = "environment_id".to_string();
+        let config_json = ConfigurationJson {
             environments: vec![Environment {
-                environment_id: "environment_id".to_string(),
+                environment_id: environment_id.clone(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
@@ -281,14 +284,16 @@ pub(crate) mod tests {
                 properties: Vec::new(),
             }],
             segments: Vec::new(),
-        }
+        };
+        Configuration::new(&environment_id, config_json).unwrap()
     }
 
     #[fixture]
-    pub(crate) fn configuration_property1_enabled() -> ConfigurationJson {
-        ConfigurationJson {
+    pub(crate) fn configuration_property1_enabled() -> Configuration {
+        let environment_id = "environment_id".to_string();
+        let config_json = ConfigurationJson {
             environments: vec![Environment {
-                environment_id: "environment_id".to_string(),
+                environment_id: environment_id.clone(),
                 properties: vec![Property {
                     name: "P1".to_string(),
                     property_id: "p1".to_string(),
@@ -301,11 +306,12 @@ pub(crate) mod tests {
                 features: Vec::new(),
             }],
             segments: Vec::new(),
-        }
+        };
+        Configuration::new(&environment_id, config_json).unwrap()
     }
 
     #[fixture]
-    pub(crate) fn configuration_unordered_segment_rules() -> ConfigurationJson {
+    pub(crate) fn configuration_unordered_segment_rules() -> Configuration {
         let segment_rules = vec![
             SegmentRule {
                 rules: vec![Segments {
@@ -326,9 +332,10 @@ pub(crate) mod tests {
         ];
         assert!(segment_rules[0].order > segment_rules[1].order);
 
-        ConfigurationJson {
+        let environment_id = "environment_id".to_string();
+        let config_json = ConfigurationJson {
             environments: vec![Environment {
-                environment_id: "environment_id".to_string(),
+                environment_id: environment_id.clone(),
                 features: vec![Feature {
                     name: "F1".to_string(),
                     feature_id: "f1".to_string(),
@@ -374,6 +381,7 @@ pub(crate) mod tests {
                     }],
                 },
             ],
-        }
+        };
+        Configuration::new(&environment_id, config_json).unwrap()
     }
 }
