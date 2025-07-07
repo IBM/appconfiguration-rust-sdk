@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Models used to interchange information with servers. These models
-//! are used for de/serialization purposes.
+//! Models used to interchange information with servers.
+//!
+//! These are internal models used for de/serialization purposes.
 
 mod configuration;
 mod metering;
