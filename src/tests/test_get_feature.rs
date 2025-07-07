@@ -14,8 +14,6 @@
 
 use std::collections::HashMap;
 
-use crate::models::ConfigurationJson;
-
 use crate::client::configuration::Configuration;
 use crate::{AppConfigurationClient, ConfigurationProvider};
 use crate::{AppConfigurationOffline, Value};
@@ -36,11 +34,10 @@ fn test_get_feature_doesnt_exist(client_enterprise: Box<dyn AppConfigurationClie
 }
 
 #[rstest]
-fn test_get_feature_ordered(configuration_unordered_segment_rules: ConfigurationJson) {
-    let config_snapshot =
-        Configuration::new("environment_id", configuration_unordered_segment_rules).unwrap();
-
-    let client = AppConfigurationOffline { config_snapshot };
+fn test_get_feature_ordered(configuration_unordered_segment_rules: Configuration) {
+    let client = AppConfigurationOffline {
+        config_snapshot: configuration_unordered_segment_rules,
+    };
 
     let entity = crate::tests::GenericEntity {
         id: "a2".into(),

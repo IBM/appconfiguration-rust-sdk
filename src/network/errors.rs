@@ -16,6 +16,8 @@ use std::sync::PoisonError;
 
 use thiserror::Error;
 
+use crate::ConfigurationDataError;
+
 #[derive(Debug, Error)]
 pub enum NetworkError {
     #[error(transparent)]
@@ -38,6 +40,9 @@ pub enum NetworkError {
 
     #[error("Contact to server lost")]
     ContactToServerLost,
+
+    #[error(transparent)]
+    ConfigurationDataError(#[from] ConfigurationDataError),
 }
 
 impl<T> From<PoisonError<T>> for NetworkError {

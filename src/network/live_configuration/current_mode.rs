@@ -23,11 +23,11 @@ pub enum CurrentMode {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CurrentModeOfflineReason {
+    // Request error, or configuration data was invalid
     FailedToGetNewConfiguration,
     Initializing,
     WebsocketClosed,
     WebsocketError,
-    ConfigurationDataInvalid,
 }
 
 impl std::fmt::Display for CurrentModeOfflineReason {
@@ -39,9 +39,6 @@ impl std::fmt::Display for CurrentModeOfflineReason {
             CurrentModeOfflineReason::Initializing => write!(f, "Initializing"),
             CurrentModeOfflineReason::WebsocketClosed => write!(f, "WebsocketClosed"),
             CurrentModeOfflineReason::WebsocketError => write!(f, "WebsocketError"),
-            CurrentModeOfflineReason::ConfigurationDataInvalid => {
-                write!(f, "ConfigurationDataInvalid")
-            }
         }
     }
 }

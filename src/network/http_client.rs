@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::{NetworkError, NetworkResult, TokenProvider};
-use crate::models::ConfigurationJson;
+use crate::client::configuration::Configuration;
 use crate::models::MeteringDataJson;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
@@ -97,10 +97,8 @@ impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader
 }
 
 pub trait ServerClient: Send + 'static {
-    fn get_configuration(
-        &self,
-        configuration_id: &ConfigurationId,
-    ) -> NetworkResult<ConfigurationJson>;
+    fn get_configuration(&self, configuration_id: &ConfigurationId)
+        -> NetworkResult<Configuration>;
 
     fn get_configuration_monitoring_websocket(
         &self,
@@ -142,7 +140,7 @@ impl ServerClient for ServerClientImpl {
     fn get_configuration(
         &self,
         configuration_id: &ConfigurationId,
-    ) -> NetworkResult<ConfigurationJson> {
+    ) -> NetworkResult<Configuration> {
         let url = format!(
             "{}/feature/v1/instances/{}/config",
             self.service_address.base_url(ServiceAddressProtocol::Http),
@@ -163,7 +161,13 @@ impl ServerClient for ServerClientImpl {
             .send();
 
         match r {
-            Ok(response) => response.json().map_err(|_| NetworkError::ProtocolError),
+            Ok(response) => {
+                let config_json = response.json().map_err(|_| NetworkError::ProtocolError)?;
+                Ok(Configuration::new(
+                    &configuration_id.environment_id,
+                    config_json,
+                )?)
+            }
             Err(e) => {
                 // TODO: Identify if token expired, get new one and retry
                 if false {

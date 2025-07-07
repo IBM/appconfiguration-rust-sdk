@@ -14,10 +14,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::errors::{ConfigurationAccessError, Result};
+use crate::errors::Result;
 use crate::models::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
 use crate::segment_evaluation::TargetingRules;
-use crate::Error;
+use crate::ConfigurationDataError;
 
 use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
@@ -34,14 +34,17 @@ pub struct Configuration {
 
 impl Configuration {
     /// Constructs the Configuration, by consuming and filtering data in exchange format
-    pub fn new(environment_id: &str, configuration: ConfigurationJson) -> Result<Self> {
+    pub fn new(
+        environment_id: &str,
+        configuration: ConfigurationJson,
+    ) -> std::result::Result<Self, ConfigurationDataError> {
         let environment = configuration
             .environments
             .into_iter()
             .find(|e| e.environment_id == environment_id)
-            .ok_or(ConfigurationAccessError::EnvironmentNotFound {
-                environment_id: environment_id.to_string(),
-            })?;
+            .ok_or(ConfigurationDataError::EnvironmentNotFound(
+                environment_id.to_string(),
+            ))?;
         // FIXME: why not filtering for collection here?
 
         let features = environment
@@ -58,10 +61,9 @@ impl Configuration {
 
                 // Integrity DB check: all segment_ids should be available in the snapshot
                 if feature.segment_rules.len() != segments.len() {
-                    return Err(ConfigurationAccessError::MissingSegments {
-                        resource_id: feature.feature_id.to_string(),
-                    }
-                    .into());
+                    return Err(ConfigurationDataError::MissingSegments(
+                        feature.feature_id.to_string(),
+                    ));
                 }
 
                 let segment_rules =
@@ -69,7 +71,7 @@ impl Configuration {
 
                 Ok((feature.feature_id.clone(), (feature, segment_rules)))
             })
-            .collect::<Result<_>>()?;
+            .collect::<std::result::Result<_, _>>()?;
 
         let properties = environment
             .properties
@@ -85,22 +87,26 @@ impl Configuration {
 
                 // Integrity DB check: all segment_ids should be available in the snapshot
                 if property.segment_rules.len() != segments.len() {
-                    return Err(ConfigurationAccessError::MissingSegments {
-                        resource_id: property.property_id.to_string(),
-                    }
-                    .into());
+                    return Err(ConfigurationDataError::MissingSegments(
+                        property.property_id.to_string(),
+                    ));
                 }
 
                 let segment_rules =
                     TargetingRules::new(segments, property.segment_rules.clone(), property.r#type);
                 Ok((property.property_id.clone(), (property, segment_rules)))
             })
-            .collect::<Result<_>>()?;
+            .collect::<std::result::Result<_, _>>()?;
 
         Ok(Configuration {
             features,
             properties,
         })
+    }
+
+    pub fn from_file(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
+        let configuration = ConfigurationJson::new(filepath)?;
+        Ok(Configuration::new(environment_id, configuration)?)
     }
 
     /// Returns a mapping of segment ID to `Segment` for all segments referenced
@@ -143,11 +149,10 @@ impl ConfigurationProvider for Configuration {
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
         // Get the feature from the snapshot
-        let (feature, segment_rules) = self.features.get(feature_id).ok_or_else(|| {
-            Error::ConfigurationAccessError(ConfigurationAccessError::FeatureNotFound {
-                feature_id: feature_id.to_string(),
-            })
-        })?;
+        let (feature, segment_rules) = self
+            .features
+            .get(feature_id)
+            .ok_or_else(|| ConfigurationDataError::FeatureNotFound(feature_id.to_string()))?;
 
         let enabled_value = (feature.r#type, feature.enabled_value.clone()).try_into()?;
         let disabled_value = (feature.r#type, feature.disabled_value.clone()).try_into()?;
@@ -168,11 +173,10 @@ impl ConfigurationProvider for Configuration {
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         // Get the property from the snapshot
-        let (property, segment_rules) = self.properties.get(property_id).ok_or_else(|| {
-            Error::ConfigurationAccessError(ConfigurationAccessError::PropertyNotFound {
-                property_id: property_id.to_string(),
-            })
-        })?;
+        let (property, segment_rules) = self
+            .properties
+            .get(property_id)
+            .ok_or_else(|| ConfigurationDataError::PropertyNotFound(property_id.to_string()))?;
 
         let value = (property.r#type, property.value.clone()).try_into()?;
         Ok(PropertySnapshot::new(
@@ -189,22 +193,26 @@ impl ConfigurationProvider for Configuration {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::errors::Error;
-    use crate::models::tests::example_configuration_enterprise;
+    use crate::models::tests::example_configuration_enterprise_path;
     use crate::models::ConfigurationJson;
 
     use rstest::*;
 
     #[rstest]
-    fn test_filter_configurations(example_configuration_enterprise: ConfigurationJson) {
-        let result =
-            Configuration::new("does_for_sure_not_exist", example_configuration_enterprise);
+    fn test_filter_configurations(example_configuration_enterprise_path: PathBuf) {
+        let content = std::fs::File::open(example_configuration_enterprise_path)
+            .expect("file should open read only");
+        let config_json: ConfigurationJson =
+            serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
+
+        let result = Configuration::new("does_for_sure_not_exist", config_json);
         assert!(result.is_err());
 
         assert!(matches!(
                 result.unwrap_err(),
-                Error::ConfigurationAccessError(ref e)
-                if matches!(e, ConfigurationAccessError::EnvironmentNotFound { ref environment_id} if environment_id == "does_for_sure_not_exist")));
+                 ConfigurationDataError::EnvironmentNotFound(ref environment_id) if environment_id == "does_for_sure_not_exist"));
     }
 }

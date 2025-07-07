@@ -191,14 +191,14 @@ mod tests {
             }
         }
         struct ServerClientMock {
-            rx: mpsc::Receiver<crate::models::ConfigurationJson>,
+            rx: mpsc::Receiver<Configuration>,
             websocket_rx: mpsc::Receiver<WebsocketReaderMock>,
         }
         impl ServerClient for ServerClientMock {
             fn get_configuration(
                 &self,
                 _configuration_id: &ConfigurationId,
-            ) -> NetworkResult<crate::models::ConfigurationJson> {
+            ) -> NetworkResult<Configuration> {
                 Ok(self.rx.recv().unwrap())
             }
 
@@ -370,7 +370,7 @@ mod tests {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
-                CurrentModeOfflineReason::ConfigurationDataInvalid,
+                CurrentModeOfflineReason::WebsocketClosed,
             ))),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
@@ -385,7 +385,7 @@ mod tests {
             assert!(r.is_err(), "Error: {}", r.unwrap_err());
             assert_eq!(
                 r.unwrap_err(),
-                Error::Offline(CurrentModeOfflineReason::ConfigurationDataInvalid)
+                Error::Offline(CurrentModeOfflineReason::WebsocketClosed)
             );
         }
 

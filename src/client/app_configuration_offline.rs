@@ -17,7 +17,6 @@ use crate::client::configuration::Configuration;
 use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
-use crate::models::ConfigurationJson;
 use crate::ConfigurationProvider;
 
 /// AppConfiguration client using a local file with a configuration snapshot
@@ -34,8 +33,7 @@ impl AppConfigurationOffline {
     /// * `filepath` - The file with the configuration.
     /// * `environment_id` - ID of the environment to use from the configuration file.
     pub fn new(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
-        let configuration = ConfigurationJson::new(filepath)?;
-        let config_snapshot = Configuration::new(environment_id, configuration)?;
+        let config_snapshot = Configuration::from_file(filepath, environment_id)?;
         Ok(Self { config_snapshot })
     }
 }

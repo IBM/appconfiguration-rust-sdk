@@ -211,7 +211,8 @@ impl<T: ServerClient> MeteringBatcher<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::ConfigurationJson;
+    use crate::client::configuration::Configuration;
+
     use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
     use crate::network::NetworkResult;
@@ -244,7 +245,7 @@ mod tests {
         fn get_configuration(
             &self,
             _configuration_id: &ConfigurationId,
-        ) -> NetworkResult<ConfigurationJson> {
+        ) -> NetworkResult<Configuration> {
             unreachable!()
         }
 
