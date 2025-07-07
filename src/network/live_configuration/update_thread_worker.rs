@@ -239,7 +239,6 @@ mod tests {
                     "environment not in response".to_string(),
                 )
                 .into())
-                // Err(network::errors::NetworkError::ConfigurationDataError(ConfigurationDataError::EnvironmentNotFound("environment not in response")))
             }
 
             #[allow(unreachable_code)]
