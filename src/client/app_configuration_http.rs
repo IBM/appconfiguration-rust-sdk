@@ -87,7 +87,7 @@ mod tests {
     };
     use crate::network::live_configuration::CurrentMode;
     use crate::utils::ThreadStatus;
-    use crate::{models::ConfigurationJson, Feature, Property};
+    use crate::{Feature, Property};
     use rstest::rstest;
 
     struct LiveConfigurationMock {
@@ -128,15 +128,12 @@ mod tests {
 
     #[rstest]
     fn test_get_feature_persistence(
-        example_configuration_enterprise: ConfigurationJson,
-        configuration_feature1_enabled: ConfigurationJson,
+        example_configuration_enterprise: Configuration,
+        configuration_feature1_enabled: Configuration,
     ) {
         let mut client = {
-            let configuration_snapshot =
-                Configuration::new("dev", example_configuration_enterprise).unwrap();
-
             let live_cfg_mock = LiveConfigurationMock {
-                configuration: configuration_snapshot,
+                configuration: example_configuration_enterprise,
             };
 
             AppConfigurationClientHttp {
@@ -150,10 +147,8 @@ mod tests {
         let feature_value1 = feature.get_value(&entity).unwrap();
 
         // We simulate an update of the configuration:
-        let configuration_snapshot =
-            Configuration::new("environment_id", configuration_feature1_enabled).unwrap();
         client.live_configuration = LiveConfigurationMock {
-            configuration: configuration_snapshot,
+            configuration: configuration_feature1_enabled,
         };
         // The feature value should not have changed (as we did not retrieve it again)
         let feature_value2 = feature.get_value(&entity).unwrap();
@@ -168,15 +163,12 @@ mod tests {
 
     #[rstest]
     fn test_get_property_persistence(
-        example_configuration_enterprise: ConfigurationJson,
-        configuration_property1_enabled: ConfigurationJson,
+        example_configuration_enterprise: Configuration,
+        configuration_property1_enabled: Configuration,
     ) {
         let mut client = {
-            let configuration_snapshot =
-                Configuration::new("dev", example_configuration_enterprise).unwrap();
-
             let live_cfg_mock = LiveConfigurationMock {
-                configuration: configuration_snapshot,
+                configuration: example_configuration_enterprise,
             };
 
             AppConfigurationClientHttp {
@@ -190,10 +182,8 @@ mod tests {
         let property_value1 = property.get_value(&entity).unwrap();
 
         // We simulate an update of the configuration:
-        let configuration_snapshot =
-            Configuration::new("environment_id", configuration_property1_enabled).unwrap();
         client.live_configuration = LiveConfigurationMock {
-            configuration: configuration_snapshot,
+            configuration: configuration_property1_enabled,
         };
         // The property value should not have changed (as we did not retrieve it again)
         let property_value2 = property.get_value(&entity).unwrap();

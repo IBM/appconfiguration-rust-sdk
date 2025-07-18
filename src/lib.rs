@@ -97,7 +97,7 @@ pub use client::{
     ConfigurationId, ConfigurationProvider,
 };
 pub use entity::Entity;
-pub use errors::{Error, Result};
+pub use errors::{ConfigurationDataError, Error, Result};
 pub use feature::Feature;
 pub use network::live_configuration::OfflineMode;
 pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
