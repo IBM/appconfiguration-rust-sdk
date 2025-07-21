@@ -57,7 +57,9 @@ pub(crate) fn start_metering<T: MeteringClient>(
 
     MeteringRecorder {
         _thread: thread,
-        evaluation_event_sender: sender,
+        sender: MeteringRecorderSender {
+            evaluation_event_sender: sender,
+        },
     }
 }
 
@@ -66,22 +68,43 @@ pub(crate) fn start_metering<T: MeteringClient>(
 #[derive(Debug)]
 pub(crate) struct MeteringRecorder {
     _thread: ThreadHandle<()>,
+    pub(crate) sender: MeteringRecorderSender,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MeteringRecorderSender {
     evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
 }
 
-impl MeteringRecorder {
-    /// Record the evaluation of a feature or property, for eventual transmission to the server.
-    pub fn record_evaluation(
+impl MeteringRecorderSender {
+    /// Record the evaluation of a property, for eventual transmission to the server.
+    pub fn record_property_evaluation(
         &self,
-        subject_id: SubjectId,
-        entity_id: String,
-        segment_id: Option<String>,
+        property_id: &str,
+        entity_id: &str,
+        segment_id: Option<&str>,
     ) -> crate::errors::Result<()> {
         self.evaluation_event_sender
             .send(EvaluationEvent::Feature(EvaluationEventData {
-                subject_id,
-                entity_id,
-                segment_id,
+                subject_id: SubjectId::Property(property_id.to_string()),
+                entity_id: entity_id.to_string(),
+                segment_id: segment_id.map(|s| s.to_string()),
+            }))
+            .map_err(|_| crate::errors::Error::MeteringError {})
+    }
+
+    /// Record the evaluation of a feature, for eventual transmission to the server.
+    pub fn record_feature_evaluation(
+        &self,
+        feature_id: &str,
+        entity_id: &str,
+        segment_id: Option<&str>,
+    ) -> crate::errors::Result<()> {
+        self.evaluation_event_sender
+            .send(EvaluationEvent::Feature(EvaluationEventData {
+                subject_id: SubjectId::Feature(feature_id.to_string()),
+                entity_id: entity_id.to_string(),
+                segment_id: segment_id.map(|s| s.to_string()),
             }))
             .map_err(|_| crate::errors::Error::MeteringError {})
     }
@@ -248,11 +271,8 @@ mod tests {
 
         // Send a single evaluation event
         metering_handle
-            .record_evaluation(
-                SubjectId::Feature("feature1".to_string()),
-                "entity1".to_string(),
-                None,
-            )
+            .sender
+            .record_feature_evaluation("feature1", "entity1", None)
             .unwrap();
 
         let time_record_evaluation = chrono::Utc::now();

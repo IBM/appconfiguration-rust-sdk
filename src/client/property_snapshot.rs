@@ -13,11 +13,13 @@
 // limitations under the License.
 
 use crate::entity::Entity;
+use crate::metering::MeteringRecorderSender;
 use crate::value::Value;
 use crate::Property;
 
 use crate::errors::Result;
 use crate::segment_evaluation::TargetingRules;
+use log::warn;
 
 /// Provides a snapshot of a [`Property`].
 #[derive(Debug)]
@@ -25,36 +27,50 @@ pub struct PropertySnapshot {
     value: Value,
     segment_rules: TargetingRules,
     name: String,
+    pub(crate) metering: Option<MeteringRecorderSender>,
 }
 
 impl PropertySnapshot {
-    pub(crate) fn new(value: Value, segment_rules: TargetingRules, name: &str) -> Self {
+    pub(crate) fn new(
+        value: Value,
+        segment_rules: TargetingRules,
+        name: &str,
+        metering: Option<MeteringRecorderSender>,
+    ) -> Self {
         Self {
             value,
             segment_rules,
             name: name.to_string(),
+            metering,
         }
     }
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
-        // TODO: For Metering, we need to record here a tuple:
-        // - guid
-        // - environmentid
-        // - collectionid
-        // - propertyid
-        // - entityid
-        // - segmentid
-        if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
-            // TODO: this makes only sense if there can be a rule which matches
-            //       even on empty attributes
-            // No match possible. Do not consider segment rules:
-            return Ok(self.value.clone());
+        let segment_rule_and_segment = {
+            if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+                // TODO: this makes only sense if there can be a rule which matches
+                //       even on empty attributes
+                // No match possible. Do not consider segment rules:
+                None
+            } else {
+                self.segment_rules
+                    .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+            }
+        };
+
+        if let Some(metering) = self.metering.as_ref() {
+            if let Err(e) = metering.record_property_evaluation(
+                &self.name,
+                &entity.get_id(),
+                segment_rule_and_segment
+                    .as_ref()
+                    .map(|(_, segment)| segment.name.as_str()),
+            ) {
+                warn!("Fail to enqueue metering data: {e}");
+            }
         }
 
-        match self
-            .segment_rules
-            .find_applicable_targeting_rule_and_segment_for_entity(entity)?
-        {
+        match segment_rule_and_segment {
             Some((segment_rule, _)) => segment_rule.value(&self.value),
             None => Ok(self.value.clone()),
         }
@@ -115,7 +131,7 @@ pub mod tests {
                 }],
                 ValueType::Numeric,
             );
-            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1")
+            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", None)
         };
 
         // Both segment rules match. Expect the one with smaller order to be used:

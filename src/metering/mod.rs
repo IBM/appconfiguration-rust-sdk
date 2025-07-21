@@ -17,6 +17,6 @@ mod errors;
 mod metering;
 
 pub(crate) use client::MeteringClient;
-pub(crate) use metering::{start_metering, MeteringRecorder};
+pub(crate) use metering::{start_metering, MeteringRecorder, MeteringRecorderSender};
 
 pub type MeteringResult<T> = std::result::Result<T, errors::MeteringError>;

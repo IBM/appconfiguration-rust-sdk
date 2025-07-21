@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::entity::Entity;
+use crate::metering::MeteringRecorderSender;
 use crate::value::Value;
 use crate::Feature;
 
@@ -31,6 +32,7 @@ pub struct FeatureSnapshot {
     name: String,
     feature_id: String,
     segment_rules: TargetingRules,
+    pub(crate) metering: Option<MeteringRecorderSender>,
 }
 
 impl FeatureSnapshot {
@@ -42,6 +44,7 @@ impl FeatureSnapshot {
         name: &str,
         feature_id: &str,
         segment_rules: TargetingRules,
+        metering: Option<MeteringRecorderSender>,
     ) -> Self {
         Self {
             enabled,
@@ -51,6 +54,7 @@ impl FeatureSnapshot {
             name: name.to_string(),
             feature_id: feature_id.to_string(),
             segment_rules,
+            metering,
         }
     }
 
@@ -185,6 +189,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -226,6 +231,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -273,6 +279,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -343,6 +350,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -397,6 +405,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 

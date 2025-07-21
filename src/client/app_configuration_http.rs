@@ -73,7 +73,9 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        self.live_configuration.get_feature(feature_id)
+        let mut feature = self.live_configuration.get_feature(feature_id)?;
+        feature.metering = self.metering.as_ref().map(|s| s.sender.clone());
+        Ok(feature)
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
@@ -81,7 +83,9 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        self.live_configuration.get_property(property_id)
+        let mut property = self.live_configuration.get_property(property_id)?;
+        property.metering = self.metering.as_ref().map(|s| s.sender.clone());
+        Ok(property)
     }
 
     fn is_online(&self) -> Result<bool> {
