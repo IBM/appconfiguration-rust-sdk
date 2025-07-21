@@ -14,7 +14,6 @@
 
 use super::{NetworkError, NetworkResult, TokenProvider};
 use crate::client::configuration::Configuration;
-use crate::models::MeteringDataJson;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;
@@ -104,11 +103,6 @@ pub trait ServerClient: Send + 'static {
         &self,
         collection: &ConfigurationId,
     ) -> NetworkResult<impl WebsocketReader>;
-
-    fn push_metering_data(&self, _data: &MeteringDataJson) -> NetworkResult<()> {
-        // Default implementation to make implementing mocks easier.
-        unimplemented!()
-    }
 }
 
 #[derive(Debug)]
@@ -215,10 +209,6 @@ impl ServerClient for ServerClientImpl {
 
         let (websocket, _) = connect(request)?;
         Ok(websocket)
-    }
-
-    fn push_metering_data(&self, _data: &MeteringDataJson) -> NetworkResult<()> {
-        todo!()
     }
 }
 

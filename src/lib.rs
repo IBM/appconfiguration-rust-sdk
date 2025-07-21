@@ -85,6 +85,7 @@ mod client;
 mod entity;
 mod errors;
 mod feature;
+pub(crate) mod metering;
 mod models;
 mod network;
 mod property;

@@ -12,15 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod errors;
-pub(crate) mod http_client;
-mod token_provider;
+use thiserror::Error;
 
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
-pub(crate) mod live_configuration;
-
-pub use errors::NetworkError;
-pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
+#[derive(Debug, Error)]
+pub enum MeteringError {}

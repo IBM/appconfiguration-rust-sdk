@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::network::ServerClient;
+
+use crate::metering::MeteringClient;
 use crate::utils::ThreadHandle;
 use crate::ConfigurationId;
 use std::sync::mpsc;
@@ -22,21 +23,21 @@ use std::sync::mpsc;
 ///
 /// * `config_id` - The ConfigurationID to which all evaluations are associated to when reported to the server.
 /// * `transmit_interval` - Time between transmissions to the server
-/// * `server_client` - Used for push access to the server
+/// * `client` - Used for push access to the server
 ///
 /// # Return values
 ///
 /// * MeteringThreadHandle<T> - Object representing the thread. Metrics will be sent as long as this object is alive.
 /// * MeteringRecorder - Use this to record all evaluations, which will eventually be sent to the server.
-pub(crate) fn start_metering<T: ServerClient>(
+pub(crate) fn start_metering<T: MeteringClient>(
     config_id: ConfigurationId,
     transmit_interval: std::time::Duration,
-    server_client: T,
+    client: T,
 ) -> (MeteringThreadHandle, MeteringRecorder) {
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
-        let mut batcher = MeteringBatcher::new(server_client, config_id);
+        let mut batcher = MeteringBatcher::new(client, config_id);
         let mut last_flush = std::time::Instant::now();
         loop {
             let recv_result = receiver.recv_timeout(std::time::Duration::from_millis(100));
@@ -126,17 +127,17 @@ struct EvaluationData {
 }
 
 /// The responsibility of the MeteringBatcher is to aggregate evaluation events and batch them for transmission to the server.
-struct MeteringBatcher<T: ServerClient> {
+struct MeteringBatcher<T: MeteringClient> {
     evaluations: std::collections::HashMap<MeteringKey, EvaluationData>,
-    server_client: T,
+    client: T,
     config_id: ConfigurationId,
 }
 
-impl<T: ServerClient> MeteringBatcher<T> {
-    fn new(server_client: T, config_id: ConfigurationId) -> Self {
+impl<T: MeteringClient> MeteringBatcher<T> {
+    fn new(client: T, config_id: ConfigurationId) -> Self {
         Self {
             evaluations: std::collections::HashMap::new(),
-            server_client,
+            client,
             config_id,
         }
     }
@@ -203,7 +204,7 @@ impl<T: ServerClient> MeteringBatcher<T> {
             environment_id: self.config_id.environment_id.to_string(),
             usages,
         };
-        let _ = self.server_client.push_metering_data(&json_data);
+        let _ = self.client.push_metering_data(&json_data);
         self.evaluations.clear();
     }
 }
@@ -211,28 +212,20 @@ impl<T: ServerClient> MeteringBatcher<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::configuration::Configuration;
 
+    use crate::metering::MeteringResult;
     use crate::models::MeteringDataJson;
     use crate::network::http_client::WebsocketReader;
-    use crate::network::NetworkResult;
-    use chrono;
 
-    struct ServerClientMock {
+    struct MeteringClientMock {
         metering_data_sender: mpsc::Sender<MeteringDataJson>,
     }
-    struct WebsocketMockReader {}
-    impl WebsocketReader for WebsocketMockReader {
-        fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
-            unreachable!()
-        }
-    }
 
-    impl ServerClientMock {
-        fn new() -> (ServerClientMock, mpsc::Receiver<MeteringDataJson>) {
+    impl MeteringClientMock {
+        fn new() -> (MeteringClientMock, mpsc::Receiver<MeteringDataJson>) {
             let (sender, receiver) = mpsc::channel::<MeteringDataJson>();
             (
-                ServerClientMock {
+                MeteringClientMock {
                     metering_data_sender: sender,
                 },
                 receiver,
@@ -240,24 +233,8 @@ mod tests {
         }
     }
 
-    impl ServerClient for ServerClientMock {
-        #[allow(unreachable_code)]
-        fn get_configuration(
-            &self,
-            _configuration_id: &ConfigurationId,
-        ) -> NetworkResult<Configuration> {
-            unreachable!()
-        }
-
-        #[allow(unreachable_code)]
-        fn get_configuration_monitoring_websocket(
-            &self,
-            _collection: &ConfigurationId,
-        ) -> NetworkResult<impl WebsocketReader> {
-            unreachable!() as NetworkResult<WebsocketMockReader>
-        }
-
-        fn push_metering_data(&self, data: &MeteringDataJson) -> NetworkResult<()> {
+    impl MeteringClient for MeteringClientMock {
+        fn push_metering_data(&self, data: &MeteringDataJson) -> MeteringResult<()> {
             self.metering_data_sender.send(data.clone()).unwrap();
             Ok(())
         }
@@ -266,7 +243,7 @@ mod tests {
     /// Tests the propagation of evaluation events through the batcher to the server client and the timings of the flush.
     #[test]
     fn test_record_evaluation_leads_to_metering_data_sent() {
-        let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
+        let (client, metering_data_sent_receiver) = MeteringClientMock::new();
         let (_, metering_handle) = start_metering(
             ConfigurationId::new(
                 "test_guid".to_string(),
@@ -274,7 +251,7 @@ mod tests {
                 "test_collection_id".to_string(),
             ),
             std::time::Duration::from_millis(200), // Use 200ms for test flushing
-            server_client,
+            client,
         );
 
         // Send a single evaluation event
@@ -312,9 +289,9 @@ mod tests {
     /// Tests the correct sorting and batching of evaluation events.
     #[test]
     fn test_metrics_multiple_same_evaluation_events_are_batched_to_one_entry() {
-        let (server_client, metering_data_sent_receiver) = ServerClientMock::new();
+        let (client, metering_data_sent_receiver) = MeteringClientMock::new();
         let mut batcher = MeteringBatcher::new(
-            server_client,
+            client,
             ConfigurationId::new(
                 "test_guid".to_string(),
                 "test_env_id".to_string(),

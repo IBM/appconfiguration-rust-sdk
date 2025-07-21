@@ -20,7 +20,6 @@ mod app_configuration_offline;
 pub(crate) mod configuration;
 pub(crate) mod feature_proxy;
 pub(crate) mod feature_snapshot;
-pub(crate) mod metering;
 pub(crate) mod property_proxy;
 pub(crate) mod property_snapshot;
 
