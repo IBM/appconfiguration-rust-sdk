@@ -27,13 +27,13 @@ use std::sync::mpsc;
 ///
 /// # Return values
 ///
-/// * MeteringThreadHandle<T> - Object representing the thread. Metrics will be sent as long as this object is alive.
+/// * ThreadHandle<()> - Object representing the thread. Metrics will be sent as long as this object is alive.
 /// * MeteringRecorder - Use this to record all evaluations, which will eventually be sent to the server.
 pub(crate) fn start_metering<T: MeteringClient>(
     config_id: ConfigurationId,
     transmit_interval: std::time::Duration,
     client: T,
-) -> (MeteringThreadHandle, MeteringRecorder) {
+) -> (crate::utils::ThreadHandle<()>, MeteringRecorder) {
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
@@ -57,9 +57,7 @@ pub(crate) fn start_metering<T: MeteringClient>(
     });
 
     (
-        MeteringThreadHandle {
-            _thread_handle: thread,
-        },
+        thread,
         MeteringRecorder {
             evaluation_event_sender: sender,
         },
@@ -67,7 +65,8 @@ pub(crate) fn start_metering<T: MeteringClient>(
 }
 
 /// Allows recording of evaluation events.
-/// Communicates with the MeteringThreadHandle, which leads to eventual transmission of recorded evaluations to the server.
+/// Communicates with the thread, which leads to eventual transmission of recorded evaluations to the server.
+#[derive(Debug)]
 pub(crate) struct MeteringRecorder {
     evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
 }
@@ -82,16 +81,12 @@ impl MeteringRecorder {
     ) -> crate::errors::Result<()> {
         self.evaluation_event_sender
             .send(EvaluationEvent::Feature(EvaluationEventData {
-                subject_id: subject_id,
-                entity_id: entity_id,
-                segment_id: segment_id,
+                subject_id,
+                entity_id,
+                segment_id,
             }))
             .map_err(|_| crate::errors::Error::MeteringError {})
     }
-}
-
-pub(crate) struct MeteringThreadHandle {
-    _thread_handle: crate::utils::ThreadHandle<()>,
 }
 
 pub(crate) enum SubjectId {

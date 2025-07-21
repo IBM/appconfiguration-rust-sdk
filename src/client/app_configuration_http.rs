@@ -16,8 +16,10 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
+use crate::metering::{start_metering, MeteringClient, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
+use crate::utils::ThreadHandle;
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
 use super::ConfigurationId;
@@ -26,6 +28,8 @@ use super::ConfigurationId;
 #[derive(Debug)]
 pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
+    _metering_thread: ThreadHandle<()>,
+    metering: MeteringRecorder,
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
@@ -47,11 +51,22 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         offline_mode: OfflineMode,
     ) -> Result<Self> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
+        let metering_client = MeteringClientImpl;
+
+        let (_metering_thread, metering) = start_metering(
+            configuration_id.clone(),
+            std::time::Duration::from_secs(10 * 60),
+            metering_client,
+        );
 
         // TODO: start metering + figure out a way to share / duplicate server_client
         let live_configuration =
             LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
-        Ok(Self { live_configuration })
+        Ok(Self {
+            live_configuration,
+            _metering_thread,
+            metering,
+        })
     }
 }
 
@@ -74,6 +89,17 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 
     fn is_online(&self) -> Result<bool> {
         self.live_configuration.is_online()
+    }
+}
+
+struct MeteringClientImpl;
+
+impl MeteringClient for MeteringClientImpl {
+    fn push_metering_data(
+        &self,
+        _data: &crate::models::MeteringDataJson,
+    ) -> crate::metering::MeteringResult<()> {
+        todo!()
     }
 }
 

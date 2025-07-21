@@ -16,8 +16,5 @@ use super::MeteringResult;
 use crate::models::MeteringDataJson;
 
 pub(crate) trait MeteringClient: Send + 'static {
-    fn push_metering_data(&self, _data: &MeteringDataJson) -> MeteringResult<()> {
-        // Default implementation to make implementing mocks easier.
-        unimplemented!()
-    }
+    fn push_metering_data(&self, _data: &MeteringDataJson) -> MeteringResult<()>;
 }
