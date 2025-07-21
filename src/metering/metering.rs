@@ -85,7 +85,7 @@ impl MeteringRecorderSender {
         segment_id: Option<&str>,
     ) -> crate::errors::Result<()> {
         self.evaluation_event_sender
-            .send(EvaluationEvent::Feature(EvaluationEventData {
+            .send(EvaluationEvent::Property(EvaluationEventData {
                 subject_id: SubjectId::Property(property_id.to_string()),
                 entity_id: entity_id.to_string(),
                 segment_id: segment_id.map(|s| s.to_string()),

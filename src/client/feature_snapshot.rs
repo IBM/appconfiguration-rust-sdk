@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use log::warn;
+
 use crate::entity::Entity;
 use crate::metering::MeteringRecorderSender;
 use crate::value::Value;
@@ -59,26 +61,31 @@ impl FeatureSnapshot {
     }
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
-        // TODO: For Metering, we need to record here a tuple:
-        // - guid
-        // - environmentid
-        // - collectionid
-        // - featureid
-        // - entityid
-        // - segmentid
         if !self.enabled {
+            self.send_metering(&entity.get_id(), None);
             return Ok(self.disabled_value.clone());
         }
 
-        if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
-            // No match possible. Do not consider segment rules:
-            return self.use_rollout_percentage_to_get_value_from_feature_directly(entity);
-        }
+        let segment_rule_and_segment = {
+            if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+                // TODO: this makes only sense if there can be a rule which matches
+                //       even on empty attributes
+                // No match possible. Do not consider segment rules:
+                None
+            } else {
+                self.segment_rules
+                    .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+            }
+        };
 
-        match self
-            .segment_rules
-            .find_applicable_targeting_rule_and_segment_for_entity(entity)?
-        {
+        self.send_metering(
+            &entity.get_id(),
+            segment_rule_and_segment
+                .as_ref()
+                .map(|(_, segment)| segment.name.as_str()),
+        );
+
+        match segment_rule_and_segment {
             Some((segment_rule, _)) => {
                 // Get rollout percentage
                 let rollout_percentage =
@@ -109,6 +116,17 @@ impl FeatureSnapshot {
             Ok(self.enabled_value.clone())
         } else {
             Ok(self.disabled_value.clone())
+        }
+    }
+
+    fn send_metering(&self, entity_id: &str, segment_id: Option<&str>) {
+        if let Some(metering) = self.metering.as_ref() {
+            if let Err(e) = metering.record_feature_evaluation(&self.name, entity_id, segment_id) {
+                warn!(
+                    "Fail to enqueue metering data for feature '{}': {e}",
+                    self.name
+                );
+            }
         }
     }
 }

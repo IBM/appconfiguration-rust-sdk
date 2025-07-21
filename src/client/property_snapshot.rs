@@ -45,7 +45,7 @@ impl PropertySnapshot {
         }
     }
 
-    fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+    fn evaluate_property_for_entity(&self, entity: &impl Entity) -> Result<Value> {
         let segment_rule_and_segment = {
             if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
                 // TODO: this makes only sense if there can be a rule which matches
@@ -58,21 +58,27 @@ impl PropertySnapshot {
             }
         };
 
-        if let Some(metering) = self.metering.as_ref() {
-            if let Err(e) = metering.record_property_evaluation(
-                &self.name,
-                &entity.get_id(),
-                segment_rule_and_segment
-                    .as_ref()
-                    .map(|(_, segment)| segment.name.as_str()),
-            ) {
-                warn!("Fail to enqueue metering data: {e}");
-            }
-        }
+        self.send_metering(
+            &entity.get_id(),
+            segment_rule_and_segment
+                .as_ref()
+                .map(|(_, segment)| segment.name.as_str()),
+        );
 
         match segment_rule_and_segment {
             Some((segment_rule, _)) => segment_rule.value(&self.value),
             None => Ok(self.value.clone()),
+        }
+    }
+
+    fn send_metering(&self, entity_id: &str, segment_id: Option<&str>) {
+        if let Some(metering) = self.metering.as_ref() {
+            if let Err(e) = metering.record_property_evaluation(&self.name, entity_id, segment_id) {
+                warn!(
+                    "Fail to enqueue metering data for property '{}': {e}",
+                    self.name
+                );
+            }
         }
     }
 }
@@ -83,7 +89,7 @@ impl Property for PropertySnapshot {
     }
 
     fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        self.evaluate_feature_for_entity(entity)
+        self.evaluate_property_for_entity(entity)
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
