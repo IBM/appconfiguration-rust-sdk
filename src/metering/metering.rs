@@ -226,7 +226,7 @@ impl<T: MeteringClient> MeteringBatcher<T> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use crate::metering::MeteringResult;
@@ -255,19 +255,27 @@ mod tests {
         }
     }
 
-    /// Tests the propagation of evaluation events through the batcher to the server client and the timings of the flush.
-    #[test]
-    fn test_record_evaluation_leads_to_metering_data_sent() {
-        let (client, metering_data_sent_receiver) = MeteringClientMock::new();
-        let metering_handle = start_metering(
-            ConfigurationId::new(
-                "test_guid".to_string(),
-                "test_env_id".to_string(),
-                "test_collection_id".to_string(),
-            ),
+    pub(crate) fn start_metering_mock(
+        configuration_id: ConfigurationId,
+    ) -> (MeteringRecorder, mpsc::Receiver<MeteringDataJson>) {
+        let (client, receiver) = MeteringClientMock::new();
+        let recorder = start_metering(
+            configuration_id,
             std::time::Duration::from_millis(200), // Use 200ms for test flushing
             client,
         );
+        (recorder, receiver)
+    }
+
+    /// Tests the propagation of evaluation events through the batcher to the server client and the timings of the flush.
+    #[test]
+    fn test_record_evaluation_leads_to_metering_data_sent() {
+        let configuration_id = ConfigurationId::new(
+            "test_guid".to_string(),
+            "test_env_id".to_string(),
+            "test_collection_id".to_string(),
+        );
+        let (metering_handle, metering_data_sent_receiver) = start_metering_mock(configuration_id);
 
         // Send a single evaluation event
         metering_handle

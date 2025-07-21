@@ -108,6 +108,7 @@ impl MeteringClient for MeteringClientImpl {
 mod tests {
     use super::*;
     use crate::client::configuration::Configuration;
+    use crate::metering::metering::tests::start_metering_mock;
     use crate::models::tests::{
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
@@ -158,15 +159,25 @@ mod tests {
         example_configuration_enterprise: Configuration,
         configuration_feature1_enabled: Configuration,
     ) {
-        let mut client = {
+        let (mut client, metering_recv) = {
             let live_cfg_mock = LiveConfigurationMock {
                 configuration: example_configuration_enterprise,
             };
 
-            AppConfigurationClientHttp {
-                live_configuration: live_cfg_mock,
-                metering: None,
-            }
+            let configuration_id = ConfigurationId::new(
+                "test_guid".to_string(),
+                "test_env_id".to_string(),
+                "test_collection_id".to_string(),
+            );
+            let (metering_handle, metering_recv) = start_metering_mock(configuration_id);
+
+            (
+                AppConfigurationClientHttp {
+                    live_configuration: live_cfg_mock,
+                    metering: Some(metering_handle),
+                },
+                metering_recv,
+            )
         };
 
         let feature = client.get_feature("f1").unwrap();
@@ -187,6 +198,22 @@ mod tests {
         // And expect the updated value
         let feature_value3 = feature.get_value(&entity).unwrap();
         assert_ne!(feature_value3, feature_value1);
+
+        // We evaluated the property 3 times (for two different configurations)
+        {
+            let mut metering_data = metering_recv.recv().unwrap();
+            assert_eq!(metering_data.usages.len(), 1);
+            assert_eq!(metering_data.collection_id, "test_collection_id"); // FIXME: Mismatch between configuration and metering data
+            assert_eq!(metering_data.environment_id, "test_env_id"); // FIXME: Mismatch between configuration and metering data
+
+            metering_data
+                .usages
+                .sort_by(|lhs, rhs| lhs.evaluation_time.cmp(&rhs.evaluation_time));
+
+            // Even if they are different configurations, they map to the same metering data
+            let metering_usage_1 = metering_data.usages.first().unwrap();
+            assert_eq!(metering_usage_1.count, 3);
+        }
     }
 
     #[rstest]
@@ -194,15 +221,25 @@ mod tests {
         example_configuration_enterprise: Configuration,
         configuration_property1_enabled: Configuration,
     ) {
-        let mut client = {
+        let (mut client, metering_recv) = {
             let live_cfg_mock = LiveConfigurationMock {
                 configuration: example_configuration_enterprise,
             };
 
-            AppConfigurationClientHttp {
-                live_configuration: live_cfg_mock,
-                metering: None,
-            }
+            let configuration_id = ConfigurationId::new(
+                "test_guid".to_string(),
+                "test_env_id".to_string(),
+                "test_collection_id".to_string(),
+            );
+            let (metering_handle, metering_recv) = start_metering_mock(configuration_id);
+
+            (
+                AppConfigurationClientHttp {
+                    live_configuration: live_cfg_mock,
+                    metering: Some(metering_handle),
+                },
+                metering_recv,
+            )
         };
 
         let property = client.get_property("p1").unwrap();
@@ -223,5 +260,23 @@ mod tests {
         // And expect the updated value
         let property_value3 = property.get_value(&entity).unwrap();
         assert_ne!(property_value3, property_value1);
+
+        // We evaluated the property 3 times (for two different configurations)
+        {
+            let mut metering_data = metering_recv.recv().unwrap();
+            assert_eq!(metering_data.usages.len(), 2);
+            assert_eq!(metering_data.collection_id, "test_collection_id"); // FIXME: Mismatch between configuration and metering data
+            assert_eq!(metering_data.environment_id, "test_env_id"); // FIXME: Mismatch between configuration and metering data
+
+            metering_data
+                .usages
+                .sort_by(|lhs, rhs| lhs.evaluation_time.cmp(&rhs.evaluation_time));
+
+            // we do 2 evaluations on the first configuration, and one on the latest.
+            let metering_usage_1 = metering_data.usages.first().unwrap();
+            assert_eq!(metering_usage_1.count, 2);
+            let metering_usage_2 = metering_data.usages.get(1).unwrap();
+            assert_eq!(metering_usage_2.count, 1);
+        }
     }
 }

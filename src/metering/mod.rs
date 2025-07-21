@@ -14,7 +14,7 @@
 
 mod client;
 mod errors;
-mod metering;
+pub(crate) mod metering;
 
 pub(crate) use client::MeteringClient;
 pub(crate) use metering::{start_metering, MeteringRecorder, MeteringRecorderSender};
