@@ -19,7 +19,6 @@ use crate::errors::Result;
 use crate::metering::{start_metering, MeteringClient, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
-use crate::utils::ThreadHandle;
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
 use super::ConfigurationId;
@@ -28,8 +27,7 @@ use super::ConfigurationId;
 #[derive(Debug)]
 pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
-    _metering_thread: ThreadHandle<()>,
-    metering: MeteringRecorder,
+    metering: Option<MeteringRecorder>,
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
@@ -53,7 +51,7 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
         let metering_client = MeteringClientImpl;
 
-        let (_metering_thread, metering) = start_metering(
+        let metering = start_metering(
             configuration_id.clone(),
             std::time::Duration::from_secs(10 * 60),
             metering_client,
@@ -64,8 +62,7 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
             LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
         Ok(Self {
             live_configuration,
-            _metering_thread,
-            metering,
+            metering: Some(metering),
         })
     }
 }
@@ -164,6 +161,7 @@ mod tests {
 
             AppConfigurationClientHttp {
                 live_configuration: live_cfg_mock,
+                metering: None,
             }
         };
 
@@ -199,6 +197,7 @@ mod tests {
 
             AppConfigurationClientHttp {
                 live_configuration: live_cfg_mock,
+                metering: None,
             }
         };
 

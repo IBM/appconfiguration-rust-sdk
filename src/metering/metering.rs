@@ -27,13 +27,12 @@ use std::sync::mpsc;
 ///
 /// # Return values
 ///
-/// * ThreadHandle<()> - Object representing the thread. Metrics will be sent as long as this object is alive.
 /// * MeteringRecorder - Use this to record all evaluations, which will eventually be sent to the server.
 pub(crate) fn start_metering<T: MeteringClient>(
     config_id: ConfigurationId,
     transmit_interval: std::time::Duration,
     client: T,
-) -> (crate::utils::ThreadHandle<()>, MeteringRecorder) {
+) -> MeteringRecorder {
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
@@ -56,18 +55,17 @@ pub(crate) fn start_metering<T: MeteringClient>(
         }
     });
 
-    (
-        thread,
-        MeteringRecorder {
-            evaluation_event_sender: sender,
-        },
-    )
+    MeteringRecorder {
+        _thread: thread,
+        evaluation_event_sender: sender,
+    }
 }
 
 /// Allows recording of evaluation events.
 /// Communicates with the thread, which leads to eventual transmission of recorded evaluations to the server.
 #[derive(Debug)]
 pub(crate) struct MeteringRecorder {
+    _thread: ThreadHandle<()>,
     evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
 }
 
@@ -210,7 +208,6 @@ mod tests {
 
     use crate::metering::MeteringResult;
     use crate::models::MeteringDataJson;
-    use crate::network::http_client::WebsocketReader;
 
     struct MeteringClientMock {
         metering_data_sender: mpsc::Sender<MeteringDataJson>,
@@ -239,7 +236,7 @@ mod tests {
     #[test]
     fn test_record_evaluation_leads_to_metering_data_sent() {
         let (client, metering_data_sent_receiver) = MeteringClientMock::new();
-        let (_, metering_handle) = start_metering(
+        let metering_handle = start_metering(
             ConfigurationId::new(
                 "test_guid".to_string(),
                 "test_env_id".to_string(),
