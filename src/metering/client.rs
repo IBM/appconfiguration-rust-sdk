@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod errors;
-pub(crate) mod http_client;
-mod token_provider;
+use super::MeteringResult;
+use crate::models::MeteringDataJson;
 
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
-pub(crate) mod live_configuration;
-
-pub use errors::NetworkError;
-pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
+pub(crate) trait MeteringClient: Send + 'static {
+    fn push_metering_data(&self, _data: &MeteringDataJson) -> MeteringResult<()> {
+        // Default implementation to make implementing mocks easier.
+        unimplemented!()
+    }
+}
