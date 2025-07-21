@@ -27,7 +27,7 @@ use super::ConfigurationId;
 #[derive(Debug)]
 pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
-    metering: Option<MeteringRecorder>,
+    metering: MeteringRecorder,
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
@@ -57,12 +57,11 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
             metering_client,
         );
 
-        // TODO: start metering + figure out a way to share / duplicate server_client
         let live_configuration =
             LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
         Ok(Self {
             live_configuration,
-            metering: Some(metering),
+            metering,
         })
     }
 }
@@ -74,7 +73,7 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
         let mut feature = self.live_configuration.get_feature(feature_id)?;
-        feature.metering = self.metering.as_ref().map(|s| s.sender.clone());
+        feature.metering = Some(self.metering.sender.clone());
         Ok(feature)
     }
 
@@ -84,7 +83,7 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
         let mut property = self.live_configuration.get_property(property_id)?;
-        property.metering = self.metering.as_ref().map(|s| s.sender.clone());
+        property.metering = Some(self.metering.sender.clone());
         Ok(property)
     }
 
@@ -169,12 +168,12 @@ mod tests {
                 "test_env_id".to_string(),
                 "test_collection_id".to_string(),
             );
-            let (metering_handle, metering_recv) = start_metering_mock(configuration_id);
+            let (metering, metering_recv) = start_metering_mock(configuration_id);
 
             (
                 AppConfigurationClientHttp {
                     live_configuration: live_cfg_mock,
-                    metering: Some(metering_handle),
+                    metering,
                 },
                 metering_recv,
             )
@@ -231,12 +230,12 @@ mod tests {
                 "test_env_id".to_string(),
                 "test_collection_id".to_string(),
             );
-            let (metering_handle, metering_recv) = start_metering_mock(configuration_id);
+            let (metering, metering_recv) = start_metering_mock(configuration_id);
 
             (
                 AppConfigurationClientHttp {
                     live_configuration: live_cfg_mock,
-                    metering: Some(metering_handle),
+                    metering,
                 },
                 metering_recv,
             )
