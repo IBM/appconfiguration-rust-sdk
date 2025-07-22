@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::entity::Entity;
+use crate::metering::{MeteringRecorderSender, MeteringSubject};
 use crate::value::Value;
 use crate::Feature;
 
@@ -28,9 +29,10 @@ pub struct FeatureSnapshot {
     enabled_value: Value,
     disabled_value: Value,
     rollout_percentage: u32,
-    name: String,
-    feature_id: String,
+    pub(crate) name: String,
+    pub(crate) feature_id: String,
     segment_rules: TargetingRules,
+    pub(crate) metering: Option<MeteringRecorderSender>,
 }
 
 impl FeatureSnapshot {
@@ -42,6 +44,7 @@ impl FeatureSnapshot {
         name: &str,
         feature_id: &str,
         segment_rules: TargetingRules,
+        metering: Option<MeteringRecorderSender>,
     ) -> Self {
         Self {
             enabled,
@@ -51,31 +54,33 @@ impl FeatureSnapshot {
             name: name.to_string(),
             feature_id: feature_id.to_string(),
             segment_rules,
+            metering,
         }
     }
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
-        // TODO: For Metering, we need to record here a tuple:
-        // - guid
-        // - environmentid
-        // - collectionid
-        // - featureid
-        // - entityid
-        // - segmentid
         if !self.enabled {
+            self.record_evaluation(entity, None);
             return Ok(self.disabled_value.clone());
         }
 
-        if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
-            // No match possible. Do not consider segment rules:
-            return self.use_rollout_percentage_to_get_value_from_feature_directly(entity);
-        }
+        let (segment_rule, segment) = {
+            if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+                // TODO: this makes only sense if there can be a rule which matches
+                //       even on empty attributes
+                // No match possible. Do not consider segment rules:
+                (None, None)
+            } else {
+                self.segment_rules
+                    .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+                    .unzip()
+            }
+        };
 
-        match self
-            .segment_rules
-            .find_applicable_targeting_rule_and_segment_for_entity(entity)?
-        {
-            Some((segment_rule, _)) => {
+        self.record_evaluation(entity, segment);
+
+        match segment_rule {
+            Some(segment_rule) => {
                 // Get rollout percentage
                 let rollout_percentage =
                     segment_rule.rollout_percentage(self.rollout_percentage)?;
@@ -185,6 +190,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -226,6 +232,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -273,6 +280,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -343,6 +351,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 
@@ -397,6 +406,7 @@ pub mod tests {
                 "F1",
                 "f1",
                 segment_rules,
+                None,
             )
         };
 

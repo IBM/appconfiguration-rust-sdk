@@ -12,9 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use log::warn;
+
+use crate::client::feature_snapshot::FeatureSnapshot;
+use crate::client::property_snapshot::PropertySnapshot;
 use crate::metering::MeteringClient;
+use crate::models::Segment;
 use crate::utils::ThreadHandle;
-use crate::ConfigurationId;
+use crate::{ConfigurationId, Entity};
 use std::sync::mpsc;
 
 /// Starts periodic metering transmission to the server.
@@ -27,13 +32,12 @@ use std::sync::mpsc;
 ///
 /// # Return values
 ///
-/// * MeteringThreadHandle<T> - Object representing the thread. Metrics will be sent as long as this object is alive.
 /// * MeteringRecorder - Use this to record all evaluations, which will eventually be sent to the server.
 pub(crate) fn start_metering<T: MeteringClient>(
     config_id: ConfigurationId,
     transmit_interval: std::time::Duration,
     client: T,
-) -> (MeteringThreadHandle, MeteringRecorder) {
+) -> MeteringRecorder {
     let (sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
@@ -56,42 +60,79 @@ pub(crate) fn start_metering<T: MeteringClient>(
         }
     });
 
-    (
-        MeteringThreadHandle {
-            _thread_handle: thread,
-        },
-        MeteringRecorder {
+    MeteringRecorder {
+        _thread: thread,
+        sender: MeteringRecorderSender {
             evaluation_event_sender: sender,
         },
-    )
-}
-
-/// Allows recording of evaluation events.
-/// Communicates with the MeteringThreadHandle, which leads to eventual transmission of recorded evaluations to the server.
-pub(crate) struct MeteringRecorder {
-    evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
-}
-
-impl MeteringRecorder {
-    /// Record the evaluation of a feature or property, for eventual transmission to the server.
-    pub fn record_evaluation(
-        &self,
-        subject_id: SubjectId,
-        entity_id: String,
-        segment_id: Option<String>,
-    ) -> crate::errors::Result<()> {
-        self.evaluation_event_sender
-            .send(EvaluationEvent::Feature(EvaluationEventData {
-                subject_id: subject_id,
-                entity_id: entity_id,
-                segment_id: segment_id,
-            }))
-            .map_err(|_| crate::errors::Error::MeteringError {})
     }
 }
 
-pub(crate) struct MeteringThreadHandle {
-    _thread_handle: crate::utils::ThreadHandle<()>,
+/// Allows recording of evaluation events.
+/// Communicates with the thread, which leads to eventual transmission of recorded evaluations to the server.
+#[derive(Debug)]
+pub(crate) struct MeteringRecorder {
+    _thread: ThreadHandle<()>,
+    pub(crate) sender: MeteringRecorderSender,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MeteringRecorderSender {
+    evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
+}
+
+pub(crate) trait MeteringSubject {
+    fn get_metering_sender(&self) -> Option<&MeteringRecorderSender>;
+
+    fn record_evaluation(&self, entity: &impl Entity, segment: Option<&Segment>);
+}
+
+impl MeteringSubject for PropertySnapshot {
+    fn get_metering_sender(&self) -> Option<&MeteringRecorderSender> {
+        self.metering.as_ref()
+    }
+
+    fn record_evaluation(&self, entity: &impl Entity, segment: Option<&Segment>) {
+        if let Some(recorder) = self.get_metering_sender() {
+            if let Err(e) = recorder
+                .evaluation_event_sender
+                .send(EvaluationEvent::Property(EvaluationEventData {
+                    subject_id: SubjectId::Property(self.property_id.clone()),
+                    entity_id: entity.get_id(),
+                    segment_id: segment.map(|s| s.segment_id.clone()),
+                }))
+            {
+                warn!(
+                    "Fail to enqueue metering data for property '{}': {e}",
+                    self.name
+                );
+            }
+        }
+    }
+}
+
+impl MeteringSubject for FeatureSnapshot {
+    fn get_metering_sender(&self) -> Option<&MeteringRecorderSender> {
+        self.metering.as_ref()
+    }
+
+    fn record_evaluation(&self, entity: &impl Entity, segment: Option<&Segment>) {
+        if let Some(recorder) = self.get_metering_sender() {
+            if let Err(e) = recorder
+                .evaluation_event_sender
+                .send(EvaluationEvent::Feature(EvaluationEventData {
+                    subject_id: SubjectId::Feature(self.feature_id.clone()),
+                    entity_id: entity.get_id(),
+                    segment_id: segment.map(|s| s.segment_id.clone()),
+                }))
+            {
+                warn!(
+                    "Fail to enqueue metering data for feature '{}': {e}",
+                    self.name
+                );
+            }
+        }
+    }
 }
 
 pub(crate) enum SubjectId {
@@ -210,12 +251,11 @@ impl<T: MeteringClient> MeteringBatcher<T> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use crate::metering::MeteringResult;
     use crate::models::MeteringDataJson;
-    use crate::network::http_client::WebsocketReader;
 
     struct MeteringClientMock {
         metering_data_sender: mpsc::Sender<MeteringDataJson>,
@@ -240,27 +280,37 @@ mod tests {
         }
     }
 
-    /// Tests the propagation of evaluation events through the batcher to the server client and the timings of the flush.
-    #[test]
-    fn test_record_evaluation_leads_to_metering_data_sent() {
-        let (client, metering_data_sent_receiver) = MeteringClientMock::new();
-        let (_, metering_handle) = start_metering(
-            ConfigurationId::new(
-                "test_guid".to_string(),
-                "test_env_id".to_string(),
-                "test_collection_id".to_string(),
-            ),
+    pub(crate) fn start_metering_mock(
+        configuration_id: ConfigurationId,
+    ) -> (MeteringRecorder, mpsc::Receiver<MeteringDataJson>) {
+        let (client, receiver) = MeteringClientMock::new();
+        let recorder = start_metering(
+            configuration_id,
             std::time::Duration::from_millis(200), // Use 200ms for test flushing
             client,
         );
+        (recorder, receiver)
+    }
+
+    /// Tests the propagation of evaluation events through the batcher to the server client and the timings of the flush.
+    #[test]
+    fn test_record_evaluation_leads_to_metering_data_sent() {
+        let configuration_id = ConfigurationId::new(
+            "test_guid".to_string(),
+            "test_env_id".to_string(),
+            "test_collection_id".to_string(),
+        );
+        let (metering_handle, metering_data_sent_receiver) = start_metering_mock(configuration_id);
 
         // Send a single evaluation event
         metering_handle
-            .record_evaluation(
-                SubjectId::Feature("feature1".to_string()),
-                "entity1".to_string(),
-                None,
-            )
+            .sender
+            .evaluation_event_sender
+            .send(EvaluationEvent::Feature(EvaluationEventData {
+                subject_id: SubjectId::Feature("feature1".to_string()),
+                entity_id: "entity1".to_string(),
+                segment_id: None,
+            }))
             .unwrap();
 
         let time_record_evaluation = chrono::Utc::now();

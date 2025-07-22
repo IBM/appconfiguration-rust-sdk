@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::entity::Entity;
+use crate::metering::{MeteringRecorderSender, MeteringSubject};
 use crate::value::Value;
 use crate::Property;
 
@@ -24,38 +25,46 @@ use crate::segment_evaluation::TargetingRules;
 pub struct PropertySnapshot {
     value: Value,
     segment_rules: TargetingRules,
-    name: String,
+    pub(crate) name: String,
+    pub(crate) property_id: String,
+    pub(crate) metering: Option<MeteringRecorderSender>,
 }
 
 impl PropertySnapshot {
-    pub(crate) fn new(value: Value, segment_rules: TargetingRules, name: &str) -> Self {
+    pub(crate) fn new(
+        value: Value,
+        segment_rules: TargetingRules,
+        name: &str,
+        property_id: &str,
+        metering: Option<MeteringRecorderSender>,
+    ) -> Self {
         Self {
             value,
             segment_rules,
             name: name.to_string(),
+            property_id: property_id.to_string(),
+            metering,
         }
     }
 
-    fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
-        // TODO: For Metering, we need to record here a tuple:
-        // - guid
-        // - environmentid
-        // - collectionid
-        // - propertyid
-        // - entityid
-        // - segmentid
-        if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
-            // TODO: this makes only sense if there can be a rule which matches
-            //       even on empty attributes
-            // No match possible. Do not consider segment rules:
-            return Ok(self.value.clone());
-        }
+    fn evaluate_property_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+        let (segment_rule, segment) = {
+            if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+                // TODO: this makes only sense if there can be a rule which matches
+                //       even on empty attributes
+                // No match possible. Do not consider segment rules:
+                (None, None)
+            } else {
+                self.segment_rules
+                    .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+                    .unzip()
+            }
+        };
 
-        match self
-            .segment_rules
-            .find_applicable_targeting_rule_and_segment_for_entity(entity)?
-        {
-            Some((segment_rule, _)) => segment_rule.value(&self.value),
+        self.record_evaluation(entity, segment);
+
+        match segment_rule {
+            Some(segment_rule) => segment_rule.value(&self.value),
             None => Ok(self.value.clone()),
         }
     }
@@ -67,7 +76,7 @@ impl Property for PropertySnapshot {
     }
 
     fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        self.evaluate_feature_for_entity(entity)
+        self.evaluate_property_for_entity(entity)
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
@@ -115,7 +124,7 @@ pub mod tests {
                 }],
                 ValueType::Numeric,
             );
-            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1")
+            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", "f1", None)
         };
 
         // Both segment rules match. Expect the one with smaller order to be used:

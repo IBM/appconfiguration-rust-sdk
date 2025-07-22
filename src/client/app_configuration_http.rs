@@ -16,6 +16,7 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
+use crate::metering::{start_metering, MeteringClient, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
@@ -26,6 +27,7 @@ use super::ConfigurationId;
 #[derive(Debug)]
 pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
+    metering: MeteringRecorder,
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
@@ -47,11 +49,20 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         offline_mode: OfflineMode,
     ) -> Result<Self> {
         let server_client = ServerClientImpl::new(service_address, token_provider)?;
+        let metering_client = MeteringClientImpl;
 
-        // TODO: start metering + figure out a way to share / duplicate server_client
+        let metering = start_metering(
+            configuration_id.clone(),
+            std::time::Duration::from_secs(10 * 60),
+            metering_client,
+        );
+
         let live_configuration =
             LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
-        Ok(Self { live_configuration })
+        Ok(Self {
+            live_configuration,
+            metering,
+        })
     }
 }
 
@@ -61,7 +72,9 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     }
 
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
-        self.live_configuration.get_feature(feature_id)
+        let mut feature = self.live_configuration.get_feature(feature_id)?;
+        feature.metering = Some(self.metering.sender.clone());
+        Ok(feature)
     }
 
     fn get_property_ids(&self) -> Result<Vec<String>> {
@@ -69,7 +82,9 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     }
 
     fn get_property(&self, property_id: &str) -> Result<PropertySnapshot> {
-        self.live_configuration.get_property(property_id)
+        let mut property = self.live_configuration.get_property(property_id)?;
+        property.metering = Some(self.metering.sender.clone());
+        Ok(property)
     }
 
     fn is_online(&self) -> Result<bool> {
@@ -77,10 +92,22 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     }
 }
 
+struct MeteringClientImpl;
+
+impl MeteringClient for MeteringClientImpl {
+    fn push_metering_data(
+        &self,
+        _data: &crate::models::MeteringDataJson,
+    ) -> crate::metering::MeteringResult<()> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::client::configuration::Configuration;
+    use crate::metering::metering::tests::start_metering_mock;
     use crate::models::tests::{
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
@@ -131,14 +158,25 @@ mod tests {
         example_configuration_enterprise: Configuration,
         configuration_feature1_enabled: Configuration,
     ) {
-        let mut client = {
+        let (mut client, metering_recv) = {
             let live_cfg_mock = LiveConfigurationMock {
                 configuration: example_configuration_enterprise,
             };
 
-            AppConfigurationClientHttp {
-                live_configuration: live_cfg_mock,
-            }
+            let configuration_id = ConfigurationId::new(
+                "test_guid".to_string(),
+                "test_env_id".to_string(),
+                "test_collection_id".to_string(),
+            );
+            let (metering, metering_recv) = start_metering_mock(configuration_id);
+
+            (
+                AppConfigurationClientHttp {
+                    live_configuration: live_cfg_mock,
+                    metering,
+                },
+                metering_recv,
+            )
         };
 
         let feature = client.get_feature("f1").unwrap();
@@ -159,6 +197,23 @@ mod tests {
         // And expect the updated value
         let feature_value3 = feature.get_value(&entity).unwrap();
         assert_ne!(feature_value3, feature_value1);
+
+        // We evaluated the property 3 times (for two different configurations)
+        {
+            let metering_data = metering_recv.recv().unwrap();
+            // The value for the `collection_id` and `environment_id` comes from the `ConfigurationId`
+            // object that was provided to the `start_metering` function. It doesn't match
+            // the `ConfigurationId` that was used to get the `Configuration` object. This
+            // inconsistency is only reachable in these tests, not via the public API, so
+            // there is nothing to fix right now.
+            assert_eq!(metering_data.collection_id, "test_collection_id");
+            assert_eq!(metering_data.environment_id, "test_env_id");
+
+            // We expect 3 evaluations to be covered in metering.
+            // Do not care about the way they are sorted.
+            let total_counts: u32 = metering_data.usages.iter().map(|usage| usage.count).sum();
+            assert_eq!(total_counts, 3);
+        }
     }
 
     #[rstest]
@@ -166,14 +221,25 @@ mod tests {
         example_configuration_enterprise: Configuration,
         configuration_property1_enabled: Configuration,
     ) {
-        let mut client = {
+        let (mut client, metering_recv) = {
             let live_cfg_mock = LiveConfigurationMock {
                 configuration: example_configuration_enterprise,
             };
 
-            AppConfigurationClientHttp {
-                live_configuration: live_cfg_mock,
-            }
+            let configuration_id = ConfigurationId::new(
+                "test_guid".to_string(),
+                "test_env_id".to_string(),
+                "test_collection_id".to_string(),
+            );
+            let (metering, metering_recv) = start_metering_mock(configuration_id);
+
+            (
+                AppConfigurationClientHttp {
+                    live_configuration: live_cfg_mock,
+                    metering,
+                },
+                metering_recv,
+            )
         };
 
         let property = client.get_property("p1").unwrap();
@@ -194,5 +260,22 @@ mod tests {
         // And expect the updated value
         let property_value3 = property.get_value(&entity).unwrap();
         assert_ne!(property_value3, property_value1);
+
+        // We evaluated the property 3 times (for two different configurations)
+        {
+            let metering_data = metering_recv.recv().unwrap();
+            // The value for the `collection_id` and `environment_id` comes from the `ConfigurationId`
+            // object that was provided to the `start_metering` function. It doesn't match
+            // the `ConfigurationId` that was used to get the `Configuration` object. This
+            // inconsistency is only reachable in these tests, not via the public API, so
+            // there is nothing to fix right now.
+            assert_eq!(metering_data.collection_id, "test_collection_id");
+            assert_eq!(metering_data.environment_id, "test_env_id");
+
+            // We expect 3 evaluations to be covered in metering.
+            // Do not care about the way they are sorted.
+            let total_counts: u32 = metering_data.usages.iter().map(|usage| usage.count).sum();
+            assert_eq!(total_counts, 3);
+        }
     }
 }

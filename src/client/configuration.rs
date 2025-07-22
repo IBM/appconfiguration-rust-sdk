@@ -164,6 +164,7 @@ impl ConfigurationProvider for Configuration {
             &feature.name,
             feature_id,
             segment_rules.clone(),
+            None,
         ))
     }
 
@@ -183,6 +184,8 @@ impl ConfigurationProvider for Configuration {
             value,
             segment_rules.clone(),
             &property.name,
+            &property.property_id,
+            None,
         ))
     }
 
