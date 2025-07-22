@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use log::warn;
+
+use crate::client::feature_snapshot::FeatureSnapshot;
+use crate::client::property_snapshot::PropertySnapshot;
 use crate::metering::MeteringClient;
 use crate::utils::ThreadHandle;
 use crate::ConfigurationId;
@@ -76,37 +80,62 @@ pub(crate) struct MeteringRecorderSender {
     evaluation_event_sender: mpsc::Sender<EvaluationEvent>,
 }
 
-impl MeteringRecorderSender {
-    /// Record the evaluation of a property, for eventual transmission to the server.
-    pub fn record_property_evaluation(
+pub(crate) trait MeteringSubject {
+    fn record_evaluation(
         &self,
-        property_id: &str,
+        metering_recorder: Option<&MeteringRecorderSender>,
         entity_id: &str,
         segment_id: Option<&str>,
-    ) -> crate::errors::Result<()> {
-        self.evaluation_event_sender
-            .send(EvaluationEvent::Property(EvaluationEventData {
-                subject_id: SubjectId::Property(property_id.to_string()),
-                entity_id: entity_id.to_string(),
-                segment_id: segment_id.map(|s| s.to_string()),
-            }))
-            .map_err(|_| crate::errors::Error::MeteringError {})
-    }
+    );
+}
 
-    /// Record the evaluation of a feature, for eventual transmission to the server.
-    pub fn record_feature_evaluation(
+impl MeteringSubject for PropertySnapshot {
+    fn record_evaluation(
         &self,
-        feature_id: &str,
+        metering_recorder: Option<&MeteringRecorderSender>,
         entity_id: &str,
         segment_id: Option<&str>,
-    ) -> crate::errors::Result<()> {
-        self.evaluation_event_sender
-            .send(EvaluationEvent::Feature(EvaluationEventData {
-                subject_id: SubjectId::Feature(feature_id.to_string()),
-                entity_id: entity_id.to_string(),
-                segment_id: segment_id.map(|s| s.to_string()),
-            }))
-            .map_err(|_| crate::errors::Error::MeteringError {})
+    ) {
+        if let Some(recorder) = metering_recorder {
+            if let Err(e) = recorder
+                .evaluation_event_sender
+                .send(EvaluationEvent::Property(EvaluationEventData {
+                    subject_id: SubjectId::Property(self.property_id.to_string()),
+                    entity_id: entity_id.to_string(),
+                    segment_id: segment_id.map(|s| s.to_string()),
+                }))
+            {
+                warn!(
+                    "Fail to enqueue metering data for property '{}': {e}",
+                    self.name
+                );
+            }
+        }
+    }
+}
+
+impl MeteringSubject for FeatureSnapshot {
+    fn record_evaluation(
+        &self,
+        metering_recorder: Option<&MeteringRecorderSender>,
+        entity_id: &str,
+        segment_id: Option<&str>,
+    ) {
+        if let Some(recorder) = metering_recorder {
+            if let Err(e) = recorder
+                .evaluation_event_sender
+                .send(EvaluationEvent::Feature(EvaluationEventData {
+                    subject_id: SubjectId::Feature(self.feature_id.to_string()),
+                    entity_id: entity_id.to_string(),
+                    segment_id: segment_id.map(|s| s.to_string()),
+                }))
+            {
+                warn!(
+                    "Fail to enqueue metering data for feature '{}': {e}",
+                    self.name
+                );
+            }
+        }
     }
 }
 
@@ -280,7 +309,12 @@ pub(crate) mod tests {
         // Send a single evaluation event
         metering_handle
             .sender
-            .record_feature_evaluation("feature1", "entity1", None)
+            .evaluation_event_sender
+            .send(EvaluationEvent::Feature(EvaluationEventData {
+                subject_id: SubjectId::Feature("feature1".to_string()),
+                entity_id: "entity1".to_string(),
+                segment_id: None,
+            }))
             .unwrap();
 
         let time_record_evaluation = chrono::Utc::now();

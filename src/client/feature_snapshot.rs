@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::warn;
-
 use crate::entity::Entity;
-use crate::metering::MeteringRecorderSender;
+use crate::metering::{MeteringRecorderSender, MeteringSubject};
 use crate::value::Value;
 use crate::Feature;
 
@@ -31,8 +29,8 @@ pub struct FeatureSnapshot {
     enabled_value: Value,
     disabled_value: Value,
     rollout_percentage: u32,
-    name: String,
-    feature_id: String,
+    pub(crate) name: String,
+    pub(crate) feature_id: String,
     segment_rules: TargetingRules,
     pub(crate) metering: Option<MeteringRecorderSender>,
 }
@@ -62,7 +60,7 @@ impl FeatureSnapshot {
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
         if !self.enabled {
-            self.send_metering(&entity.get_id(), None);
+            self.record_evaluation(self.metering.as_ref(), &entity.get_id(), None);
             return Ok(self.disabled_value.clone());
         }
 
@@ -78,11 +76,12 @@ impl FeatureSnapshot {
             }
         };
 
-        self.send_metering(
+        self.record_evaluation(
+            self.metering.as_ref(),
             &entity.get_id(),
             segment_rule_and_segment
                 .as_ref()
-                .map(|(_, segment)| segment.name.as_str()),
+                .map(|(_, segment)| segment.segment_id.as_str()),
         );
 
         match segment_rule_and_segment {
@@ -116,17 +115,6 @@ impl FeatureSnapshot {
             Ok(self.enabled_value.clone())
         } else {
             Ok(self.disabled_value.clone())
-        }
-    }
-
-    fn send_metering(&self, entity_id: &str, segment_id: Option<&str>) {
-        if let Some(metering) = self.metering.as_ref() {
-            if let Err(e) = metering.record_feature_evaluation(&self.name, entity_id, segment_id) {
-                warn!(
-                    "Fail to enqueue metering data for feature '{}': {e}",
-                    self.name
-                );
-            }
         }
     }
 }

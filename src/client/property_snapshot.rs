@@ -13,20 +13,20 @@
 // limitations under the License.
 
 use crate::entity::Entity;
-use crate::metering::MeteringRecorderSender;
+use crate::metering::{MeteringRecorderSender, MeteringSubject};
 use crate::value::Value;
 use crate::Property;
 
 use crate::errors::Result;
 use crate::segment_evaluation::TargetingRules;
-use log::warn;
 
 /// Provides a snapshot of a [`Property`].
 #[derive(Debug)]
 pub struct PropertySnapshot {
     value: Value,
     segment_rules: TargetingRules,
-    name: String,
+    pub(crate) name: String,
+    pub(crate) property_id: String,
     pub(crate) metering: Option<MeteringRecorderSender>,
 }
 
@@ -35,12 +35,14 @@ impl PropertySnapshot {
         value: Value,
         segment_rules: TargetingRules,
         name: &str,
+        property_id: &str,
         metering: Option<MeteringRecorderSender>,
     ) -> Self {
         Self {
             value,
             segment_rules,
             name: name.to_string(),
+            property_id: property_id.to_string(),
             metering,
         }
     }
@@ -58,27 +60,17 @@ impl PropertySnapshot {
             }
         };
 
-        self.send_metering(
+        self.record_evaluation(
+            self.metering.as_ref(),
             &entity.get_id(),
             segment_rule_and_segment
                 .as_ref()
-                .map(|(_, segment)| segment.name.as_str()),
+                .map(|(_, segment)| segment.segment_id.as_str()),
         );
 
         match segment_rule_and_segment {
             Some((segment_rule, _)) => segment_rule.value(&self.value),
             None => Ok(self.value.clone()),
-        }
-    }
-
-    fn send_metering(&self, entity_id: &str, segment_id: Option<&str>) {
-        if let Some(metering) = self.metering.as_ref() {
-            if let Err(e) = metering.record_property_evaluation(&self.name, entity_id, segment_id) {
-                warn!(
-                    "Fail to enqueue metering data for property '{}': {e}",
-                    self.name
-                );
-            }
         }
     }
 }
@@ -137,7 +129,7 @@ pub mod tests {
                 }],
                 ValueType::Numeric,
             );
-            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", None)
+            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", "f1", None)
         };
 
         // Both segment rules match. Expect the one with smaller order to be used:

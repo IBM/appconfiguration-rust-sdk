@@ -200,7 +200,7 @@ mod tests {
 
         // We evaluated the property 3 times (for two different configurations)
         {
-            let mut metering_data = metering_recv.recv().unwrap();
+            let metering_data = metering_recv.recv().unwrap();
             // The value for the `collection_id` and `environment_id` comes from the `ConfigurationId`
             // object that was provided to the `start_metering` function. It doesn't match
             // the `ConfigurationId` that was used to get the `Configuration` object. This
@@ -211,9 +211,7 @@ mod tests {
 
             // We expect 3 evaluations to be covered in metering.
             // Do not care about the way they are sorted.
-            let total_counts : u32 = metering_data
-                .usages
-                .iter().map(|usage| usage.count).sum();
+            let total_counts: u32 = metering_data.usages.iter().map(|usage| usage.count).sum();
             assert_eq!(total_counts, 3);
         }
     }
@@ -265,7 +263,7 @@ mod tests {
 
         // We evaluated the property 3 times (for two different configurations)
         {
-            let mut metering_data = metering_recv.recv().unwrap();
+            let metering_data = metering_recv.recv().unwrap();
             // The value for the `collection_id` and `environment_id` comes from the `ConfigurationId`
             // object that was provided to the `start_metering` function. It doesn't match
             // the `ConfigurationId` that was used to get the `Configuration` object. This
@@ -276,9 +274,7 @@ mod tests {
 
             // We expect 3 evaluations to be covered in metering.
             // Do not care about the way they are sorted.
-            let total_counts : u32 = metering_data
-                .usages
-                .iter().map(|usage| usage.count).sum();
+            let total_counts: u32 = metering_data.usages.iter().map(|usage| usage.count).sum();
             assert_eq!(total_counts, 3);
         }
     }
