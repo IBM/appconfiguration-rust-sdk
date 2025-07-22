@@ -17,8 +17,9 @@ use log::warn;
 use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::metering::MeteringClient;
+use crate::models::Segment;
 use crate::utils::ThreadHandle;
-use crate::ConfigurationId;
+use crate::{ConfigurationId, Entity};
 use std::sync::mpsc;
 
 /// Starts periodic metering transmission to the server.
@@ -81,28 +82,24 @@ pub(crate) struct MeteringRecorderSender {
 }
 
 pub(crate) trait MeteringSubject {
-    fn record_evaluation(
-        &self,
-        metering_recorder: Option<&MeteringRecorderSender>,
-        entity_id: &str,
-        segment_id: Option<&str>,
-    );
+    fn get_metering_sender(&self) -> Option<&MeteringRecorderSender>;
+
+    fn record_evaluation(&self, entity: &impl Entity, segment: Option<&Segment>);
 }
 
 impl MeteringSubject for PropertySnapshot {
-    fn record_evaluation(
-        &self,
-        metering_recorder: Option<&MeteringRecorderSender>,
-        entity_id: &str,
-        segment_id: Option<&str>,
-    ) {
-        if let Some(recorder) = metering_recorder {
+    fn get_metering_sender(&self) -> Option<&MeteringRecorderSender> {
+        self.metering.as_ref()
+    }
+
+    fn record_evaluation(&self, entity: &impl Entity, segment: Option<&Segment>) {
+        if let Some(recorder) = self.get_metering_sender() {
             if let Err(e) = recorder
                 .evaluation_event_sender
                 .send(EvaluationEvent::Property(EvaluationEventData {
-                    subject_id: SubjectId::Property(self.property_id.to_string()),
-                    entity_id: entity_id.to_string(),
-                    segment_id: segment_id.map(|s| s.to_string()),
+                    subject_id: SubjectId::Property(self.property_id.clone()),
+                    entity_id: entity.get_id(),
+                    segment_id: segment.map(|s| s.segment_id.clone()),
                 }))
             {
                 warn!(
@@ -115,19 +112,18 @@ impl MeteringSubject for PropertySnapshot {
 }
 
 impl MeteringSubject for FeatureSnapshot {
-    fn record_evaluation(
-        &self,
-        metering_recorder: Option<&MeteringRecorderSender>,
-        entity_id: &str,
-        segment_id: Option<&str>,
-    ) {
-        if let Some(recorder) = metering_recorder {
+    fn get_metering_sender(&self) -> Option<&MeteringRecorderSender> {
+        self.metering.as_ref()
+    }
+
+    fn record_evaluation(&self, entity: &impl Entity, segment: Option<&Segment>) {
+        if let Some(recorder) = self.get_metering_sender() {
             if let Err(e) = recorder
                 .evaluation_event_sender
                 .send(EvaluationEvent::Feature(EvaluationEventData {
-                    subject_id: SubjectId::Feature(self.feature_id.to_string()),
-                    entity_id: entity_id.to_string(),
-                    segment_id: segment_id.map(|s| s.to_string()),
+                    subject_id: SubjectId::Feature(self.feature_id.clone()),
+                    entity_id: entity.get_id(),
+                    segment_id: segment.map(|s| s.segment_id.clone()),
                 }))
             {
                 warn!(

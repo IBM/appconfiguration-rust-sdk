@@ -60,32 +60,27 @@ impl FeatureSnapshot {
 
     fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
         if !self.enabled {
-            self.record_evaluation(self.metering.as_ref(), &entity.get_id(), None);
+            self.record_evaluation(entity, None);
             return Ok(self.disabled_value.clone());
         }
 
-        let segment_rule_and_segment = {
+        let (segment_rule, segment) = {
             if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
                 // TODO: this makes only sense if there can be a rule which matches
                 //       even on empty attributes
                 // No match possible. Do not consider segment rules:
-                None
+                (None, None)
             } else {
                 self.segment_rules
                     .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+                    .unzip()
             }
         };
 
-        self.record_evaluation(
-            self.metering.as_ref(),
-            &entity.get_id(),
-            segment_rule_and_segment
-                .as_ref()
-                .map(|(_, segment)| segment.segment_id.as_str()),
-        );
+        self.record_evaluation(entity, segment);
 
-        match segment_rule_and_segment {
-            Some((segment_rule, _)) => {
+        match segment_rule {
+            Some(segment_rule) => {
                 // Get rollout percentage
                 let rollout_percentage =
                     segment_rule.rollout_percentage(self.rollout_percentage)?;
