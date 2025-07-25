@@ -18,11 +18,24 @@ use super::{NetworkError, NetworkResult};
 use reqwest::blocking::Client;
 use serde::Deserialize;
 
-pub trait TokenProvider: std::fmt::Debug + Send + Sync {
+pub trait TokenProvider: std::fmt::Debug + Send + Sync + TokenProviderDynClone {
     fn get_access_token(&self) -> NetworkResult<String>;
 }
 
-#[derive(Debug)]
+pub trait TokenProviderDynClone {
+    fn dyn_clone(&self) -> Box<dyn TokenProvider>;
+}
+
+impl<T> TokenProviderDynClone for T
+where
+    T: 'static + TokenProvider + Clone,
+{
+    fn dyn_clone(&self) -> Box<dyn TokenProvider> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct IBMCloudTokenProvider {
     apikey: String,
 }

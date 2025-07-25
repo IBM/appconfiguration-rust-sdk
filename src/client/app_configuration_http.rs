@@ -16,7 +16,7 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
-use crate::metering::{start_metering, MeteringClient, MeteringRecorder};
+use crate::metering::{start_metering, MeteringClientImpl, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
@@ -48,8 +48,9 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         configuration_id: ConfigurationId,
         offline_mode: OfflineMode,
     ) -> Result<Self> {
-        let server_client = ServerClientImpl::new(service_address, token_provider)?;
-        let metering_client = MeteringClientImpl;
+        let server_client =
+            ServerClientImpl::new(service_address.clone(), token_provider.dyn_clone())?;
+        let metering_client = MeteringClientImpl::new(service_address, token_provider);
 
         let metering = start_metering(
             configuration_id.clone(),
@@ -89,17 +90,6 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 
     fn is_online(&self) -> Result<bool> {
         self.live_configuration.is_online()
-    }
-}
-
-struct MeteringClientImpl;
-
-impl MeteringClient for MeteringClientImpl {
-    fn push_metering_data(
-        &self,
-        _data: &crate::models::MeteringDataJson,
-    ) -> crate::metering::MeteringResult<()> {
-        todo!()
     }
 }
 
