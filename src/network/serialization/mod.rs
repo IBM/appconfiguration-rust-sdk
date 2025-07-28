@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Models that are used for de/serialization of the data interchanged with
+//! the server
+
 mod config_value;
 mod configuration;
 mod environment;
