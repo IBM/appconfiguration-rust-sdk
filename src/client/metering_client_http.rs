@@ -3,9 +3,9 @@ use crate::models::MeteringDataJson;
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 use reqwest::blocking::Client;
-use reqwest::StatusCode;
 use url::Url;
 
+/// A MeteringClient pushing metering data to a http server.
 #[derive(Debug)]
 pub(crate) struct MeteringClientHttp {
     service_address: ServiceAddress,
