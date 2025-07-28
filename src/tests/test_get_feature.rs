@@ -21,7 +21,7 @@ use rstest::*;
 
 use super::client_enterprise;
 use crate::feature::Feature;
-use crate::models::tests::configuration_unordered_segment_rules;
+use crate::network::serialization::fixtures::configuration_unordered_segment_rules;
 
 #[rstest]
 fn test_get_feature_doesnt_exist(client_enterprise: Box<dyn AppConfigurationClient>) {

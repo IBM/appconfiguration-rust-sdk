@@ -15,7 +15,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
-use crate::models::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
+use crate::network::serialization::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
 use crate::segment_evaluation::TargetingRules;
 use crate::ConfigurationDataError;
 
@@ -199,8 +199,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::models::tests::example_configuration_enterprise_path;
-    use crate::models::ConfigurationJson;
+    use crate::network::serialization::fixtures::example_configuration_enterprise_path;
+    use crate::network::serialization::ConfigurationJson;
 
     use rstest::*;
 

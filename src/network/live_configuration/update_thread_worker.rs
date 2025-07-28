@@ -196,7 +196,7 @@ mod tests {
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> NetworkResult<Configuration> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+                Ok(crate::network::serialization::fixtures::configuration_feature1_enabled())
             }
 
             #[allow(unreachable_code)]
@@ -358,7 +358,7 @@ mod tests {
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> NetworkResult<Configuration> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+                Ok(crate::network::serialization::fixtures::configuration_feature1_enabled())
             }
 
             #[allow(unreachable_code)]
@@ -600,7 +600,7 @@ mod tests {
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> NetworkResult<Configuration> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+                Ok(crate::network::serialization::fixtures::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
@@ -638,7 +638,7 @@ mod tests {
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> NetworkResult<Configuration> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+                Ok(crate::network::serialization::fixtures::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(
@@ -677,7 +677,7 @@ mod tests {
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> NetworkResult<Configuration> {
-                Ok(crate::models::tests::configuration_feature1_enabled())
+                Ok(crate::network::serialization::fixtures::configuration_feature1_enabled())
             }
 
             fn get_configuration_monitoring_websocket(

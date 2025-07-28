@@ -1,4 +1,4 @@
-// (C) Copyright IBM Corp. 2024.
+// (C) Copyright IBM Corp. 2025.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod errors;
-pub(crate) mod http_client;
-mod token_provider;
+use serde::Deserialize;
 
-pub(crate) use http_client::ServerClientImpl;
-pub use http_client::ServiceAddress;
-pub(crate) use token_provider::IBMCloudTokenProvider;
-pub use token_provider::TokenProvider;
-pub(crate) mod live_configuration;
+use super::{SegmentRule, ValueType};
+use crate::network::serialization::config_value::ConfigValue;
 
-pub use errors::NetworkError;
-pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
-
-pub(crate) mod serialization; // FIXME: Make this module private to 'network'
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub(crate) struct Feature {
+    pub name: String,
+    pub feature_id: String,
+    pub r#type: ValueType,
+    pub format: Option<String>,
+    pub enabled_value: ConfigValue,
+    pub disabled_value: ConfigValue,
+    pub segment_rules: Vec<SegmentRule>,
+    pub enabled: bool,
+    pub rollout_percentage: u32,
+}

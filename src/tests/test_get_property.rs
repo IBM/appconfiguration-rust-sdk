@@ -20,7 +20,7 @@ use crate::{ConfigurationProvider, Value};
 use rstest::*;
 
 use super::client_enterprise;
-use crate::models::tests::configuration_unordered_segment_rules;
+use crate::network::serialization::fixtures::configuration_unordered_segment_rules;
 use crate::property::Property;
 
 #[rstest]

@@ -92,7 +92,8 @@ impl Property for PropertySnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
+    use crate::network::serialization::fixtures::create_one_segment_rule;
+    use crate::network::serialization::{Rule, Segment, ValueType};
     use std::collections::HashMap;
 
     #[test]
@@ -112,18 +113,12 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(
-                segments,
-                vec![SegmentRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_1".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::String("$default".into())),
-                    order: 1,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                }],
-                ValueType::Numeric,
+            let segment_rules = create_one_segment_rule(
+                "some_segment_id_1".into(),
+                serde_json::Value::String("$default".into()),
+                serde_json::Value::Number((100).into()),
             );
+            let segment_rules = TargetingRules::new(segments, segment_rules, ValueType::Numeric);
             PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", "f1", None)
         };
 

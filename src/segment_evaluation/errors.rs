@@ -14,7 +14,7 @@
 
 use thiserror::Error;
 
-use crate::models::{Rule, Segment};
+use crate::network::serialization::{Rule, Segment};
 
 #[derive(Debug, Error)]
 pub(crate) enum SegmentEvaluationError {

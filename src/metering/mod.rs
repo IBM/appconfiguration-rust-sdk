@@ -14,7 +14,10 @@
 
 mod client;
 mod errors;
+mod models;
+
 pub(crate) mod metering;
+pub(crate) use models::MeteringDataJson;
 
 pub(crate) use client::MeteringClient;
 pub(crate) use metering::{
