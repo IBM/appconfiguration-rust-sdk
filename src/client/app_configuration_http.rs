@@ -97,7 +97,7 @@ struct MeteringClientImpl;
 impl MeteringClient for MeteringClientImpl {
     fn push_metering_data(
         &self,
-        _data: &crate::models::MeteringDataJson,
+        _data: &crate::metering::MeteringDataJson,
     ) -> crate::metering::MeteringResult<()> {
         todo!()
     }
