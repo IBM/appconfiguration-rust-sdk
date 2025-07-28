@@ -3,7 +3,6 @@ use crate::models::MeteringDataJson;
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 use reqwest::blocking::Client;
-use serde::Serialize;
 use url::Url;
 
 #[derive(Debug)]
@@ -39,7 +38,7 @@ impl MeteringClient for MeteringClientHttp {
         );
         let url = Url::parse(&url).map_err(|_| NetworkError::UrlParseError(url))?;
         let client = Client::new();
-        let r = client
+        let _r = client
             .post(url)
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
             .bearer_auth(&token)
