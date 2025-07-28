@@ -26,7 +26,7 @@ pub struct AppConfigurationOffline {
 }
 
 impl AppConfigurationOffline {
-    /// Creates a new [`AppConfigurationClient`] taking the configuration from a local file.
+    /// Creates a new [`crate::AppConfigurationClient`] taking the configuration from a local file.
     ///
     /// # Arguments
     ///
