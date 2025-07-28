@@ -15,4 +15,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum MeteringError {}
+pub enum MeteringError {
+    #[error(transparent)]
+    NetworkError(#[from] crate::network::NetworkError),
+}

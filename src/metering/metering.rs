@@ -276,7 +276,11 @@ pub(crate) mod tests {
     }
 
     impl MeteringClient for MeteringClientMock {
-        fn push_metering_data(&self, guid: &String, data: &MeteringDataJson) -> MeteringResult<()> {
+        fn push_metering_data(
+            &self,
+            _guid: &String,
+            data: &MeteringDataJson,
+        ) -> MeteringResult<()> {
             self.metering_data_sender.send(data.clone()).unwrap();
             Ok(())
         }

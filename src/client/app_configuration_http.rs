@@ -16,7 +16,8 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
-use crate::metering::{start_metering, MeteringClientImpl, MeteringRecorder};
+use super::metering_client_http::MeteringClientHttp;
+use crate::metering::{start_metering, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
@@ -50,7 +51,7 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
     ) -> Result<Self> {
         let server_client =
             ServerClientImpl::new(service_address.clone(), token_provider.dyn_clone())?;
-        let metering_client = MeteringClientImpl::new(service_address, token_provider);
+        let metering_client = MeteringClientHttp::new(service_address, token_provider);
 
         let metering = start_metering(
             configuration_id.clone(),

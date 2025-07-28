@@ -16,6 +16,7 @@ mod app_configuration_client;
 pub(crate) mod app_configuration_http;
 mod app_configuration_ibm_cloud;
 mod app_configuration_offline;
+mod metering_client_http;
 
 pub(crate) mod configuration;
 pub(crate) mod feature_proxy;
