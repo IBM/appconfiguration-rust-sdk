@@ -18,4 +18,7 @@ use thiserror::Error;
 pub enum MeteringError {
     #[error(transparent)]
     NetworkError(#[from] crate::network::NetworkError),
+
+    #[error("Metering data was rejected: {0}")]
+    DataNotAccepted(String),
 }

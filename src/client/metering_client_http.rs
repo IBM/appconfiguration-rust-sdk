@@ -1,8 +1,9 @@
-use crate::metering::{MeteringClient, MeteringResult};
+use crate::metering::{MeteringClient, MeteringError, MeteringResult};
 use crate::models::MeteringDataJson;
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 use reqwest::blocking::Client;
+use reqwest::StatusCode;
 use url::Url;
 
 #[derive(Debug)]
@@ -38,15 +39,24 @@ impl MeteringClient for MeteringClientHttp {
         );
         let url = Url::parse(&url).map_err(|_| NetworkError::UrlParseError(url))?;
         let client = Client::new();
-        let _r = client
+        let r = client
             .post(url)
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
             .bearer_auth(&token)
             .json(data)
             .send();
 
-        // TODO: Error handling
-        Ok(())
+        match r {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    Ok(())
+                } else {
+                    Err(MeteringError::DataNotAccepted(status.to_string()))
+                }
+            }
+            Err(e) => Err(NetworkError::ReqwestError(e).into()),
+        }
     }
 }
 
@@ -104,6 +114,32 @@ pub(crate) mod tests {
         let result = client.push_metering_data(&"example_guid".to_string(), &data);
 
         assert!(result.is_ok());
+        mock.assert();
+    }
+
+    /// In case of the server returning a bad status, `push_metering_data` should fail.
+    #[test]
+    fn test_error_handling() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST);
+            then.status(400);
+        });
+
+        let client = MeteringClientHttp::new(
+            ServiceAddress::new_without_ssl(server.host(), Some(server.port()), None),
+            Box::new(MockTokenProvider {}),
+        );
+
+        let data = MeteringDataJson {
+            collection_id: "test".to_string(),
+            environment_id: "dev".to_string(),
+            usages: Vec::new(),
+        };
+
+        let result = client.push_metering_data(&"example_guid".to_string(), &data);
+
+        assert!(matches!(result, Err(MeteringError::DataNotAccepted(_))));
         mock.assert();
     }
 }

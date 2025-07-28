@@ -163,6 +163,7 @@ impl ServerClient for ServerClientImpl {
                 )?)
             }
             Err(e) => {
+                // FIXME: bad status might not necessarily map to a reqwest error
                 // TODO: Identify if token expired, get new one and retry
                 if false {
                     let access_token = self.token_provider.get_access_token()?;
