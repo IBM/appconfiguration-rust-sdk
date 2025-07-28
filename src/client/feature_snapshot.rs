@@ -140,7 +140,8 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
+    use crate::network::serialization::fixtures::one_segment_rule;
+    use crate::network::serialization::{Rule, Segment, SegmentRule, ValueType};
     use rstest::rstest;
     use std::collections::HashMap;
 
@@ -174,7 +175,7 @@ pub mod tests {
     // attrs but no segment rules
     #[case([].into(), [("key".into(), Value::from("value".to_string()))].into())]
     // no attrs but segment rules
-    #[case([SegmentRule{rules: Vec::new(), value: ConfigValue(serde_json::json!("")), order: 0, rollout_percentage: None}].into(), [].into())]
+    #[case(crate::network::serialization::fixtures::one_segment_rule(), [].into())]
     fn test_get_value_no_match_50_50_rollout(
         #[case] segment_rules: Vec<SegmentRule>,
         #[case] entity_attributes: HashMap<String, Value>,
@@ -243,8 +244,8 @@ pub mod tests {
 
     // Get a feature value using different entities, matching or not matching a segment rule.
     // Uses rollout percentage to also test no rollout even if matched
-    #[test]
-    fn test_get_value_matching_a_rule() {
+    #[rstest]
+    fn test_get_value_matching_a_rule(one_segment_rule: Vec<SegmentRule>) {
         let feature = {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
@@ -260,18 +261,7 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(
-                segments,
-                vec![SegmentRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((-48).into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
-                }],
-                ValueType::Numeric,
-            );
+            let segment_rules = TargetingRules::new(segments, one_segment_rule, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),
@@ -314,8 +304,8 @@ pub mod tests {
 
     // The matched segment rule's value has a "$default" value.
     // In this case, the feature's enabled value should be used whenever the rule matches.
-    #[test]
-    fn test_get_value_matching_yielding_default_value() {
+    #[rstest]
+    fn test_get_value_matching_yielding_default_value(one_segment_rule: Vec<SegmentRule>) {
         let feature = {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
@@ -331,18 +321,7 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(
-                segments,
-                vec![SegmentRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::String("$default".into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
-                }],
-                ValueType::Numeric,
-            );
+            let segment_rules = TargetingRules::new(segments, one_segment_rule, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),
@@ -367,8 +346,8 @@ pub mod tests {
 
     // The matched segment rule's rollout percentage has a "$default" value.
     // In this case, the feature's rollout percentage should be used whenever the rule matches.
-    #[test]
-    fn test_get_value_matching_segment_rollout_default_value() {
+    #[rstest]
+    fn test_get_value_matching_segment_rollout_default_value(one_segment_rule: Vec<SegmentRule>) {
         let feature = {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
@@ -384,20 +363,7 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(
-                segments,
-                vec![SegmentRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::Number((48).into())),
-                    order: 0,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::String(
-                        "$default".into(),
-                    ))),
-                }],
-                ValueType::Numeric,
-            );
+            let segment_rules = TargetingRules::new(segments, one_segment_rule, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),

@@ -92,11 +92,13 @@ impl Property for PropertySnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments, ValueType};
+    use crate::network::serialization::fixtures::one_segment_rule;
+    use crate::network::serialization::{Rule, Segment, SegmentRule, ValueType};
+    use rstest::rstest;
     use std::collections::HashMap;
 
-    #[test]
-    fn test_get_value_segment_with_default_value() {
+    #[rstest]
+    fn test_get_value_segment_with_default_value(one_segment_rule: Vec<SegmentRule>) {
         let property = {
             let segments = HashMap::from([(
                 "some_segment_id_1".into(),
@@ -112,18 +114,7 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(
-                segments,
-                vec![SegmentRule {
-                    rules: vec![Segments {
-                        segments: vec!["some_segment_id_1".into()],
-                    }],
-                    value: ConfigValue(serde_json::Value::String("$default".into())),
-                    order: 1,
-                    rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-                }],
-                ValueType::Numeric,
-            );
+            let segment_rules = TargetingRules::new(segments, one_segment_rule, ValueType::Numeric);
             PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", "f1", None)
         };
 

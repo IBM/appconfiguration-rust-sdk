@@ -17,7 +17,7 @@ use log::warn;
 use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::metering::MeteringClient;
-use crate::models::Segment;
+use crate::network::serialization::Segment;
 use crate::utils::ThreadHandle;
 use crate::{ConfigurationId, Entity};
 use std::sync::mpsc;
