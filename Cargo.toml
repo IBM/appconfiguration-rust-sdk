@@ -35,7 +35,7 @@ log = "0.4.27"
 [dev-dependencies]
 appconfiguration = {path = ".", features = ["test_utils"]}
 dotenvy = "0.15.7"
-rstest = "0.25.0"
+rstest = "0.26.0"
 
 [badges]
 github = { repository = "IBM/appconfiguration-rust-sdk" }
