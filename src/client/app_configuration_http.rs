@@ -31,7 +31,7 @@ pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
-    /// Creates a new [`AppConfigurationClient`] connecting to the server specified in the constructor arguments
+    /// Creates a new [`crate::AppConfigurationClient`] connecting to the server specified in the constructor arguments
     ///
     /// This client keeps a websocket open to the server to receive live-updates
     /// to features and properties.
