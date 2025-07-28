@@ -33,13 +33,6 @@ pub(crate) use value_type::ValueType;
 
 use crate::Value;
 
-#[cfg(test)]
-pub(crate) mod fixtures {
-    pub(crate) use super::configuration::fixtures::*;
-    pub(crate) use super::segment::fixtures::*;
-    pub(crate) use super::segment_rule::fixtures::*;
-}
-
 impl TryFrom<(ValueType, config_value::ConfigValue)> for Value {
     type Error = crate::Error;
 
@@ -71,4 +64,11 @@ impl TryFrom<(ValueType, config_value::ConfigValue)> for Value {
                 .ok_or(crate::Error::MismatchType),
         }
     }
+}
+
+#[cfg(test)]
+pub(crate) mod fixtures {
+    pub(crate) use super::configuration::fixtures::*;
+    pub(crate) use super::segment::fixtures::*;
+    pub(crate) use super::segment_rule::fixtures::*;
 }

@@ -36,6 +36,21 @@ pub mod fixtures {
     use crate::network::serialization::SegmentRule;
     use rstest::*;
 
+    pub fn create_one_segment_rule(
+        segment_id: String,
+        value: serde_json::Value,
+        rollout_percentage: serde_json::Value,
+    ) -> Vec<SegmentRule> {
+        vec![SegmentRule {
+            rules: vec![Segments {
+                segments: vec![segment_id],
+            }],
+            value: ConfigValue(value),
+            order: 0,
+            rollout_percentage: Some(ConfigValue(rollout_percentage)),
+        }]
+    }
+
     #[fixture]
     pub fn one_segment_rule() -> Vec<SegmentRule> {
         vec![SegmentRule {

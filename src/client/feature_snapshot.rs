@@ -140,7 +140,7 @@ impl Feature for FeatureSnapshot {
 pub mod tests {
 
     use super::*;
-    use crate::network::serialization::fixtures::one_segment_rule;
+    use crate::network::serialization::fixtures::{create_one_segment_rule, one_segment_rule};
     use crate::network::serialization::{Rule, Segment, SegmentRule, ValueType};
     use rstest::rstest;
     use std::collections::HashMap;
@@ -304,8 +304,8 @@ pub mod tests {
 
     // The matched segment rule's value has a "$default" value.
     // In this case, the feature's enabled value should be used whenever the rule matches.
-    #[rstest]
-    fn test_get_value_matching_yielding_default_value(one_segment_rule: Vec<SegmentRule>) {
+    #[test]
+    fn test_get_value_matching_yielding_default_value() {
         let feature = {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
@@ -321,7 +321,12 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(segments, one_segment_rule, ValueType::Numeric);
+            let segment_rules = create_one_segment_rule(
+                "some_segment_id".into(),
+                serde_json::Value::String("$default".into()),
+                serde_json::Value::Number((50).into()),
+            );
+            let segment_rules = TargetingRules::new(segments, segment_rules, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),
@@ -346,8 +351,8 @@ pub mod tests {
 
     // The matched segment rule's rollout percentage has a "$default" value.
     // In this case, the feature's rollout percentage should be used whenever the rule matches.
-    #[rstest]
-    fn test_get_value_matching_segment_rollout_default_value(one_segment_rule: Vec<SegmentRule>) {
+    #[test]
+    fn test_get_value_matching_segment_rollout_default_value() {
         let feature = {
             let segments = HashMap::from([(
                 "some_segment_id".into(),
@@ -363,7 +368,12 @@ pub mod tests {
                     }],
                 },
             )]);
-            let segment_rules = TargetingRules::new(segments, one_segment_rule, ValueType::Numeric);
+            let segment_rules = create_one_segment_rule(
+                "some_segment_id".into(),
+                serde_json::Value::Number(48.into()),
+                serde_json::Value::String("$default".into()),
+            );
+            let segment_rules = TargetingRules::new(segments, segment_rules, ValueType::Numeric);
             FeatureSnapshot::new(
                 true,
                 Value::Int64(-42),
