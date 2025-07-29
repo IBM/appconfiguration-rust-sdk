@@ -16,8 +16,7 @@ use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
 
-use super::metering_client_http::MeteringClientHttp;
-use crate::metering::{start_metering, MeteringRecorder};
+use crate::metering::{start_metering, MeteringClientHttp, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
