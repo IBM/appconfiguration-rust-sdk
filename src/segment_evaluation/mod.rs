@@ -19,9 +19,7 @@ use std::collections::HashMap;
 use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
-use crate::models::Segment;
-use crate::models::SegmentRule;
-use crate::models::ValueType;
+use crate::network::serialization::{Segment, SegmentRule, ValueType};
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
@@ -268,80 +266,19 @@ fn check_operator(
 pub mod tests {
     use super::*;
     use crate::errors::{EntityEvaluationError, Error};
-    use crate::models::{ConfigValue, Rule, Segment, SegmentRule, Segments};
+    use crate::network::serialization::fixtures::{
+        segment_rules_with_invalid_segment_id, some_segment_rules, some_segments,
+    };
+    use crate::network::serialization::{Segment, SegmentRule};
     use rstest::*;
-
-    #[fixture]
-    fn segments() -> HashMap<String, Segment> {
-        HashMap::from([
-            (
-                "some_segment_id_1".into(),
-                Segment {
-                    name: "".into(),
-                    segment_id: "some_segment_id_1".into(),
-                    description: "".into(),
-                    tags: None,
-                    rules: vec![Rule {
-                        attribute_name: "name".into(),
-                        operator: "is".into(),
-                        values: vec!["heinz".into()],
-                    }],
-                },
-            ),
-            (
-                "some_segment_id_2".into(),
-                Segment {
-                    name: "".into(),
-                    segment_id: "some_segment_id_2".into(),
-                    description: "".into(),
-                    tags: None,
-                    rules: vec![Rule {
-                        attribute_name: "name".into(),
-                        operator: "is".into(),
-                        values: vec!["peter".into()],
-                    }],
-                },
-            ),
-            (
-                "some_segment_id_3".into(),
-                Segment {
-                    name: "".into(),
-                    segment_id: "some_segment_id_3".into(),
-                    description: "".into(),
-                    tags: None,
-                    rules: vec![Rule {
-                        attribute_name: "name".into(),
-                        operator: "is".into(),
-                        values: vec!["jane".into()],
-                    }],
-                },
-            ),
-        ])
-    }
-
-    #[fixture]
-    fn targeting_rules() -> Vec<SegmentRule> {
-        vec![SegmentRule {
-            rules: vec![
-                Segments {
-                    segments: vec!["some_segment_id_1".into(), "some_segment_id_2".into()],
-                },
-                Segments {
-                    segments: vec!["some_segment_id_3".into()],
-                },
-            ],
-            value: ConfigValue(serde_json::Value::Number((-48).into())),
-            order: 0,
-            rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-        }]
-    }
 
     #[rstest]
     fn test_targeting_rule_matches_and_correct_segment_reported_back(
-        segments: HashMap<String, Segment>,
-        targeting_rules: Vec<SegmentRule>,
+        some_segments: HashMap<String, Segment>,
+        some_segment_rules: Vec<SegmentRule>,
     ) {
-        let segment_rules = TargetingRules::new(segments, targeting_rules, ValueType::String);
+        let segment_rules =
+            TargetingRules::new(some_segments, some_segment_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
@@ -385,10 +322,11 @@ pub mod tests {
     //  We should not fail the evaluation.
     #[rstest]
     fn test_attribute_not_found(
-        segments: HashMap<String, Segment>,
-        targeting_rules: Vec<SegmentRule>,
+        some_segments: HashMap<String, Segment>,
+        some_segment_rules: Vec<SegmentRule>,
     ) {
-        let segment_rules = TargetingRules::new(segments, targeting_rules, ValueType::String);
+        let segment_rules =
+            TargetingRules::new(some_segments, some_segment_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
@@ -404,22 +342,19 @@ pub mod tests {
     // This is a very good question. Firstly, the our server-side API are strongly validating inputs and give the responses. We have unittests & integration tests that verifies the input & output of /config API.  The response is always right. It is very much rare scenario where the API response has segment_id in featureflag object, that is not present is segments array.
     // We can agree to return error and mark evaluation as failed.
     #[rstest]
-    fn test_invalid_segment_id(segments: HashMap<String, Segment>) {
+    fn test_invalid_segment_id(
+        some_segments: HashMap<String, Segment>,
+        segment_rules_with_invalid_segment_id: Vec<SegmentRule>,
+    ) {
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),
         };
-        let segment_rules = {
-            let targeting_rules = vec![SegmentRule {
-                rules: vec![Segments {
-                    segments: vec!["non_existing_segment_id".into()],
-                }],
-                value: ConfigValue(serde_json::Value::Number((-48).into())),
-                order: 0,
-                rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
-            }];
-            TargetingRules::new(segments, targeting_rules, ValueType::String)
-        };
+        let segment_rules = TargetingRules::new(
+            some_segments,
+            segment_rules_with_invalid_segment_id,
+            ValueType::String,
+        );
         let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Error message should look something like this:
         //  Failed to evaluate entity: Failed to evaluate entity 'a2' against targeting rule '0'.
@@ -439,8 +374,12 @@ pub mod tests {
     // SCENARIO - evaluating an operator fails. Meaning, [for example] user has added a numeric value(int/float) in appconfig segment attribute, but in their application they pass the attribute with a boolean value.
     // We can mark this as failure and return error.
     #[rstest]
-    fn test_operator_failed(segments: HashMap<String, Segment>, targeting_rules: Vec<SegmentRule>) {
-        let segment_rules = TargetingRules::new(segments, targeting_rules, ValueType::String);
+    fn test_operator_failed(
+        some_segments: HashMap<String, Segment>,
+        some_segment_rules: Vec<SegmentRule>,
+    ) {
+        let segment_rules =
+            TargetingRules::new(some_segments, some_segment_rules, ValueType::String);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),

@@ -1,4 +1,4 @@
-// (C) Copyright IBM Corp. 2024.
+// (C) Copyright IBM Corp. 2025.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,35 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt::Display;
+use serde::Deserialize;
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
-use crate::{errors::DeserializationError, Error, Result, Value};
-
-#[derive(Debug, Clone, Serialize)]
-pub struct MeteringDataUsageJson {
-    pub feature_id: Option<String>,
-    pub property_id: Option<String>,
-    pub entity_id: String,
-    // Serialized as "nil" when None
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub segment_id: Option<String>,
-    // When this evaluation was last done
-    pub evaluation_time: DateTime<Utc>,
-    // how often this was evaluated
-    pub count: u32,
-}
-
-/// Represents Metering data in a structure for data exchange used for
-/// sending to the server.
-#[derive(Debug, Clone, Serialize)]
-pub struct MeteringDataJson {
-    pub collection_id: String,
-    pub environment_id: String,
-    pub usages: Vec<MeteringDataUsageJson>,
-}
+use super::Segment;
+use crate::network::serialization::environment::Environment;
+use crate::{errors::DeserializationError, Error, Result};
 
 /// Represents AppConfig data in a structure intended for data exchange
 /// (typically JSON encoded) used by
@@ -76,168 +52,13 @@ impl ConfigurationJson {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct Environment {
-    pub environment_id: String,
-    pub features: Vec<Feature>,
-    pub properties: Vec<Property>,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) struct Segment {
-    pub name: String,
-    pub segment_id: String,
-    pub description: String,
-    pub tags: Option<String>,
-    pub rules: Vec<Rule>,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct Feature {
-    pub name: String,
-    pub feature_id: String,
-    pub r#type: ValueType,
-    pub format: Option<String>,
-    pub enabled_value: ConfigValue,
-    pub disabled_value: ConfigValue,
-    pub segment_rules: Vec<SegmentRule>,
-    pub enabled: bool,
-    pub rollout_percentage: u32,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct Property {
-    pub name: String,
-    pub property_id: String,
-    pub r#type: ValueType,
-    pub tags: Option<String>,
-    pub format: Option<String>,
-    pub value: ConfigValue,
-    pub segment_rules: Vec<SegmentRule>,
-}
-
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) enum ValueType {
-    #[serde(rename(deserialize = "NUMERIC"))]
-    Numeric,
-    #[serde(rename(deserialize = "BOOLEAN"))]
-    Boolean,
-    #[serde(rename(deserialize = "STRING"))]
-    String,
-}
-
-impl Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            Self::Numeric => "NUMERIC",
-            Self::Boolean => "BOOLEAN",
-            Self::String => "STRING",
-        };
-        write!(f, "{label}")
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub(crate) struct ConfigValue(pub(crate) serde_json::Value);
-
-impl ConfigValue {
-    pub fn as_i64(&self) -> Option<i64> {
-        self.0.as_i64()
-    }
-
-    pub fn as_u64(&self) -> Option<u64> {
-        self.0.as_u64()
-    }
-
-    pub fn as_f64(&self) -> Option<f64> {
-        self.0.as_f64()
-    }
-
-    pub fn as_boolean(&self) -> Option<bool> {
-        self.0.as_bool()
-    }
-
-    pub fn as_string(&self) -> Option<String> {
-        self.0.as_str().map(|s| s.to_string())
-    }
-
-    pub fn is_default(&self) -> bool {
-        if let Some(s) = self.0.as_str() {
-            s == "$default"
-        } else {
-            false
-        }
-    }
-}
-
-impl Display for ConfigValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl TryFrom<(ValueType, ConfigValue)> for Value {
-    type Error = crate::Error;
-
-    fn try_from(value: (ValueType, ConfigValue)) -> std::result::Result<Self, Self::Error> {
-        let (kind, value) = value;
-        match kind {
-            ValueType::Numeric => {
-                if let Some(n) = value.as_i64() {
-                    Ok(Value::Int64(n))
-                } else if let Some(n) = value.as_u64() {
-                    Ok(Value::UInt64(n))
-                } else if let Some(n) = value.as_f64() {
-                    Ok(Value::Float64(n))
-                } else {
-                    Err(crate::Error::ProtocolError(
-                        "Cannot convert numeric type".to_string(),
-                    ))
-                }
-            }
-            ValueType::Boolean => value
-                .as_boolean()
-                .map(Value::Boolean)
-                .ok_or(crate::Error::MismatchType),
-            ValueType::String => value
-                .as_string()
-                .map(Value::String)
-                .ok_or(crate::Error::MismatchType),
-        }
-    }
-}
-
-/// Represents a Rule of a Segment.
-/// Those are the rules to check if an entity belongs to a segment.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub(crate) struct Rule {
-    pub attribute_name: String,
-    pub operator: String,
-    pub values: Vec<String>,
-}
-
-/// Associates a Feature/Property to one or more Segments
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct SegmentRule {
-    /// The list of targeted segments
-    /// NOTE: no rules by itself, but the rules are found in the segments
-    /// NOTE: why list of lists?
-    /// NOTE: why is this field called "rules"?
-    pub rules: Vec<Segments>,
-    pub value: ConfigValue,
-    pub order: u32,
-    pub rollout_percentage: Option<ConfigValue>,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct Segments {
-    pub segments: Vec<String>,
-}
-
 #[cfg(test)]
-pub(crate) mod tests {
+pub(crate) mod fixtures {
 
     use crate::client::configuration::Configuration;
+    use crate::network::serialization::config_value::ConfigValue;
+    use crate::network::serialization::segments::Segments;
+    use crate::network::serialization::{Feature, Property, Rule, SegmentRule, ValueType};
 
     use super::*;
     use rstest::*;

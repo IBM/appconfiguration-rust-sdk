@@ -12,18 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod client;
-mod client_http;
-mod errors;
-mod models;
+use serde::Deserialize;
 
-pub(crate) mod metering;
+use super::{Feature, Property};
 
-pub(crate) use client::MeteringClient;
-pub(crate) use client_http::MeteringClientHttp;
-pub(crate) use errors::MeteringError;
-pub(crate) use metering::{
-    start_metering, MeteringRecorder, MeteringRecorderSender, MeteringSubject,
-};
-
-pub type MeteringResult<T> = std::result::Result<T, errors::MeteringError>;
+#[derive(Debug, Deserialize)]
+pub(crate) struct Environment {
+    pub environment_id: String,
+    pub features: Vec<Feature>,
+    pub properties: Vec<Property>,
+}

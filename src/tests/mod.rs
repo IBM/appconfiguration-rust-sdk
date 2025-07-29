@@ -22,7 +22,7 @@ mod test_get_property_ids;
 mod test_using_example_data;
 
 use crate::client::{AppConfigurationClient, AppConfigurationOffline};
-use crate::models::tests::example_configuration_enterprise_path;
+use crate::network::serialization::fixtures::example_configuration_enterprise_path;
 
 use crate::Entity;
 use crate::Value;

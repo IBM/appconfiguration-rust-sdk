@@ -16,8 +16,9 @@ use log::warn;
 
 use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_snapshot::PropertySnapshot;
+use crate::metering::models::MeteringDataJson;
 use crate::metering::MeteringClient;
-use crate::models::Segment;
+use crate::network::serialization::Segment;
 use crate::utils::ThreadHandle;
 use crate::{ConfigurationId, Entity};
 use std::sync::mpsc;
@@ -227,20 +228,22 @@ impl<T: MeteringClient> MeteringBatcher<T> {
         if self.evaluations.is_empty() {
             return;
         }
-        let usages: Vec<crate::models::MeteringDataUsageJson> = self
+        let usages: Vec<crate::metering::models::MeteringDataUsageJson> = self
             .evaluations
             .iter()
-            .map(|(key, value)| crate::models::MeteringDataUsageJson {
-                feature_id: key.feature_id.clone(),
-                property_id: key.property_id.clone(),
-                entity_id: key.entity_id.clone(),
-                segment_id: key.segment_id.clone(),
-                evaluation_time: value.time_of_last_evaluation,
-                count: value.number_of_evaluations,
-            })
+            .map(
+                |(key, value)| crate::metering::models::MeteringDataUsageJson {
+                    feature_id: key.feature_id.clone(),
+                    property_id: key.property_id.clone(),
+                    entity_id: key.entity_id.clone(),
+                    segment_id: key.segment_id.clone(),
+                    evaluation_time: value.time_of_last_evaluation,
+                    count: value.number_of_evaluations,
+                },
+            )
             .collect();
 
-        let json_data = crate::models::MeteringDataJson {
+        let json_data = MeteringDataJson {
             collection_id: self.config_id.collection_id.to_string(),
             environment_id: self.config_id.environment_id.to_string(),
             usages,
@@ -257,7 +260,6 @@ pub(crate) mod tests {
     use super::*;
 
     use crate::metering::MeteringResult;
-    use crate::models::MeteringDataJson;
 
     struct MeteringClientMock {
         metering_data_sender: mpsc::Sender<MeteringDataJson>,

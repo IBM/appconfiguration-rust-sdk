@@ -31,7 +31,7 @@ pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
-    /// Creates a new [`AppConfigurationClient`] connecting to the server specified in the constructor arguments
+    /// Creates a new [`crate::AppConfigurationClient`] connecting to the server specified in the constructor arguments
     ///
     /// This client keeps a websocket open to the server to receive live-updates
     /// to features and properties.
@@ -98,11 +98,11 @@ mod tests {
     use super::*;
     use crate::client::configuration::Configuration;
     use crate::metering::metering::tests::start_metering_mock;
-    use crate::models::tests::{
+    use crate::network::live_configuration::CurrentMode;
+    use crate::network::serialization::fixtures::{
         configuration_feature1_enabled, configuration_property1_enabled,
         example_configuration_enterprise,
     };
-    use crate::network::live_configuration::CurrentMode;
     use crate::utils::ThreadStatus;
     use crate::{Feature, Property};
     use rstest::rstest;

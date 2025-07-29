@@ -25,3 +25,5 @@ pub(crate) mod live_configuration;
 
 pub use errors::NetworkError;
 pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
+
+pub(crate) mod serialization; // FIXME: Make this module private to 'network'

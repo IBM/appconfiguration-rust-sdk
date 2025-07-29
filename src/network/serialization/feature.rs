@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod client;
-mod client_http;
-mod errors;
-mod models;
+use serde::Deserialize;
 
-pub(crate) mod metering;
+use super::{SegmentRule, ValueType};
+use crate::network::serialization::config_value::ConfigValue;
 
-pub(crate) use client::MeteringClient;
-pub(crate) use client_http::MeteringClientHttp;
-pub(crate) use errors::MeteringError;
-pub(crate) use metering::{
-    start_metering, MeteringRecorder, MeteringRecorderSender, MeteringSubject,
-};
-
-pub type MeteringResult<T> = std::result::Result<T, errors::MeteringError>;
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub(crate) struct Feature {
+    pub name: String,
+    pub feature_id: String,
+    pub r#type: ValueType,
+    pub format: Option<String>,
+    pub enabled_value: ConfigValue,
+    pub disabled_value: ConfigValue,
+    pub segment_rules: Vec<SegmentRule>,
+    pub enabled: bool,
+    pub rollout_percentage: u32,
+}

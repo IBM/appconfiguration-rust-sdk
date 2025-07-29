@@ -1,5 +1,5 @@
+use crate::metering::models::MeteringDataJson;
 use crate::metering::{MeteringClient, MeteringError, MeteringResult};
-use crate::models::MeteringDataJson;
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 use reqwest::blocking::Client;
@@ -64,7 +64,7 @@ impl MeteringClient for MeteringClientHttp {
 pub(crate) mod tests {
     use super::*;
 
-    use crate::models::MeteringDataJson;
+    use crate::metering::models::MeteringDataJson;
     use httpmock::Method::POST;
     use httpmock::MockServer;
     use serde_json::json;

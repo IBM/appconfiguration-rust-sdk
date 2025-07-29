@@ -12,18 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod client;
-mod client_http;
-mod errors;
-mod models;
+use serde::Deserialize;
 
-pub(crate) mod metering;
-
-pub(crate) use client::MeteringClient;
-pub(crate) use client_http::MeteringClientHttp;
-pub(crate) use errors::MeteringError;
-pub(crate) use metering::{
-    start_metering, MeteringRecorder, MeteringRecorderSender, MeteringSubject,
-};
-
-pub type MeteringResult<T> = std::result::Result<T, errors::MeteringError>;
+/// Represents a Rule of a Segment.
+/// Those are the rules to check if an entity belongs to a segment.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub(crate) struct Rule {
+    pub attribute_name: String,
+    pub operator: String,
+    pub values: Vec<String>,
+}

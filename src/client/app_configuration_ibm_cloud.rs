@@ -29,7 +29,7 @@ pub struct AppConfigurationClientIBMCloud {
 }
 
 impl AppConfigurationClientIBMCloud {
-    /// Creates a new [`AppConfigurationClient`] connecting to IBM Cloud.
+    /// Creates a new [`crate::AppConfigurationClient`] connecting to IBM Cloud.
     ///
     /// This client keeps a websocket open to the server to receive live-updates
     /// to features and properties.
