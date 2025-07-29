@@ -64,7 +64,6 @@ impl MeteringClient for MeteringClientHttp {
 pub(crate) mod tests {
     use super::*;
 
-    use crate::metering::models::MeteringDataJson;
     use httpmock::Method::POST;
     use httpmock::MockServer;
     use serde_json::json;
