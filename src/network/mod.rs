@@ -18,6 +18,7 @@ mod token_provider;
 
 pub(crate) use http_client::ServerClientImpl;
 pub use http_client::ServiceAddress;
+pub(crate) use http_client::ServiceAddressProtocol;
 pub(crate) use token_provider::IBMCloudTokenProvider;
 pub use token_provider::TokenProvider;
 pub(crate) mod live_configuration;

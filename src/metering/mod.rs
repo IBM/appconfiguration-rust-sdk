@@ -13,13 +13,15 @@
 // limitations under the License.
 
 mod client;
+mod client_http;
 mod errors;
 mod models;
 
 pub(crate) mod metering;
-pub(crate) use models::MeteringDataJson;
 
 pub(crate) use client::MeteringClient;
+pub(crate) use client_http::MeteringClientHttp;
+pub(crate) use errors::MeteringError;
 pub(crate) use metering::{
     start_metering, MeteringRecorder, MeteringRecorderSender, MeteringSubject,
 };

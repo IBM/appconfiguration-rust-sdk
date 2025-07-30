@@ -15,4 +15,10 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum MeteringError {}
+pub enum MeteringError {
+    #[error(transparent)]
+    NetworkError(#[from] crate::network::NetworkError),
+
+    #[error("Metering data was rejected: {0}")]
+    DataNotAccepted(String),
+}

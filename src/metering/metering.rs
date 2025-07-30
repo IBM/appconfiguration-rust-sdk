@@ -248,7 +248,9 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             environment_id: self.config_id.environment_id.to_string(),
             usages,
         };
-        let _ = self.client.push_metering_data(&json_data);
+        let _ = self
+            .client
+            .push_metering_data(&self.config_id.guid, &json_data);
         self.evaluations.clear();
     }
 }
@@ -276,7 +278,11 @@ pub(crate) mod tests {
     }
 
     impl MeteringClient for MeteringClientMock {
-        fn push_metering_data(&self, data: &MeteringDataJson) -> MeteringResult<()> {
+        fn push_metering_data(
+            &self,
+            _guid: &String,
+            data: &MeteringDataJson,
+        ) -> MeteringResult<()> {
             self.metering_data_sender.send(data.clone()).unwrap();
             Ok(())
         }

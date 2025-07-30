@@ -156,6 +156,7 @@ impl ServerClient for ServerClientImpl {
 
         match r {
             Ok(response) => {
+                // TODO: Handle response.status()
                 let config_json = response.json().map_err(|_| NetworkError::ProtocolError)?;
                 Ok(Configuration::new(
                     &configuration_id.environment_id,
@@ -164,6 +165,10 @@ impl ServerClient for ServerClientImpl {
             }
             Err(e) => {
                 // TODO: Identify if token expired, get new one and retry
+                // NOTE: bad status might not necessarily map to a reqwest error.
+                // For metering there is a test where server returns a bad status (e.g. Token expired).
+                // In this test reqwest client returns Ok(response). So if we intend to do token renewal,
+                // this Err(e) match arm might not be the right place.
                 if false {
                     let access_token = self.token_provider.get_access_token()?;
                     self.access_token.replace(access_token);
