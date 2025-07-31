@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
-pub struct MeteringDataUsageJson {
+pub(crate) struct MeteringDataUsageJson {
     pub feature_id: Option<String>,
     pub property_id: Option<String>,
     pub entity_id: String,
@@ -32,7 +32,7 @@ pub struct MeteringDataUsageJson {
 /// Represents Metering data in a structure for data exchange used for
 /// sending to the server.
 #[derive(Debug, Clone, Serialize)]
-pub struct MeteringDataJson {
+pub(crate) struct MeteringDataJson {
     pub collection_id: String,
     pub environment_id: String,
     pub usages: Vec<MeteringDataUsageJson>,

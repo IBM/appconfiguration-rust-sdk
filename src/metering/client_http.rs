@@ -18,8 +18,8 @@ impl MeteringClientHttp {
         token_provider: Box<dyn TokenProvider>,
     ) -> MeteringClientHttp {
         Self {
-            service_address: service_address,
-            token_provider: token_provider,
+            service_address,
+            token_provider,
         }
     }
 }
