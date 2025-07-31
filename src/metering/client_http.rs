@@ -25,7 +25,7 @@ impl MeteringClientHttp {
 }
 
 impl MeteringClient for MeteringClientHttp {
-    fn push_metering_data(&self, guid: &String, data: &MeteringDataJson) -> MeteringResult<()> {
+    fn push_metering_data(&self, guid: &str, data: &MeteringDataJson) -> MeteringResult<()> {
         // TODO: implement token renewal.
         // For now get a new access token each time, avoiding the need for renewals. We don't expect high
         // frequency calls for metering, so it should be OK for now, but once we implement renewals for
