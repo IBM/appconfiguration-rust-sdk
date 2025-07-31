@@ -14,8 +14,8 @@
 
 use crate::Property;
 
-use super::property_snapshot::PropertySnapshot;
 use super::AppConfigurationClient;
+use crate::models::PropertySnapshot;
 use crate::value::Value;
 use crate::Entity;
 

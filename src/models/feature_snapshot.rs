@@ -17,10 +17,13 @@ use crate::metering::{MeteringRecorderSender, MeteringSubject};
 use crate::value::Value;
 use crate::Feature;
 
-use super::feature_proxy::random_value;
 use crate::segment_evaluation::TargetingRules;
 
 use crate::errors::Result;
+
+use std::io::Cursor;
+
+use murmur3::murmur3_32;
 
 /// Provides a snapshot of a [`Feature`].
 #[derive(Debug)]
@@ -134,6 +137,15 @@ impl Feature for FeatureSnapshot {
         let value = self.get_value(entity)?;
         value.try_into()
     }
+}
+
+pub(crate) fn random_value(v: &str) -> u32 {
+    let max_hash = u32::MAX;
+    (f64::from(hash(v)) / f64::from(max_hash) * 100.0) as u32
+}
+
+fn hash(v: &str) -> u32 {
+    murmur3_32(&mut Cursor::new(v), 0).expect("Cannot hash the value.")
 }
 
 #[cfg(test)]

@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::Cursor;
-
-use murmur3::murmur3_32;
-
 use crate::entity::Entity;
 use crate::{Feature, Value};
 
-use super::feature_snapshot::FeatureSnapshot;
 use super::AppConfigurationClient;
+use crate::models::FeatureSnapshot;
 
 /// Provides live-updated data for a given [`Feature`].
 pub struct FeatureProxy<'a> {
@@ -60,13 +56,4 @@ impl Feature for FeatureProxy<'_> {
             .get_feature(&self.feature_id)?
             .get_value_into(entity)
     }
-}
-
-pub(crate) fn random_value(v: &str) -> u32 {
-    let max_hash = u32::MAX;
-    (f64::from(hash(v)) / f64::from(max_hash) * 100.0) as u32
-}
-
-fn hash(v: &str) -> u32 {
-    murmur3_32(&mut Cursor::new(v), 0).expect("Cannot hash the value.")
 }

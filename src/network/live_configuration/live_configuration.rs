@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use super::current_mode::CurrentModeOfflineReason;
 use super::update_thread_worker::UpdateThreadWorker;
 use super::{CurrentMode, Error, OfflineMode, Result};
-use crate::client::configuration::Configuration;
+use crate::models::Configuration;
 use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus};
 use crate::{ConfigurationId, ConfigurationProvider};
@@ -127,10 +127,7 @@ impl ConfigurationProvider for LiveConfigurationImpl {
         self.get_configuration()?.get_feature_ids()
     }
 
-    fn get_feature(
-        &self,
-        feature_id: &str,
-    ) -> crate::Result<crate::client::feature_snapshot::FeatureSnapshot> {
+    fn get_feature(&self, feature_id: &str) -> crate::Result<crate::models::FeatureSnapshot> {
         self.get_configuration()?.get_feature(feature_id)
     }
 
@@ -138,10 +135,7 @@ impl ConfigurationProvider for LiveConfigurationImpl {
         self.get_configuration()?.get_property_ids()
     }
 
-    fn get_property(
-        &self,
-        property_id: &str,
-    ) -> crate::Result<crate::client::property_snapshot::PropertySnapshot> {
+    fn get_property(&self, property_id: &str) -> crate::Result<crate::models::PropertySnapshot> {
         self.get_configuration()?.get_property(property_id)
     }
 
