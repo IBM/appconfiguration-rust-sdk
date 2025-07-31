@@ -55,7 +55,7 @@ impl ConfigurationJson {
 #[cfg(test)]
 pub(crate) mod fixtures {
 
-    use crate::client::configuration::Configuration;
+    use crate::models::Configuration;
     use crate::network::serialization::config_value::ConfigValue;
     use crate::network::serialization::segments::Segments;
     use crate::network::serialization::{Feature, Property, Rule, SegmentRule, ValueType};

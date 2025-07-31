@@ -21,7 +21,7 @@ use crate::ConfigurationDataError;
 
 use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
-use super::ConfigurationProvider;
+use crate::ConfigurationProvider;
 
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.

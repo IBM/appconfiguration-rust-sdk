@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::feature_snapshot::FeatureSnapshot;
-use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
+use crate::models::{FeatureSnapshot, PropertySnapshot};
 use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
 use crate::{ConfigurationProvider, IBMCloudTokenProvider, OfflineMode};

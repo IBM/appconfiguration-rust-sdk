@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use crate::client::configuration::Configuration;
+use crate::models::Configuration;
 use crate::{AppConfigurationClient, ConfigurationProvider};
 use crate::{AppConfigurationOffline, Value};
 use rstest::*;
