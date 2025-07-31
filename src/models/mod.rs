@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod app_configuration_client;
-pub(crate) mod app_configuration_http;
-mod app_configuration_ibm_cloud;
-mod app_configuration_offline;
+//! Application internal models.
+//!
+//! All input data is converted to these models as soon as possible and
+//! all the operations run on these models.
+//!
+//! These models are also internal to the application so they can
+//! evolve without breaking the API offered to users.
+//!
 
-pub(crate) mod feature_proxy;
-pub(crate) mod property_proxy;
+mod configuration;
+mod feature_snapshot;
+mod property_snapshot;
 
-pub use app_configuration_client::{
-    AppConfigurationClient, ConfigurationId, ConfigurationProvider,
-};
-
-pub use app_configuration_ibm_cloud::AppConfigurationClientIBMCloud;
-pub use app_configuration_offline::AppConfigurationOffline;
+pub(crate) use configuration::Configuration;
+pub(crate) use feature_snapshot::FeatureSnapshot;
+pub(crate) use property_snapshot::PropertySnapshot;

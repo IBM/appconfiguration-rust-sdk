@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::{NetworkError, NetworkResult, TokenProvider};
-use crate::client::configuration::Configuration;
+use crate::models::Configuration;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;

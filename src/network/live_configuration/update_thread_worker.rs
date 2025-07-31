@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use super::current_mode::CurrentModeOfflineReason;
 use super::CurrentMode;
 use super::{Error, Result};
-use crate::client::configuration::Configuration;
+use crate::models::Configuration;
 use crate::network::http_client::{ServerClient, WebsocketReader};
 use crate::network::NetworkError;
 use crate::ConfigurationId;

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::feature_snapshot::FeatureSnapshot;
-use crate::client::property_snapshot::PropertySnapshot;
 use crate::errors::Result;
+use crate::models::{FeatureSnapshot, PropertySnapshot};
 
 use crate::metering::{start_metering, MeteringClientHttp, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
@@ -96,8 +95,8 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::configuration::Configuration;
     use crate::metering::metering::tests::start_metering_mock;
+    use crate::models::Configuration;
     use crate::network::live_configuration::CurrentMode;
     use crate::network::serialization::fixtures::{
         configuration_feature1_enabled, configuration_property1_enabled,

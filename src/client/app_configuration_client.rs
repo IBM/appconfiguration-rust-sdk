@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use crate::client::feature_proxy::FeatureProxy;
-use crate::client::feature_snapshot::FeatureSnapshot;
 use crate::client::property_proxy::PropertyProxy;
-use crate::client::property_snapshot::PropertySnapshot;
+use crate::models::{FeatureSnapshot, PropertySnapshot};
 use crate::Result;
 /// Identifies a configuration
 #[derive(Debug, Clone)]
