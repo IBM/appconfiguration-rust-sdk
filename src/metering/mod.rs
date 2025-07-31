@@ -16,6 +16,7 @@ mod client;
 mod client_http;
 mod errors;
 mod models;
+mod serialization;
 
 pub(crate) mod metering;
 

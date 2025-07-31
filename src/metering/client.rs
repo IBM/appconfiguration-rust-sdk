@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::MeteringResult;
-use crate::metering::models::MeteringDataJson;
+use crate::metering::serialization::MeteringDataJson;
 
 pub(crate) trait MeteringClient: Send + 'static {
     fn push_metering_data(&self, guid: &String, data: &MeteringDataJson) -> MeteringResult<()>;

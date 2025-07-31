@@ -1,4 +1,4 @@
-use crate::metering::models::MeteringDataJson;
+use crate::metering::serialization::MeteringDataJson;
 use crate::metering::{MeteringClient, MeteringError, MeteringResult};
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
@@ -104,11 +104,7 @@ pub(crate) mod tests {
             Box::new(MockTokenProvider {}),
         );
 
-        let data = MeteringDataJson {
-            collection_id: "test".to_string(),
-            environment_id: "dev".to_string(),
-            usages: Vec::new(),
-        };
+        let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
 
         let result = client.push_metering_data(&"example_guid".to_string(), &data);
 
@@ -130,11 +126,7 @@ pub(crate) mod tests {
             Box::new(MockTokenProvider {}),
         );
 
-        let data = MeteringDataJson {
-            collection_id: "test".to_string(),
-            environment_id: "dev".to_string(),
-            usages: Vec::new(),
-        };
+        let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
 
         let result = client.push_metering_data(&"example_guid".to_string(), &data);
 
