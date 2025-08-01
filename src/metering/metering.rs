@@ -14,7 +14,10 @@
 
 use log::warn;
 
-use crate::metering::models::MeteringDataJson;
+use crate::metering::models::{
+    EvaluationData, EvaluationEvent, EvaluationEventData, MeteringKey, SubjectId,
+};
+use crate::metering::serialization::MeteringDataJson;
 use crate::metering::MeteringClient;
 use crate::models::{FeatureSnapshot, PropertySnapshot};
 use crate::network::serialization::Segment;
@@ -135,38 +138,6 @@ impl MeteringSubject for FeatureSnapshot {
     }
 }
 
-pub(crate) enum SubjectId {
-    Feature(String),
-    Property(String),
-}
-
-pub(crate) struct EvaluationEventData {
-    /// ID if the subject being evaluated. E.g. feature ID.
-    pub subject_id: SubjectId,
-    /// The ID of the Entity against which the subject was evaluated.
-    pub entity_id: String,
-    /// If applicable, the segment the subject was associated to during evaluation.
-    pub segment_id: Option<String>,
-}
-
-pub(crate) enum EvaluationEvent {
-    Feature(EvaluationEventData),
-    Property(EvaluationEventData),
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
-struct MeteringKey {
-    feature_id: Option<String>,
-    property_id: Option<String>,
-    entity_id: String,
-    segment_id: Option<String>,
-}
-
-struct EvaluationData {
-    number_of_evaluations: u32,
-    time_of_last_evaluation: chrono::DateTime<chrono::Utc>,
-}
-
 /// The responsibility of the MeteringBatcher is to aggregate evaluation events and batch them for transmission to the server.
 struct MeteringBatcher<T: MeteringClient> {
     evaluations: std::collections::HashMap<MeteringKey, EvaluationData>,
@@ -184,69 +155,47 @@ impl<T: MeteringClient> MeteringBatcher<T> {
     }
 
     fn handle_event(&mut self, event: EvaluationEvent) {
-        let (feature_id, property_id, entity_id, segment_id) = match event {
-            EvaluationEvent::Feature(data) => (
-                match data.subject_id {
-                    SubjectId::Feature(ref id) => Some(id.clone()),
-                    _ => None,
-                },
-                None,
-                data.entity_id,
-                data.segment_id,
-            ),
-            EvaluationEvent::Property(data) => (
-                None,
-                match data.subject_id {
-                    SubjectId::Property(ref id) => Some(id.clone()),
-                    _ => None,
-                },
-                data.entity_id,
-                data.segment_id,
-            ),
+        let key = match event {
+            EvaluationEvent::Feature(data) => match data.subject_id {
+                SubjectId::Feature(ref id) => {
+                    MeteringKey::from_feature(id.clone(), data.entity_id, data.segment_id)
+                }
+                _ => unreachable!(
+                    "If it's a EvaluationEvent::Feature inside it contains a SubjectId::Feature"
+                ),
+            },
+            EvaluationEvent::Property(data) => match data.subject_id {
+                SubjectId::Property(ref id) => {
+                    MeteringKey::from_property(id.clone(), data.entity_id, data.segment_id)
+                }
+                _ => unreachable!(
+                    "If it's a EvaluationEvent::Property inside it contains a SubjectId::Property"
+                ),
+            },
         };
-        let key = MeteringKey {
-            feature_id: feature_id.clone(),
-            property_id: property_id.clone(),
-            entity_id: entity_id.clone(),
-            segment_id: segment_id.clone(),
-        };
-        let now = chrono::Utc::now();
+
         self.evaluations
             .entry(key)
             .and_modify(|v| {
-                v.number_of_evaluations += 1;
-                v.time_of_last_evaluation = now;
+                v.add_one();
             })
-            .or_insert(EvaluationData {
-                number_of_evaluations: 1,
-                time_of_last_evaluation: now,
-            });
+            .or_default();
     }
 
     fn flush(&mut self) {
         if self.evaluations.is_empty() {
             return;
         }
-        let usages: Vec<crate::metering::models::MeteringDataUsageJson> = self
-            .evaluations
-            .iter()
-            .map(
-                |(key, value)| crate::metering::models::MeteringDataUsageJson {
-                    feature_id: key.feature_id.clone(),
-                    property_id: key.property_id.clone(),
-                    entity_id: key.entity_id.clone(),
-                    segment_id: key.segment_id.clone(),
-                    evaluation_time: value.time_of_last_evaluation,
-                    count: value.number_of_evaluations,
-                },
-            )
-            .collect();
 
-        let json_data = MeteringDataJson {
-            collection_id: self.config_id.collection_id.to_string(),
-            environment_id: self.config_id.environment_id.to_string(),
-            usages,
-        };
+        let mut json_data = MeteringDataJson::new(
+            self.config_id.collection_id.clone(),
+            self.config_id.environment_id.clone(),
+        );
+
+        for evaluation in self.evaluations.iter() {
+            json_data.add_usage(evaluation.0, evaluation.1);
+        }
+
         let _ = self
             .client
             .push_metering_data(&self.config_id.guid, &json_data);
@@ -277,11 +226,7 @@ pub(crate) mod tests {
     }
 
     impl MeteringClient for MeteringClientMock {
-        fn push_metering_data(
-            &self,
-            _guid: &String,
-            data: &MeteringDataJson,
-        ) -> MeteringResult<()> {
+        fn push_metering_data(&self, _guid: &str, data: &MeteringDataJson) -> MeteringResult<()> {
             self.metering_data_sender.send(data.clone()).unwrap();
             Ok(())
         }

@@ -1,4 +1,4 @@
-use crate::metering::models::MeteringDataJson;
+use crate::metering::serialization::MeteringDataJson;
 use crate::metering::{MeteringClient, MeteringError, MeteringResult};
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
@@ -18,14 +18,14 @@ impl MeteringClientHttp {
         token_provider: Box<dyn TokenProvider>,
     ) -> MeteringClientHttp {
         Self {
-            service_address: service_address,
-            token_provider: token_provider,
+            service_address,
+            token_provider,
         }
     }
 }
 
 impl MeteringClient for MeteringClientHttp {
-    fn push_metering_data(&self, guid: &String, data: &MeteringDataJson) -> MeteringResult<()> {
+    fn push_metering_data(&self, guid: &str, data: &MeteringDataJson) -> MeteringResult<()> {
         // TODO: implement token renewal.
         // For now get a new access token each time, avoiding the need for renewals. We don't expect high
         // frequency calls for metering, so it should be OK for now, but once we implement renewals for
@@ -104,11 +104,7 @@ pub(crate) mod tests {
             Box::new(MockTokenProvider {}),
         );
 
-        let data = MeteringDataJson {
-            collection_id: "test".to_string(),
-            environment_id: "dev".to_string(),
-            usages: Vec::new(),
-        };
+        let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
 
         let result = client.push_metering_data(&"example_guid".to_string(), &data);
 
@@ -130,11 +126,7 @@ pub(crate) mod tests {
             Box::new(MockTokenProvider {}),
         );
 
-        let data = MeteringDataJson {
-            collection_id: "test".to_string(),
-            environment_id: "dev".to_string(),
-            usages: Vec::new(),
-        };
+        let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
 
         let result = client.push_metering_data(&"example_guid".to_string(), &data);
 

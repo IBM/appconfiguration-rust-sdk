@@ -12,28 +12,74 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Utc};
-use serde::Serialize;
+pub(crate) enum SubjectId {
+    Feature(String),
+    Property(String),
+}
 
-#[derive(Debug, Clone, Serialize)]
-pub struct MeteringDataUsageJson {
+pub(crate) struct EvaluationEventData {
+    /// ID if the subject being evaluated. E.g. feature ID.
+    pub subject_id: SubjectId,
+    /// The ID of the Entity against which the subject was evaluated.
+    pub entity_id: String,
+    /// If applicable, the segment the subject was associated to during evaluation.
+    pub segment_id: Option<String>,
+}
+
+pub(crate) enum EvaluationEvent {
+    Feature(EvaluationEventData),
+    Property(EvaluationEventData),
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub(crate) struct MeteringKey {
     pub feature_id: Option<String>,
     pub property_id: Option<String>,
     pub entity_id: String,
-    // Serialized as "nil" when None
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub segment_id: Option<String>,
-    // When this evaluation was last done
-    pub evaluation_time: DateTime<Utc>,
-    // how often this was evaluated
-    pub count: u32,
 }
 
-/// Represents Metering data in a structure for data exchange used for
-/// sending to the server.
-#[derive(Debug, Clone, Serialize)]
-pub struct MeteringDataJson {
-    pub collection_id: String,
-    pub environment_id: String,
-    pub usages: Vec<MeteringDataUsageJson>,
+impl MeteringKey {
+    pub fn from_feature(feature_id: String, entity_id: String, segment_id: Option<String>) -> Self {
+        Self {
+            feature_id: Some(feature_id),
+            property_id: None,
+            entity_id,
+            segment_id,
+        }
+    }
+
+    pub fn from_property(
+        property_id: String,
+        entity_id: String,
+        segment_id: Option<String>,
+    ) -> Self {
+        Self {
+            feature_id: None,
+            property_id: Some(property_id),
+            entity_id,
+            segment_id,
+        }
+    }
+}
+
+pub(crate) struct EvaluationData {
+    pub number_of_evaluations: u32,
+    pub time_of_last_evaluation: chrono::DateTime<chrono::Utc>,
+}
+
+impl Default for EvaluationData {
+    fn default() -> Self {
+        Self {
+            number_of_evaluations: 1,
+            time_of_last_evaluation: chrono::Utc::now(),
+        }
+    }
+}
+
+impl EvaluationData {
+    pub fn add_one(&mut self) {
+        self.number_of_evaluations += 1;
+        self.time_of_last_evaluation = chrono::Utc::now();
+    }
 }
