@@ -87,6 +87,7 @@ impl IBMCloudTokenProvider {
 struct AccessTokenResponse {
     access_token: String,
     expires_in: u64,
+    // We are discarding some fields:
     // refresh_token: String, // "not_supported"
     // token_type: String,    // "Bearer"
     // expiration: u64,       // 1755854106 <- unix time when it expires

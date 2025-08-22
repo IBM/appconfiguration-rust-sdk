@@ -14,6 +14,7 @@
 
 use super::{NetworkError, NetworkResult, TokenProvider};
 use crate::models::Configuration;
+use crate::network::serialization::ConfigurationJson;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::sync::Arc;
@@ -135,7 +136,7 @@ impl ServerClient for ServerClientImpl {
         );
         let url = Url::parse(&url).map_err(|_| NetworkError::UrlParseError(url))?;
         let client = Client::new();
-        let r = client
+        let config_json = client
             .get(url)
             .query(&[
                 ("action", "sdkConfig"),
@@ -145,30 +146,14 @@ impl ServerClient for ServerClientImpl {
             .header("Accept", "application/json")
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
             .bearer_auth(self.token_provider.get_access_token()?)
-            .send();
+            .send()?
+            .json::<ConfigurationJson>()
+            .map_err(|_| NetworkError::ProtocolError)?;
 
-        match r {
-            Ok(response) => {
-                // TODO: Handle response.status()
-                let config_json = response.json().map_err(|_| NetworkError::ProtocolError)?;
-                Ok(Configuration::new(
-                    &configuration_id.environment_id,
-                    config_json,
-                )?)
-            }
-            Err(e) => {
-                // TODO: Identify if token expired, get new one and retry
-                // NOTE: bad status might not necessarily map to a reqwest error.
-                // For metering there is a test where server returns a bad status (e.g. Token expired).
-                // In this test reqwest client returns Ok(response). So if we intend to do token renewal,
-                // this Err(e) match arm might not be the right place.
-                // if false {
-                //     let access_token = self.token_provider.get_access_token()?;
-                //     self.access_token.replace(access_token);
-                // }
-                Err(e.into())
-            }
-        }
+        Ok(Configuration::new(
+            &configuration_id.environment_id,
+            config_json,
+        )?)
     }
 
     fn get_configuration_monitoring_websocket(
