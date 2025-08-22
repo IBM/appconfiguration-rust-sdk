@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cell::RefCell, collections::HashMap, sync::RwLock};
+use std::{collections::HashMap, sync::RwLock};
 
 use super::{NetworkError, NetworkResult};
 use reqwest::blocking::Client;
@@ -35,29 +35,13 @@ pub trait TokenProvider: std::fmt::Debug + Send + Sync {
 //     }
 // }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct AccessToken {
     token: String,
     expiration: u64,
 }
 
-impl Default for AccessToken {
-    fn default() -> Self {
-        Self {
-            token: Default::default(),
-            expiration: 0,
-        }
-    }
-}
-
 impl AccessToken {
-    pub fn new(token: String, expires_in: u64) -> Self {
-        Self {
-            token,
-            expiration: std::time::UNIX_EPOCH.elapsed().unwrap().as_secs() + expires_in,
-        }
-    }
-
     pub fn expired(&self) -> bool {
         let now = std::time::UNIX_EPOCH.elapsed().unwrap().as_secs();
         now >= self.expiration
@@ -83,8 +67,8 @@ impl IBMCloudTokenProvider {
         }
     }
 
-    fn expired(&self) -> bool {
-        self.access_token.read().map_or(false, |t| t.expired())
+    pub fn expired(&self) -> bool {
+        self.access_token.read().is_ok_and(|t| t.expired())
     }
 
     fn renew_token(&self) -> NetworkResult<()> {
@@ -115,17 +99,11 @@ impl IBMCloudTokenProvider {
 #[derive(Deserialize)]
 struct AccessTokenResponse {
     access_token: String,
+    expires_in: u64,
     // refresh_token: String, // "not_supported"
     // token_type: String,    // "Bearer"
-    expires_in: u64, // 3600
-                     // expiration: u64,       // 1755854106 <- unix time when it expires
-                     // scope: String,         // "ibm openid"
-}
-
-impl Into<AccessToken> for AccessTokenResponse {
-    fn into(self) -> AccessToken {
-        AccessToken::new(self.access_token, self.expires_in)
-    }
+    // expiration: u64,       // 1755854106 <- unix time when it expires
+    // scope: String,         // "ibm openid"
 }
 
 impl TokenProvider for IBMCloudTokenProvider {

@@ -16,7 +16,6 @@ use super::{NetworkError, NetworkResult, TokenProvider};
 use crate::models::Configuration;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
-use std::cell::RefCell;
 use std::sync::Arc;
 
 use tungstenite::client::IntoClientRequest;
