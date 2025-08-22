@@ -55,7 +55,7 @@ impl IBMCloudTokenProvider {
     }
 
     pub fn expired(&self) -> bool {
-        self.access_token.read().is_ok_and(|t| t.expired())
+        self.access_token.read().map_or(true, |t| t.expired())
     }
 
     fn renew_token(&self) -> NetworkResult<()> {
