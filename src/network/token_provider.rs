@@ -103,3 +103,41 @@ impl TokenProvider for IBMCloudTokenProvider {
         Ok(self.access_token.read()?.token.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_access_token() {
+        let mut access_token = AccessToken::default();
+        assert!(access_token.expired());
+
+        access_token.renew("something".to_string(), 10);
+        assert!(!access_token.expired());
+        assert_eq!(access_token.token, "something".to_string());
+    }
+
+    #[test]
+    fn test_ibm_cloud_token_provider() {
+        let provider = IBMCloudTokenProvider::new("apikey");
+        assert!(provider.expired());
+
+        // If the token is expired, it will try to renew it when requesting it
+        assert!(matches!(
+            provider.get_access_token().unwrap_err(),
+            NetworkError::ReqwestError(_)
+        ));
+
+        // If it has not expired, it will just return the token
+        provider
+            .access_token
+            .write()
+            .unwrap()
+            .renew("the-token".to_string(), 10);
+        assert_eq!(
+            provider.get_access_token().unwrap(),
+            "the-token".to_string()
+        );
+    }
+}
