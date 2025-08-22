@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::metering::serialization::MeteringDataJson;
 use crate::metering::{MeteringClient, MeteringError, MeteringResult};
 use crate::network::NetworkError;
@@ -9,13 +11,13 @@ use url::Url;
 #[derive(Debug)]
 pub(crate) struct MeteringClientHttp {
     service_address: ServiceAddress,
-    token_provider: Box<dyn TokenProvider>,
+    token_provider: Arc<Box<dyn TokenProvider>>,
 }
 
 impl MeteringClientHttp {
     pub(crate) fn new(
         service_address: ServiceAddress,
-        token_provider: Box<dyn TokenProvider>,
+        token_provider: Arc<Box<dyn TokenProvider>>,
     ) -> MeteringClientHttp {
         Self {
             service_address,
@@ -26,12 +28,6 @@ impl MeteringClientHttp {
 
 impl MeteringClient for MeteringClientHttp {
     fn push_metering_data(&self, guid: &str, data: &MeteringDataJson) -> MeteringResult<()> {
-        // TODO: implement token renewal.
-        // For now get a new access token each time, avoiding the need for renewals. We don't expect high
-        // frequency calls for metering, so it should be OK for now, but once we implement renewals for
-        // the config endpoint, we might want to change it here too:
-        let token = self.token_provider.get_access_token()?;
-
         let url = format!(
             "{}/apprapp/events/v1/instances/{}/usage",
             self.service_address.base_url(ServiceAddressProtocol::Http),
@@ -42,7 +38,7 @@ impl MeteringClient for MeteringClientHttp {
         let r = client
             .post(url)
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
-            .bearer_auth(&token)
+            .bearer_auth(self.token_provider.get_access_token()?)
             .json(data)
             .send();
 

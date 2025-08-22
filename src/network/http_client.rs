@@ -17,6 +17,7 @@ use crate::models::Configuration;
 use crate::ConfigurationId;
 use reqwest::blocking::Client;
 use std::cell::RefCell;
+use std::sync::Arc;
 
 use tungstenite::client::IntoClientRequest;
 
@@ -108,24 +109,17 @@ pub trait ServerClient: Send + 'static {
 #[derive(Debug)]
 pub(crate) struct ServerClientImpl {
     service_address: ServiceAddress,
-    token_provider: Box<dyn TokenProvider>,
-
-    // FIXME: If we test that this object is not Send+Sync, is it safe to
-    // assume that the RefCell will never be borrowed and replaced at the
-    // same time?
-    access_token: RefCell<String>,
+    token_provider: Arc<Box<dyn TokenProvider>>,
 }
 
 impl ServerClientImpl {
     pub fn new(
         service_address: ServiceAddress,
-        token_provider: Box<dyn TokenProvider>,
+        token_provider: Arc<Box<dyn TokenProvider>>,
     ) -> NetworkResult<Self> {
-        let access_token = RefCell::new(token_provider.get_access_token()?);
         Ok(Self {
             service_address,
             token_provider,
-            access_token,
         })
     }
 }
@@ -151,7 +145,7 @@ impl ServerClient for ServerClientImpl {
             ])
             .header("Accept", "application/json")
             .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
-            .bearer_auth(self.access_token.borrow())
+            .bearer_auth(self.token_provider.get_access_token()?)
             .send();
 
         match r {
@@ -169,10 +163,10 @@ impl ServerClient for ServerClientImpl {
                 // For metering there is a test where server returns a bad status (e.g. Token expired).
                 // In this test reqwest client returns Ok(response). So if we intend to do token renewal,
                 // this Err(e) match arm might not be the right place.
-                if false {
-                    let access_token = self.token_provider.get_access_token()?;
-                    self.access_token.replace(access_token);
-                }
+                // if false {
+                //     let access_token = self.token_provider.get_access_token()?;
+                //     self.access_token.replace(access_token);
+                // }
                 Err(e.into())
             }
         }
@@ -207,7 +201,7 @@ impl ServerClient for ServerClientImpl {
         );
         headers.insert(
             "Authorization",
-            format!("Bearer {}", self.access_token.borrow())
+            format!("Bearer {}", self.token_provider.get_access_token()?)
                 .parse()
                 .map_err(|_| NetworkError::InvalidHeaderValue("Authorization".to_string()))?,
         );

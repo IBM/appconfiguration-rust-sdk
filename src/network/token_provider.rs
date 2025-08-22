@@ -12,49 +12,82 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, sync::RwLock};
 
 use super::{NetworkError, NetworkResult};
 use reqwest::blocking::Client;
 use serde::Deserialize;
 
-pub trait TokenProvider: std::fmt::Debug + Send + Sync + TokenProviderDynClone {
+pub trait TokenProvider: std::fmt::Debug + Send + Sync {
     fn get_access_token(&self) -> NetworkResult<String>;
 }
 
-pub trait TokenProviderDynClone {
-    fn dyn_clone(&self) -> Box<dyn TokenProvider>;
+// pub trait TokenProviderDynClone {
+//     fn dyn_clone(&self) -> Box<dyn TokenProvider>;
+// }
+
+// impl<T> TokenProviderDynClone for T
+// where
+//     T: 'static + TokenProvider + Clone,
+// {
+//     fn dyn_clone(&self) -> Box<dyn TokenProvider> {
+//         Box::new(self.clone())
+//     }
+// }
+
+#[derive(Debug)]
+struct AccessToken {
+    token: String,
+    expiration: u64,
 }
 
-impl<T> TokenProviderDynClone for T
-where
-    T: 'static + TokenProvider + Clone,
-{
-    fn dyn_clone(&self) -> Box<dyn TokenProvider> {
-        Box::new(self.clone())
+impl Default for AccessToken {
+    fn default() -> Self {
+        Self {
+            token: Default::default(),
+            expiration: 0,
+        }
     }
 }
 
-#[derive(Debug, Clone)]
+impl AccessToken {
+    pub fn new(token: String, expires_in: u64) -> Self {
+        Self {
+            token,
+            expiration: std::time::UNIX_EPOCH.elapsed().unwrap().as_secs() + expires_in,
+        }
+    }
+
+    pub fn expired(&self) -> bool {
+        let now = std::time::UNIX_EPOCH.elapsed().unwrap().as_secs();
+        now >= self.expiration
+    }
+
+    pub fn renew(&mut self, token: String, expires_in: u64) {
+        self.token = token;
+        self.expiration = std::time::UNIX_EPOCH.elapsed().unwrap().as_secs() + expires_in;
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct IBMCloudTokenProvider {
     apikey: String,
+    access_token: RwLock<AccessToken>,
 }
 
 impl IBMCloudTokenProvider {
     pub fn new(apikey: &str) -> Self {
         Self {
             apikey: apikey.to_string(),
+            access_token: RwLock::default(),
         }
     }
-}
 
-#[derive(Deserialize)]
-struct AccessTokenResponse {
-    access_token: String,
-}
+    fn expired(&self) -> bool {
+        self.access_token.read().map_or(false, |t| t.expired())
+    }
 
-impl TokenProvider for IBMCloudTokenProvider {
-    fn get_access_token(&self) -> NetworkResult<String> {
+    fn renew_token(&self) -> NetworkResult<()> {
         let mut form_data = HashMap::new();
         form_data.insert("reponse_type".to_string(), "cloud_iam".to_string());
         form_data.insert(
@@ -64,14 +97,43 @@ impl TokenProvider for IBMCloudTokenProvider {
         form_data.insert("apikey".to_string(), self.apikey.to_string());
 
         let client = Client::new();
-        Ok(client
+        let new_token = client
             .post("https://iam.cloud.ibm.com/identity/token")
             .header("Accept", "application/json")
             .form(&form_data)
             .send()
             .map_err(NetworkError::ReqwestError)?
             .json::<AccessTokenResponse>()
-            .map_err(NetworkError::ReqwestError)? // FIXME: This is a deserialization error (extract it from Reqwest)
-            .access_token)
+            .map_err(NetworkError::ReqwestError)?; // FIXME: This is a deserialization error (extract it from Reqwest)
+
+        let mut access_token = self.access_token.write()?;
+        access_token.renew(new_token.access_token, new_token.expires_in);
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
+struct AccessTokenResponse {
+    access_token: String,
+    // refresh_token: String, // "not_supported"
+    // token_type: String,    // "Bearer"
+    expires_in: u64, // 3600
+                     // expiration: u64,       // 1755854106 <- unix time when it expires
+                     // scope: String,         // "ibm openid"
+}
+
+impl Into<AccessToken> for AccessTokenResponse {
+    fn into(self) -> AccessToken {
+        AccessToken::new(self.access_token, self.expires_in)
+    }
+}
+
+impl TokenProvider for IBMCloudTokenProvider {
+    fn get_access_token(&self) -> NetworkResult<String> {
+        if self.access_token.read()?.expired() {
+            self.renew_token()?;
+        }
+
+        Ok(self.access_token.read()?.token.to_string())
     }
 }

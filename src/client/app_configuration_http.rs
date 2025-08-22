@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use crate::errors::Result;
 use crate::models::{FeatureSnapshot, PropertySnapshot};
 
@@ -47,8 +49,8 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         configuration_id: ConfigurationId,
         offline_mode: OfflineMode,
     ) -> Result<Self> {
-        let server_client =
-            ServerClientImpl::new(service_address.clone(), token_provider.dyn_clone())?;
+        let token_provider = Arc::new(token_provider);
+        let server_client = ServerClientImpl::new(service_address.clone(), token_provider.clone())?;
         let metering_client = MeteringClientHttp::new(service_address, token_provider);
 
         let metering = start_metering(
