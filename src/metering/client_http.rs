@@ -97,12 +97,12 @@ pub(crate) mod tests {
 
         let client = MeteringClientHttp::new(
             ServiceAddress::new_without_ssl(server.host(), Some(server.port()), None),
-            Box::new(MockTokenProvider {}),
+            Arc::new(Box::new(MockTokenProvider {})),
         );
 
         let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
 
-        let result = client.push_metering_data(&"example_guid".to_string(), &data);
+        let result = client.push_metering_data("example_guid", &data);
 
         assert!(result.is_ok());
         mock.assert();
@@ -119,12 +119,12 @@ pub(crate) mod tests {
 
         let client = MeteringClientHttp::new(
             ServiceAddress::new_without_ssl(server.host(), Some(server.port()), None),
-            Box::new(MockTokenProvider {}),
+            Arc::new(Box::new(MockTokenProvider {})),
         );
 
         let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
 
-        let result = client.push_metering_data(&"example_guid".to_string(), &data);
+        let result = client.push_metering_data("example_guid", &data);
 
         assert!(matches!(result, Err(MeteringError::DataNotAccepted(_))));
         mock.assert();

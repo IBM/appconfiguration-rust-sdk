@@ -22,19 +22,6 @@ pub trait TokenProvider: std::fmt::Debug + Send + Sync {
     fn get_access_token(&self) -> NetworkResult<String>;
 }
 
-// pub trait TokenProviderDynClone {
-//     fn dyn_clone(&self) -> Box<dyn TokenProvider>;
-// }
-
-// impl<T> TokenProviderDynClone for T
-// where
-//     T: 'static + TokenProvider + Clone,
-// {
-//     fn dyn_clone(&self) -> Box<dyn TokenProvider> {
-//         Box::new(self.clone())
-//     }
-// }
-
 #[derive(Debug, Default)]
 struct AccessToken {
     token: String,
