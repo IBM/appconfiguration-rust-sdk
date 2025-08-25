@@ -133,6 +133,10 @@ mod tests {
         access_token.renew("something".to_string(), 10);
         assert!(!access_token.expired());
         assert_eq!(access_token.token, "something".to_string());
+
+        // If it expires in zero seconds, it's actually expired already
+        access_token.renew("token".to_string(), 0);
+        assert!(access_token.expired());
     }
 
     #[test]
