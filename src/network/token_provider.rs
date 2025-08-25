@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, sync::RwLock};
+use std::{cmp::max, collections::HashMap, sync::RwLock};
 
 use super::{NetworkError, NetworkResult};
 use reqwest::blocking::Client;
@@ -29,14 +29,15 @@ struct AccessToken {
 }
 
 impl AccessToken {
-    pub fn expired(&self) -> bool {
+    fn expired(&self) -> bool {
         let now = std::time::UNIX_EPOCH.elapsed().unwrap().as_secs();
         now >= self.expiration
     }
 
-    pub fn renew(&mut self, token: String, expires_in: u64) {
+    fn renew(&mut self, token: String, expires_in: u64) -> u64 {
         self.token = token;
         self.expiration = std::time::UNIX_EPOCH.elapsed().unwrap().as_secs() + expires_in;
+        self.expiration
     }
 }
 
@@ -54,11 +55,25 @@ impl IBMCloudTokenProvider {
         }
     }
 
-    pub fn expired(&self) -> bool {
+    fn expired(&self) -> bool {
         self.access_token.read().map_or(true, |t| t.expired())
     }
 
-    fn renew_token(&self) -> NetworkResult<()> {
+    fn safe_expires_in(expires_in: u64) -> u64 {
+        if expires_in == 0 {
+            expires_in
+        } else {
+            max((expires_in as f32 * 0.9f32) as u64, 1u64)
+        }
+    }
+
+    // Renews the stored token.
+    //
+    // It will use 90% of the expires_in value returned by the server
+    // to account for possible latencies and delays between token renewal and usage.
+    //
+    // It returns new expiration time (unix time)
+    fn renew_token(&self) -> NetworkResult<u64> {
         let mut form_data = HashMap::new();
         form_data.insert("reponse_type".to_string(), "cloud_iam".to_string());
         form_data.insert(
@@ -78,8 +93,10 @@ impl IBMCloudTokenProvider {
             .map_err(NetworkError::ReqwestError)?; // FIXME: This is a deserialization error (extract it from Reqwest)
 
         let mut access_token = self.access_token.write()?;
-        access_token.renew(new_token.access_token, new_token.expires_in);
-        Ok(())
+        Ok(access_token.renew(
+            new_token.access_token,
+            IBMCloudTokenProvider::safe_expires_in(new_token.expires_in),
+        ))
     }
 }
 
@@ -96,7 +113,7 @@ struct AccessTokenResponse {
 
 impl TokenProvider for IBMCloudTokenProvider {
     fn get_access_token(&self) -> NetworkResult<String> {
-        if self.access_token.read()?.expired() {
+        if self.expired() {
             self.renew_token()?;
         }
 
@@ -139,5 +156,15 @@ mod tests {
             provider.get_access_token().unwrap(),
             "the-token".to_string()
         );
+    }
+
+    #[test]
+    fn test_safe_expires_in() {
+        assert_eq!(IBMCloudTokenProvider::safe_expires_in(10), 9);
+        assert_eq!(IBMCloudTokenProvider::safe_expires_in(2), 1);
+
+        // Corner cases
+        assert_eq!(IBMCloudTokenProvider::safe_expires_in(0), 0);
+        assert_eq!(IBMCloudTokenProvider::safe_expires_in(1), 1);
     }
 }
