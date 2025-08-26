@@ -43,15 +43,21 @@ impl AccessToken {
 
 #[derive(Debug)]
 pub(crate) struct IBMCloudTokenProvider {
+    endpoint: String,
     apikey: String,
     access_token: RwLock<AccessToken>,
 }
 
 impl IBMCloudTokenProvider {
     pub fn new(apikey: &str) -> Self {
+        IBMCloudTokenProvider::new_with_endpoint(apikey, "https://iam.cloud.ibm.com/identity/token")
+    }
+
+    fn new_with_endpoint(apikey: &str, endpoint: &str) -> Self {
         Self {
             apikey: apikey.to_string(),
             access_token: RwLock::default(),
+            endpoint: endpoint.to_owned(),
         }
     }
 
@@ -84,7 +90,7 @@ impl IBMCloudTokenProvider {
 
         let client = Client::new();
         let new_token = client
-            .post("https://iam.cloud.ibm.com/identity/token")
+            .post(&self.endpoint)
             .header("Accept", "application/json")
             .form(&form_data)
             .send()
@@ -123,7 +129,11 @@ impl TokenProvider for IBMCloudTokenProvider {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+
+    use httpmock::Method::POST;
+    use httpmock::MockServer;
 
     #[test]
     fn test_access_token() {
@@ -140,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ibm_cloud_token_provider() {
+    fn test_ibm_cloud_token_provider_expiration_logic() {
         let provider = IBMCloudTokenProvider::new("apikey");
         assert!(provider.expired());
 
@@ -170,5 +180,40 @@ mod tests {
         // Corner cases
         assert_eq!(IBMCloudTokenProvider::safe_expires_in(0), 0);
         assert_eq!(IBMCloudTokenProvider::safe_expires_in(1), 1);
+    }
+
+    #[test]
+    fn test_ibm_cloud_token_provider_renew_call() {
+        let endpoint = "/give/me/a/token";
+        let apikey = "12345";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path(endpoint)
+                .header("Accept", "application/json")
+                .x_www_form_urlencoded_tuple("reponse_type", "cloud_iam")
+                .x_www_form_urlencoded_tuple("grant_type", "urn:ibm:params:oauth:grant-type:apikey")
+                .x_www_form_urlencoded_tuple("apikey", apikey);
+            then.status(200)
+                .header("content-type", "application/json")
+                .json_body(serde_json::json!(
+                    {
+                    "access_token": "the-new-token",
+                    "expires_in": 60
+                    }
+                ));
+        });
+
+        let token_provider = IBMCloudTokenProvider::new_with_endpoint(
+            apikey,
+            &std::format!("http://{}:{}{}", server.host(), server.port(), endpoint),
+        );
+        assert_eq!(token_provider.access_token.read().unwrap().token, "");
+        assert_eq!(token_provider.access_token.read().unwrap().expiration, 0);
+
+        let token = token_provider.get_access_token();
+        mock.assert();
+        assert_eq!(token.unwrap(), "the-new-token");
     }
 }
