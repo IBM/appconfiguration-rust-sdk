@@ -1,3 +1,4 @@
+[![Crates.io](https://img.shields.io/crates/v/appconfiguration.svg)](https://crates.io/crates/appconfiguration)
 {{badges}}
 
 # IBM Cloud App Configuration Rust SDK
