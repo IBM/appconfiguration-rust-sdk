@@ -1,3 +1,4 @@
+[![Crates.io](https://img.shields.io/crates/v/appconfiguration.svg)](https://crates.io/crates/appconfiguration)
 [![Workflow Status](https://github.com/IBM/appconfiguration-rust-sdk/workflows/main/badge.svg)](https://github.com/IBM/appconfiguration-rust-sdk/actions?query=workflow%3A%22main%22)
 
 # IBM Cloud App Configuration Rust SDK
