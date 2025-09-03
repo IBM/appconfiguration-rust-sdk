@@ -11,6 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::io::Cursor;
+
+use murmur3::murmur3_32;
 
 use crate::entity::Entity;
 use crate::metering::{MeteringRecorderSender, MeteringSubject};
@@ -20,10 +23,6 @@ use crate::Feature;
 use crate::segment_evaluation::TargetingRules;
 
 use crate::errors::Result;
-
-use std::io::Cursor;
-
-use murmur3::murmur3_32;
 
 /// Provides a snapshot of a [`Feature`].
 #[derive(Debug)]
@@ -99,11 +98,6 @@ impl FeatureSnapshot {
         }
     }
 
-    fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
-        let tag = format!("{}:{}", entity.get_id(), feature_id);
-        rollout_percentage == 100 || random_value(&tag) < rollout_percentage
-    }
-
     fn use_rollout_percentage_to_get_value_from_feature_directly(
         &self,
         entity: &impl Entity,
@@ -114,6 +108,16 @@ impl FeatureSnapshot {
         } else {
             Ok(self.disabled_value.clone())
         }
+    }
+
+    fn calculate_normalized_hash(data: &str) -> u32 {
+        let hash = murmur3_32(&mut Cursor::new(data), 0).expect("Cannot hash the value.");
+        (f64::from(hash) / f64::from(u32::MAX) * 100.0) as u32
+    }
+
+    fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
+        let tag = format!("{}:{}", entity.get_id(), feature_id);
+        rollout_percentage == 100 || Self::calculate_normalized_hash(&tag) < rollout_percentage
     }
 }
 
@@ -213,7 +217,9 @@ pub mod tests {
             attributes: entity_attributes.clone(),
         };
         assert_eq!(
-            random_value(format!("{}:{}", entity.id, feature.feature_id).as_str()),
+            FeatureSnapshot::calculate_normalized_hash(
+                format!("{}:{}", entity.id, feature.feature_id).as_str()
+            ),
             68
         );
         let value = feature.get_value(&entity).unwrap();
@@ -225,7 +231,9 @@ pub mod tests {
             attributes: entity_attributes,
         };
         assert_eq!(
-            random_value(format!("{}:{}", entity.id, feature.feature_id).as_str()),
+            FeatureSnapshot::calculate_normalized_hash(
+                format!("{}:{}", entity.id, feature.feature_id).as_str()
+            ),
             29
         );
         let value = feature.get_value(&entity).unwrap();
@@ -406,5 +414,9 @@ pub mod tests {
 
         let value = feature.get_value(&entity).unwrap();
         assert!(matches!(value, Value::Int64(ref v) if v == &2));
+    }
+
+    fn test_calculate_normalized_hash() {
+        assert_eq!(calculate_normalized_hash(&"".to_string()), 41)
     }
 }
