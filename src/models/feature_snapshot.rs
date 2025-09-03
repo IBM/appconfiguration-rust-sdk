@@ -264,7 +264,7 @@ pub mod tests {
                 Segment {
                     name: "".into(),
                     segment_id: "".into(),
-                    description: "".into(),
+                    description: None,
                     tags: None,
                     rules: vec![Rule {
                         attribute_name: "name".into(),
@@ -324,7 +324,7 @@ pub mod tests {
                 Segment {
                     name: "".into(),
                     segment_id: "".into(),
-                    description: "".into(),
+                    description: None,
                     tags: None,
                     rules: vec![Rule {
                         attribute_name: "name".into(),
@@ -371,7 +371,7 @@ pub mod tests {
                 Segment {
                     name: "".into(),
                     segment_id: "".into(),
-                    description: "".into(),
+                    description: None,
                     tags: None,
                     rules: vec![Rule {
                         attribute_name: "name".into(),
