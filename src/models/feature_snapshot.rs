@@ -99,14 +99,14 @@ impl FeatureSnapshot {
         }
     }
 
-    fn calculate_normalized_hash(data: &str) -> u32 {
+    fn normalized_hash(data: &str) -> u32 {
         let hash = murmur3_32(&mut Cursor::new(data), 0).expect("Cannot hash the value.");
         (f64::from(hash) / f64::from(u32::MAX) * 100.0) as u32
     }
 
     fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
         let tag = format!("{}:{}", entity.get_id(), feature_id);
-        rollout_percentage == 100 || Self::calculate_normalized_hash(&tag) < rollout_percentage
+        rollout_percentage == 100 || Self::normalized_hash(&tag) < rollout_percentage
     }
 
     fn use_rollout_percentage_to_get_value_from_feature_directly(
@@ -218,7 +218,7 @@ pub mod tests {
             attributes: entity_attributes.clone(),
         };
         assert_eq!(
-            FeatureSnapshot::calculate_normalized_hash(
+            FeatureSnapshot::normalized_hash(
                 format!("{}:{}", entity.id, feature.feature_id).as_str()
             ),
             68
@@ -232,7 +232,7 @@ pub mod tests {
             attributes: entity_attributes,
         };
         assert_eq!(
-            FeatureSnapshot::calculate_normalized_hash(
+            FeatureSnapshot::normalized_hash(
                 format!("{}:{}", entity.id, feature.feature_id).as_str()
             ),
             29
@@ -421,10 +421,7 @@ pub mod tests {
     /// See same test for Node client:
     /// https://github.com/IBM/appconfiguration-node-sdk/blob/master/test/unit/configurations/internal/utils.test.js#L25
     #[test]
-    fn test_calculate_normalized_hash() {
-        assert_eq!(
-            FeatureSnapshot::calculate_normalized_hash("entityId:featureId"),
-            41
-        )
+    fn test_normalized_hash() {
+        assert_eq!(FeatureSnapshot::normalized_hash("entityId:featureId"), 41)
     }
 }
