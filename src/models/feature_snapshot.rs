@@ -416,7 +416,14 @@ pub mod tests {
         assert!(matches!(value, Value::Int64(ref v) if v == &2));
     }
 
+    /// This test ensures that the rust client is using the same hashing algorithm as to other clients.
+    /// See same test for Node client:
+    /// https://github.com/IBM/appconfiguration-node-sdk/blob/master/test/unit/configurations/internal/utils.test.js#L25
+    #[test]
     fn test_calculate_normalized_hash() {
-        assert_eq!(calculate_normalized_hash(&"".to_string()), 41)
+        assert_eq!(
+            FeatureSnapshot::calculate_normalized_hash("entityId:featureId"),
+            41
+        )
     }
 }
