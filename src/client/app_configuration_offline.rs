@@ -15,6 +15,7 @@
 use crate::errors::Result;
 use crate::models::{Configuration, FeatureSnapshot, PropertySnapshot};
 use crate::ConfigurationProvider;
+use log::error;
 
 /// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
@@ -54,5 +55,15 @@ impl ConfigurationProvider for AppConfigurationOffline {
 
     fn is_online(&self) -> Result<bool> {
         Ok(false)
+    }
+
+    fn wait_until_online(&self) {
+        error!("Waiting for AppConfigurationOffline to get online. This will never happen.");
+        std::thread::park(); // block forever
+    }
+
+    fn wait_until_configuration_is_available(&self) {
+        // No wait required:
+        // AppConfigurationOffline always has a configuration available.
     }
 }

@@ -86,6 +86,14 @@ impl ConfigurationProvider for AppConfigurationClientIBMCloud {
     fn is_online(&self) -> Result<bool> {
         self.client.is_online()
     }
+
+    fn wait_until_online(&self) {
+        self.client.wait_until_online();
+    }
+
+    fn wait_until_configuration_is_available(&self) {
+        self.client.wait_until_configuration_is_available();
+    }
 }
 
 #[cfg(test)]
