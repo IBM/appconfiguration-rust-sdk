@@ -21,7 +21,7 @@ use crate::models::Configuration;
 use crate::network::http_client::ServerClient;
 use crate::network::live_configuration::current_mode;
 use crate::utils::{ThreadHandle, ThreadStatus};
-use crate::{ConfigurationId, ConfigurationProvider};
+use crate::{AppConfigurationOffline, ConfigurationId, ConfigurationProvider};
 
 /// A [`ConfigurationProvider`] that keeps the configuration updated with some
 /// third-party source using an asyncronous mechanism.
@@ -132,6 +132,8 @@ impl LiveConfigurationImpl {
     }
 }
 
+fn assert_type<T>(_val: T) {}
+
 impl ConfigurationProvider for LiveConfigurationImpl {
     fn get_feature_ids(&self) -> crate::Result<Vec<String>> {
         self.get_configuration()?.get_feature_ids()
@@ -154,11 +156,22 @@ impl ConfigurationProvider for LiveConfigurationImpl {
     }
 
     fn wait_until_configuration_is_available(&self) {
-        let (configuration_mutex, condition_variable) = &*self.configuration;
-        let configuration_guard = configuration_mutex.lock().unwrap();
-        let _guard = condition_variable
-            .wait_while(configuration_guard, |configuration| configuration.is_none())
-            .unwrap();
+        match &self.offline_mode {
+            OfflineMode::FallbackData(fallback) => {
+                // Have fallback data available.
+                // No wait required.
+                assert_type::<&AppConfigurationOffline>(fallback);
+                // NOTE: Asserting the type here, as this works only because currently offline data is allowed as fallback.
+                // Once we allow more complex fallbacks, this needs to be handled better.
+            }
+            _ => {
+                let (configuration_mutex, condition_variable) = &*self.configuration;
+                let configuration_guard = configuration_mutex.lock().unwrap();
+                let _guard = condition_variable
+                    .wait_while(configuration_guard, |configuration| configuration.is_none())
+                    .unwrap();
+            }
+        }
     }
 
     fn wait_until_online(&self) {
@@ -166,7 +179,7 @@ impl ConfigurationProvider for LiveConfigurationImpl {
         let current_mode_guard = current_mode_mutex.lock().unwrap();
         let _guard = condition_variable
             .wait_while(current_mode_guard, |current_mode| {
-                *current_mode == CurrentMode::Online
+                *current_mode != CurrentMode::Online
             })
             .unwrap();
     }
