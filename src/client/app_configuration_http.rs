@@ -140,6 +140,14 @@ mod tests {
         fn is_online(&self) -> Result<bool> {
             todo!()
         }
+
+        fn wait_until_online(&self) {
+            todo!()
+        }
+
+        fn wait_until_configuration_is_available(&self) {
+            todo!()
+        }
     }
     impl LiveConfiguration for LiveConfigurationMock {
         fn get_thread_status(
