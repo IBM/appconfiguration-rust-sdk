@@ -182,7 +182,7 @@ pub(crate) mod fixtures {
                 Segment {
                     name: "".into(),
                     segment_id: "some_segment_id_1".into(),
-                    description: "".into(),
+                    description: None,
                     tags: None,
                     rules: vec![Rule {
                         attribute_name: "name".into(),
@@ -193,7 +193,7 @@ pub(crate) mod fixtures {
                 Segment {
                     name: "".into(),
                     segment_id: "some_segment_id_2".into(),
-                    description: "".into(),
+                    description: None,
                     tags: None,
                     rules: vec![Rule {
                         attribute_name: "name".into(),
