@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::error;
-use log::info;
+use log::debug;
 use log::warn;
 
 use crate::metering::models::{
@@ -48,7 +47,7 @@ pub(crate) fn start_metering<T: MeteringClient>(
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
         let mut batcher = MeteringBatcher::new(client, config_id);
         let mut last_flush = std::time::Instant::now();
-        info!("Starting Metering transmitting thread");
+        debug!("Starting Metering transmitting thread");
         loop {
             let recv_result = receiver.recv_timeout(std::time::Duration::from_millis(100));
             match recv_result {
@@ -199,7 +198,7 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             json_data.add_usage(evaluation.0, evaluation.1);
         }
 
-        info!(
+        debug!(
             "Sending metering data for {} usages.",
             json_data.usages.len()
         );
@@ -208,7 +207,7 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             .push_metering_data(&self.config_id.guid, &json_data);
         match result {
             Err(err) => {
-                error!("Sending metering data failed: {}", err);
+                warn!("Sending metering data failed: {}", err);
             }
             _ => {}
         }
