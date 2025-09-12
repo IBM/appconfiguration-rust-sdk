@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use log::error;
+use log::info;
 use log::warn;
 
 use crate::metering::models::{
@@ -196,9 +198,17 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             json_data.add_usage(evaluation.0, evaluation.1);
         }
 
-        let _ = self
+        info!(
+            "Sending metering data for {} usages.",
+            json_data.usages.len()
+        );
+        let result = self
             .client
             .push_metering_data(&self.config_id.guid, &json_data);
+        match result {
+            Err(err) => error!("Sending metering data failed: {}", err),
+            _ => {}
+        }
         self.evaluations.clear();
     }
 }
