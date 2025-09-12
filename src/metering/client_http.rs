@@ -82,7 +82,7 @@ pub(crate) mod tests {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
-                .path("/apprapp/events/v1/instances/example_guid/usage")
+                .path("/events/v1/instances/example_guid/usage")
                 .header("content-type", "application/json")
                 .header("Authorization", "Bearer mocked_token")
                 .json_body(json!(
