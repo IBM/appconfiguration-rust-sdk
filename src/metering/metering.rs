@@ -48,6 +48,7 @@ pub(crate) fn start_metering<T: MeteringClient>(
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
         let mut batcher = MeteringBatcher::new(client, config_id);
         let mut last_flush = std::time::Instant::now();
+        info!("Starting Metering transmitting thread");
         loop {
             let recv_result = receiver.recv_timeout(std::time::Duration::from_millis(100));
             match recv_result {
@@ -206,7 +207,9 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             .client
             .push_metering_data(&self.config_id.guid, &json_data);
         match result {
-            Err(err) => error!("Sending metering data failed: {}", err),
+            Err(err) => {
+                error!("Sending metering data failed: {}", err);
+            }
             _ => {}
         }
         self.evaluations.clear();

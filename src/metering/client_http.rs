@@ -29,7 +29,7 @@ impl MeteringClientHttp {
 impl MeteringClient for MeteringClientHttp {
     fn push_metering_data(&self, guid: &str, data: &MeteringDataJson) -> MeteringResult<()> {
         let url = format!(
-            "{}/apprapp/events/v1/instances/{}/usage",
+            "{}/events/v1/instances/{}/usage",
             self.service_address.base_url(ServiceAddressProtocol::Http),
             guid
         );
