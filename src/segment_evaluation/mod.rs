@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub(crate) mod errors;
+pub(crate) mod rule_operator;
 
 use std::collections::HashMap;
 
@@ -20,6 +21,7 @@ use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
+use crate::segment_evaluation::rule_operator::RuleOperator;
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
@@ -165,9 +167,9 @@ fn find_segment_which_applies_to_entity<'a>(
     Ok(None)
 }
 
-fn belong_to_segment(
+fn belong_to_segment<TValue: RuleOperator>(
     segment: &Segment,
-    attrs: HashMap<String, Value>,
+    attrs: HashMap<String, TValue>,
 ) -> std::result::Result<bool, SegmentEvaluationError> {
     for rule in segment.rules.iter() {
         let operator = &rule.operator;
@@ -188,7 +190,7 @@ fn belong_to_segment(
                 let candidate = rule
                     .values
                     .iter()
-                    .find_map(|value| match check_operator(attr_value, operator, value) {
+                    .find_map(|value| match attr_value.operate(operator, value) {
                         Ok(true) => Some(Ok::<_, SegmentEvaluationError>(())),
                         Ok(false) => None,
                         Err(e) => Some(Err((e, segment, rule, value).into())),
@@ -204,62 +206,6 @@ fn belong_to_segment(
         }
     }
     Ok(true)
-}
-
-fn check_operator(
-    attribute_value: &Value,
-    operator: &str,
-    reference_value: &str,
-) -> std::result::Result<bool, CheckOperatorErrorDetail> {
-    match operator {
-        "is" => match attribute_value {
-            Value::String(data) => Ok(*data == reference_value),
-            Value::Boolean(data) => Ok(*data == reference_value.parse::<bool>()?),
-            Value::Float64(data) => Ok(*data == reference_value.parse::<f64>()?),
-            Value::UInt64(data) => Ok(*data == reference_value.parse::<u64>()?),
-            Value::Int64(data) => Ok(*data == reference_value.parse::<i64>()?),
-        },
-        "contains" => match attribute_value {
-            Value::String(data) => Ok(data.contains(reference_value)),
-            _ => Err(CheckOperatorErrorDetail::StringExpected),
-        },
-        "startsWith" => match attribute_value {
-            Value::String(data) => Ok(data.starts_with(reference_value)),
-            _ => Err(CheckOperatorErrorDetail::StringExpected),
-        },
-        "endsWith" => match attribute_value {
-            Value::String(data) => Ok(data.ends_with(reference_value)),
-            _ => Err(CheckOperatorErrorDetail::StringExpected),
-        },
-        "greaterThan" => match attribute_value {
-            // TODO: Go implementation also compares strings (by parsing them as floats). Do we need this?
-            //       https://github.com/IBM/appconfiguration-go-sdk/blob/master/lib/internal/models/Rule.go#L82
-            // TODO: we could have numbers not representable as f64, maybe we should try to parse it to i64 and u64 too?
-            Value::Float64(data) => Ok(*data > reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data > reference_value.parse()?),
-            Value::Int64(data) => Ok(*data > reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        "lesserThan" => match attribute_value {
-            Value::Float64(data) => Ok(*data < reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data < reference_value.parse()?),
-            Value::Int64(data) => Ok(*data < reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        "greaterThanEquals" => match attribute_value {
-            Value::Float64(data) => Ok(*data >= reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data >= reference_value.parse()?),
-            Value::Int64(data) => Ok(*data >= reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        "lesserThanEquals" => match attribute_value {
-            Value::Float64(data) => Ok(*data <= reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data <= reference_value.parse()?),
-            Value::Int64(data) => Ok(*data <= reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        _ => Err(CheckOperatorErrorDetail::OperatorNotImplemented),
-    }
 }
 
 #[cfg(test)]
