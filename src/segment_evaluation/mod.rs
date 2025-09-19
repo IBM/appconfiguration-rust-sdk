@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub(crate) mod errors;
+pub(crate) mod matches_entity;
 
 use std::collections::HashMap;
 
@@ -20,6 +21,7 @@ use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
+use crate::segment_evaluation::matches_entity::MatchesEntity;
 use crate::Value;
 use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
 
@@ -151,113 +153,18 @@ fn find_segment_which_applies_to_entity<'a>(
     segment_ids: &[String],
     entity: &impl Entity,
 ) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
-    for segment_id in segment_ids.iter() {
-        let segment = segments
-            .get(segment_id)
-            .ok_or(SegmentEvaluationError::SegmentIdNotFound(
-                segment_id.clone(),
-            ))?;
-        let applies = belong_to_segment(segment, entity.get_attributes())?;
-        if applies {
-            return Ok(Some(segment));
-        }
-    }
-    Ok(None)
-}
-
-fn belong_to_segment(
-    segment: &Segment,
-    attrs: HashMap<String, Value>,
-) -> std::result::Result<bool, SegmentEvaluationError> {
-    // An entity belongs to a segment iif it satisfies ALL the rules
-    segment
-        .rules
+    Ok(segment_ids
         .iter()
-        .map(|rule| {
-            // A rule is satisfied iif the corresponding attribute in the
-            // entity satisfies ANY of the rule values.
-            let operator = &rule.operator;
-            let attr_name = &rule.attribute_name;
-            let attr_value = attrs.get(attr_name);
-
-            match attr_value {
-                Some(attr_value) => {
-                    rule.values.iter().map(|value| -> std::result::Result<bool, SegmentEvaluationError>{
-                        // A rule value is satisfied iif:
-                        //  * the attribute value satisfies the rule operator for the rule value
-                        //  * the operator fails
-                        match check_operator(attr_value, operator, value) {
-                            Ok(true) => Ok(true),
-                            Ok(false) => Ok(false),
-                            Err(e) => Err((e, segment, rule, value).into()),
-                        }
-                    }).collect::<std::result::Result<Vec<bool>, _>>().map(|v| v.iter().any(|&x| x))
-                },
-                None => {
-                    println!("Warning: Operation '{attr_name}' '{operator}' '[...]' failed to evaluate: '{attr_name}' not found in entity");
-                    Ok(false)
-                },
-            }
-
+        .map(|segment_id| match segments.get(segment_id) {
+            Some(segment) => segment.matches_entity(entity).map(|v| v.then_some(segment)),
+            None => Err(SegmentEvaluationError::SegmentIdNotFound(
+                segment_id.clone(),
+            )),
         })
-        .collect::<std::result::Result<Vec<bool>, _>>()
-        .map(|v| v.iter().all(|&x| x))
-}
-
-fn check_operator(
-    attribute_value: &Value,
-    operator: &str,
-    reference_value: &str,
-) -> std::result::Result<bool, CheckOperatorErrorDetail> {
-    match operator {
-        "is" => match attribute_value {
-            Value::String(data) => Ok(*data == reference_value),
-            Value::Boolean(data) => Ok(*data == reference_value.parse::<bool>()?),
-            Value::Float64(data) => Ok(*data == reference_value.parse::<f64>()?),
-            Value::UInt64(data) => Ok(*data == reference_value.parse::<u64>()?),
-            Value::Int64(data) => Ok(*data == reference_value.parse::<i64>()?),
-        },
-        "contains" => match attribute_value {
-            Value::String(data) => Ok(data.contains(reference_value)),
-            _ => Err(CheckOperatorErrorDetail::StringExpected),
-        },
-        "startsWith" => match attribute_value {
-            Value::String(data) => Ok(data.starts_with(reference_value)),
-            _ => Err(CheckOperatorErrorDetail::StringExpected),
-        },
-        "endsWith" => match attribute_value {
-            Value::String(data) => Ok(data.ends_with(reference_value)),
-            _ => Err(CheckOperatorErrorDetail::StringExpected),
-        },
-        "greaterThan" => match attribute_value {
-            // TODO: Go implementation also compares strings (by parsing them as floats). Do we need this?
-            //       https://github.com/IBM/appconfiguration-go-sdk/blob/master/lib/internal/models/Rule.go#L82
-            // TODO: we could have numbers not representable as f64, maybe we should try to parse it to i64 and u64 too?
-            Value::Float64(data) => Ok(*data > reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data > reference_value.parse()?),
-            Value::Int64(data) => Ok(*data > reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        "lesserThan" => match attribute_value {
-            Value::Float64(data) => Ok(*data < reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data < reference_value.parse()?),
-            Value::Int64(data) => Ok(*data < reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        "greaterThanEquals" => match attribute_value {
-            Value::Float64(data) => Ok(*data >= reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data >= reference_value.parse()?),
-            Value::Int64(data) => Ok(*data >= reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        "lesserThanEquals" => match attribute_value {
-            Value::Float64(data) => Ok(*data <= reference_value.parse()?),
-            Value::UInt64(data) => Ok(*data <= reference_value.parse()?),
-            Value::Int64(data) => Ok(*data <= reference_value.parse()?),
-            _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
-        },
-        _ => Err(CheckOperatorErrorDetail::OperatorNotImplemented),
-    }
+        .collect::<std::result::Result<Vec<Option<&Segment>>, _>>()?
+        .into_iter()
+        .find(|s| s.is_some())
+        .and_then(|v| v))
 }
 
 #[cfg(test)]
