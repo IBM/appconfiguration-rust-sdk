@@ -167,9 +167,9 @@ fn find_segment_which_applies_to_entity<'a>(
     Ok(None)
 }
 
-fn belong_to_segment<TValue: RuleOperator>(
+fn belong_to_segment(
     segment: &Segment,
-    attrs: HashMap<String, TValue>,
+    attrs: HashMap<String, Value>,
 ) -> std::result::Result<bool, SegmentEvaluationError> {
     for rule in segment.rules.iter() {
         let operator = &rule.operator;
