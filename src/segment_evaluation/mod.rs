@@ -169,41 +169,39 @@ fn belong_to_segment(
     segment: &Segment,
     attrs: HashMap<String, Value>,
 ) -> std::result::Result<bool, SegmentEvaluationError> {
-    for rule in segment.rules.iter() {
-        let operator = &rule.operator;
-        let attr_name = &rule.attribute_name;
-        let attr_value = attrs.get(attr_name);
-        if attr_value.is_none() {
-            return Ok(false);
-        }
-        let rule_result = match attr_value {
-            None => {
-                println!("Warning: Operation '{attr_name}' '{operator}' '[...]' failed to evaluate: '{attr_name}' not found in entity");
-                false
+    // An entity belongs to a segment iif it satisfies ALL the rules
+    segment
+        .rules
+        .iter()
+        .map(|rule| {
+            // A rule is satisfied iif the corresponding attribute in the
+            // entity satisfies ANY of the rule values.
+            let operator = &rule.operator;
+            let attr_name = &rule.attribute_name;
+            let attr_value = attrs.get(attr_name);
+
+            match attr_value {
+                Some(attr_value) => {
+                    rule.values.iter().map(|value| -> std::result::Result<bool, SegmentEvaluationError>{
+                        // A rule value is satisfied iif:
+                        //  * the attribute value satisfies the rule operator for the rule value
+                        //  * the operator fails
+                        match check_operator(attr_value, operator, value) {
+                            Ok(true) => Ok(true),
+                            Ok(false) => Ok(false),
+                            Err(e) => Err((e, segment, rule, value).into()),
+                        }
+                    }).collect::<std::result::Result<Vec<bool>, _>>().map(|v| v.iter().any(|&x| x))
+                },
+                None => {
+                    println!("Warning: Operation '{attr_name}' '{operator}' '[...]' failed to evaluate: '{attr_name}' not found in entity");
+                    Ok(false)
+                },
             }
-            Some(attr_value) => {
-                // FIXME: the following algorithm is too hard to read. Is it just me or do we need to simplify this?
-                // One of the values needs to match.
-                // Find a candidate (a candidate corresponds to a value which matches or which might match but the operator failed):
-                let candidate = rule
-                    .values
-                    .iter()
-                    .find_map(|value| match check_operator(attr_value, operator, value) {
-                        Ok(true) => Some(Ok::<_, SegmentEvaluationError>(())),
-                        Ok(false) => None,
-                        Err(e) => Some(Err((e, segment, rule, value).into())),
-                    })
-                    .transpose()?;
-                // check if the candidate is good, or if the operator failed:
-                candidate.is_some()
-            }
-        };
-        // All rules must match:
-        if !rule_result {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+
+        })
+        .collect::<std::result::Result<Vec<bool>, _>>()
+        .map(|v| v.iter().all(|&x| x))
 }
 
 fn check_operator(
