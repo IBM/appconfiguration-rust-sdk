@@ -29,7 +29,7 @@ impl MeteringClientHttp {
 impl MeteringClient for MeteringClientHttp {
     fn push_metering_data(&self, guid: &str, data: &MeteringDataJson) -> MeteringResult<()> {
         let url = format!(
-            "{}/apprapp/events/v1/instances/{}/usage",
+            "{}/events/v1/instances/{}/usage",
             self.service_address.base_url(ServiceAddressProtocol::Http),
             guid
         );
@@ -82,7 +82,7 @@ pub(crate) mod tests {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
-                .path("/apprapp/events/v1/instances/example_guid/usage")
+                .path("/events/v1/instances/example_guid/usage")
                 .header("content-type", "application/json")
                 .header("Authorization", "Bearer mocked_token")
                 .json_body(json!(

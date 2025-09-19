@@ -60,13 +60,11 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
         city: "Bangalore".to_string(),
         radius: 60,
     };
-
+    thread::sleep(Duration::from_secs(5));
     println!("The information is displayed every 5 seconds.");
     println!("Try changing the configuraiton in the App Configuration instances.");
 
     loop {
-        println!("\n\nFEATURE FLAG OPERATIONS\n");
-
         match client.get_feature_proxy(&feature_id) {
             Ok(feature) => {
                 println!("Feature name: {}", feature.get_name()?);
@@ -78,8 +76,6 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
                 println!("There was an error getting the Feature Flag. Error {error}",);
             }
         }
-
-        println!("\n\nPROPERTY OPERATIONS\n");
         match client.get_property_proxy(&property_id) {
             Ok(property) => {
                 println!("Property name: {}", property.get_name()?);
