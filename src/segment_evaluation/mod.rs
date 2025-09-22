@@ -13,7 +13,8 @@
 // limitations under the License.
 
 pub(crate) mod errors;
-pub(crate) mod matches_entity;
+mod matches_entity;
+mod rule_operator;
 
 use std::collections::HashMap;
 
@@ -23,7 +24,7 @@ use crate::errors::Result;
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
 use crate::segment_evaluation::matches_entity::MatchesEntity;
 use crate::Value;
-use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
+use errors::SegmentEvaluationError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetingRules {
