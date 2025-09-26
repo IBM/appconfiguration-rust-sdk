@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub(crate) mod errors;
-mod matches_entity;
+mod matches_attributes;
 mod rule_operator;
 
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
-use crate::segment_evaluation::matches_entity::MatchesEntity;
+use crate::segment_evaluation::matches_attributes::MatchesAttributes;
 use crate::Value;
 use errors::SegmentEvaluationError;
 
@@ -157,7 +157,9 @@ fn find_segment_which_applies_to_entity<'a>(
     Ok(segment_ids
         .iter()
         .map(|segment_id| match segments.get(segment_id) {
-            Some(segment) => segment.matches_entity(entity).map(|v| v.then_some(segment)),
+            Some(segment) => segment
+                .matches_attributes(&entity.get_attributes())
+                .map(|v| v.then_some(segment)),
             None => Err(SegmentEvaluationError::SegmentIdNotFound(
                 segment_id.clone(),
             )),

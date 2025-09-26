@@ -12,28 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use super::errors::CheckOperatorErrorDetail;
 use crate::network::serialization::{Rule, Segment};
 use crate::segment_evaluation::errors::SegmentEvaluationError;
 use crate::segment_evaluation::rule_operator::RuleOperator;
-use crate::Entity;
+use crate::{Entity, Value};
 
-pub(crate) trait MatchesEntity {
+pub(crate) trait MatchesAttributes {
     type Error;
 
-    fn matches_entity(&self, entity: &impl Entity) -> std::result::Result<bool, Self::Error>;
+    fn matches_attributes(
+        &self,
+        attributes: &HashMap<String, Value>,
+    ) -> std::result::Result<bool, Self::Error>;
 }
 
-impl MatchesEntity for Segment {
+impl MatchesAttributes for Segment {
     type Error = SegmentEvaluationError;
 
     /// A [`Segment`] matches an [`Entity`] iif:
     /// * ALL the rules match the entity
-    fn matches_entity(&self, entity: &impl Entity) -> std::result::Result<bool, Self::Error> {
+    fn matches_attributes(
+        &self,
+        attributes: &HashMap<String, Value>,
+    ) -> std::result::Result<bool, Self::Error> {
         self.rules
             .iter()
             .map(|rule| {
-                rule.matches_entity(entity)
+                rule.matches_attributes(attributes)
                     .map_err(|(e, rule_value)| (e, self, rule, rule_value).into())
             })
             .collect::<std::result::Result<Vec<bool>, _>>()
@@ -41,7 +49,7 @@ impl MatchesEntity for Segment {
     }
 }
 
-impl MatchesEntity for Rule {
+impl MatchesAttributes for Rule {
     type Error = (CheckOperatorErrorDetail, String);
 
     /// A [`Rule`] matches an [`Entity`] iif:
@@ -49,9 +57,11 @@ impl MatchesEntity for Rule {
     /// * the entity attribute satisfies ANY of the rule values.
     ///
     /// TODO: What if rules.values is empty? Now it returns false
-    fn matches_entity(&self, entity: &impl Entity) -> std::result::Result<bool, Self::Error> {
-        entity
-            .get_attributes()
+    fn matches_attributes(
+        &self,
+        attributes: &HashMap<String, Value>,
+    ) -> std::result::Result<bool, Self::Error> {
+        attributes
             .get(&self.attribute_name)
             .map_or(Ok(false), |attr_value| {
                 self.values
