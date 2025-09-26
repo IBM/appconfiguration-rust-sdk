@@ -18,7 +18,7 @@ use super::errors::CheckOperatorErrorDetail;
 use crate::network::serialization::{Rule, Segment};
 use crate::segment_evaluation::errors::SegmentEvaluationError;
 use crate::segment_evaluation::rule_operator::RuleOperator;
-use crate::{Entity, Value};
+use crate::Value;
 
 pub(crate) trait MatchesAttributes {
     type Error;
