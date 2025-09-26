@@ -99,9 +99,14 @@ impl FeatureSnapshot {
         }
     }
 
+    fn normalized_hash(data: &str) -> u32 {
+        let hash = murmur3_32(&mut Cursor::new(data), 0).expect("Cannot hash the value.");
+        (f64::from(hash) / f64::from(u32::MAX) * 100.0) as u32
+    }
+
     fn should_rollout(rollout_percentage: u32, entity: &impl Entity, feature_id: &str) -> bool {
         let tag = format!("{}:{}", entity.get_id(), feature_id);
-        rollout_percentage == 100 || random_value(&tag) < rollout_percentage
+        rollout_percentage == 100 || Self::normalized_hash(&tag) < rollout_percentage
     }
 
     fn use_rollout_percentage_to_get_value_from_feature_directly(
@@ -137,15 +142,6 @@ impl Feature for FeatureSnapshot {
         let value = self.get_value(entity)?;
         value.try_into()
     }
-}
-
-pub(crate) fn random_value(v: &str) -> u32 {
-    let max_hash = u32::MAX;
-    (f64::from(hash(v)) / f64::from(max_hash) * 100.0) as u32
-}
-
-fn hash(v: &str) -> u32 {
-    murmur3_32(&mut Cursor::new(v), 0).expect("Cannot hash the value.")
 }
 
 #[cfg(test)]
@@ -213,7 +209,9 @@ pub mod tests {
             attributes: entity_attributes.clone(),
         };
         assert_eq!(
-            random_value(format!("{}:{}", entity.id, feature.feature_id).as_str()),
+            FeatureSnapshot::normalized_hash(
+                format!("{}:{}", entity.id, feature.feature_id).as_str()
+            ),
             68
         );
         let value = feature.get_value(&entity).unwrap();
@@ -225,7 +223,9 @@ pub mod tests {
             attributes: entity_attributes,
         };
         assert_eq!(
-            random_value(format!("{}:{}", entity.id, feature.feature_id).as_str()),
+            FeatureSnapshot::normalized_hash(
+                format!("{}:{}", entity.id, feature.feature_id).as_str()
+            ),
             29
         );
         let value = feature.get_value(&entity).unwrap();
@@ -406,5 +406,13 @@ pub mod tests {
 
         let value = feature.get_value(&entity).unwrap();
         assert!(matches!(value, Value::Int64(ref v) if v == &2));
+    }
+
+    /// This test ensures that the rust client is using the same hashing algorithm as to other clients.
+    /// See same test for Node client:
+    /// https://github.com/IBM/appconfiguration-node-sdk/blob/master/test/unit/configurations/internal/utils.test.js#L25
+    #[test]
+    fn test_normalized_hash() {
+        assert_eq!(FeatureSnapshot::normalized_hash("entityId:featureId"), 41)
     }
 }
