@@ -16,7 +16,7 @@ use crate::errors::Result;
 use crate::models::{FeatureSnapshot, PropertySnapshot};
 use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
-use crate::{ConfigurationProvider, IBMCloudTokenProvider, OfflineMode};
+use crate::{ConfigurationProvider, OfflineMode, TokenProviderImpl};
 
 use super::ConfigurationId;
 use crate::client::app_configuration_http::AppConfigurationClientHttp;
@@ -39,14 +39,17 @@ impl AppConfigurationClientIBMCloud {
     /// * `region` - Region name where the App Configuration service instance is created
     /// * `configuration_id` - Identifies the App Configuration configuration to use.
     /// * `offline_mode` - Behavior when the configuration might not be synced with the server
+    /// * `use_private_endpoint` - Set to true if the SDK should connect to App Configuration
+    ///                            using private endpoint through IBM Cloud private network.
     pub fn new(
         apikey: &str,
         region: &str,
         configuration_id: ConfigurationId,
         offline_mode: OfflineMode,
+        use_private_endpoint: bool,
     ) -> Result<Self> {
-        let service_address = Self::create_service_address(region);
-        let token_provider = Box::new(IBMCloudTokenProvider::new(apikey));
+        let service_address = Self::create_service_address(region, use_private_endpoint);
+        let token_provider = Box::new(Self::create_token_provider(apikey, use_private_endpoint));
         Ok(Self {
             client: AppConfigurationClientHttp::new(
                 service_address,
@@ -57,12 +60,23 @@ impl AppConfigurationClientIBMCloud {
         })
     }
 
-    fn create_service_address(region: &str) -> ServiceAddress {
-        ServiceAddress::new(
-            format!("{region}.apprapp.cloud.ibm.com"),
-            None,
-            Some("apprapp".to_string()),
-        )
+    fn create_service_address(region: &str, use_private_endpoint: bool) -> ServiceAddress {
+        let host = if use_private_endpoint {
+            format!("private.{region}.apprapp.cloud.ibm.com")
+        } else {
+            format!("{region}.apprapp.cloud.ibm.com")
+        };
+
+        ServiceAddress::new(host, None, Some("apprapp".to_string()))
+    }
+
+    fn create_token_provider(apikey: &str, use_private_endpoint: bool) -> TokenProviderImpl {
+        let host = if use_private_endpoint {
+            "private.iam.cloud.ibm.com".to_string()
+        } else {
+            "iam.cloud.ibm.com".to_string()
+        };
+        TokenProviderImpl::new(apikey, &format!("https://{host}/identity/token"))
     }
 }
 
@@ -96,7 +110,8 @@ mod tests {
 
     #[test]
     fn test_ibm_service_address() {
-        let service_address = AppConfigurationClientIBMCloud::create_service_address("region");
+        let service_address =
+            AppConfigurationClientIBMCloud::create_service_address("region", false);
 
         assert_eq!(
             service_address.base_url(ServiceAddressProtocol::Http),
@@ -105,6 +120,34 @@ mod tests {
         assert_eq!(
             service_address.base_url(ServiceAddressProtocol::Ws),
             "wss://region.apprapp.cloud.ibm.com/apprapp"
+        );
+    }
+
+    #[test]
+    fn test_ibm_service_address_private_endpoint() {
+        let service_address =
+            AppConfigurationClientIBMCloud::create_service_address("region", true);
+
+        assert_eq!(
+            service_address.base_url(ServiceAddressProtocol::Http),
+            "https://private.region.apprapp.cloud.ibm.com/apprapp"
+        );
+        assert_eq!(
+            service_address.base_url(ServiceAddressProtocol::Ws),
+            "wss://private.region.apprapp.cloud.ibm.com/apprapp"
+        );
+    }
+
+    #[test]
+    fn test_ibm_token_provider_address() {
+        assert_eq!(
+            AppConfigurationClientIBMCloud::create_token_provider("apikey", false).endpoint,
+            "https://iam.cloud.ibm.com/identity/token"
+        );
+
+        assert_eq!(
+            AppConfigurationClientIBMCloud::create_token_provider("apikey", true).endpoint,
+            "https://private.iam.cloud.ibm.com/identity/token"
         );
     }
 }

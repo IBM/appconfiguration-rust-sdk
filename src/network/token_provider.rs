@@ -42,18 +42,14 @@ impl AccessToken {
 }
 
 #[derive(Debug)]
-pub(crate) struct IBMCloudTokenProvider {
-    endpoint: String,
+pub(crate) struct TokenProviderImpl {
+    pub(crate) endpoint: String,
     apikey: String,
     access_token: RwLock<AccessToken>,
 }
 
-impl IBMCloudTokenProvider {
-    pub fn new(apikey: &str) -> Self {
-        IBMCloudTokenProvider::new_with_endpoint(apikey, "https://iam.cloud.ibm.com/identity/token")
-    }
-
-    fn new_with_endpoint(apikey: &str, endpoint: &str) -> Self {
+impl TokenProviderImpl {
+    pub fn new(apikey: &str, endpoint: &str) -> Self {
         Self {
             apikey: apikey.to_string(),
             access_token: RwLock::default(),
@@ -101,7 +97,7 @@ impl IBMCloudTokenProvider {
         let mut access_token = self.access_token.write()?;
         Ok(access_token.renew(
             new_token.access_token,
-            IBMCloudTokenProvider::safe_expires_in(new_token.expires_in),
+            TokenProviderImpl::safe_expires_in(new_token.expires_in),
         ))
     }
 }
@@ -117,7 +113,7 @@ struct AccessTokenResponse {
     // scope: String,         // "ibm openid"
 }
 
-impl TokenProvider for IBMCloudTokenProvider {
+impl TokenProvider for TokenProviderImpl {
     fn get_access_token(&self) -> NetworkResult<String> {
         if self.expired() {
             self.renew_token()?;
@@ -151,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_ibm_cloud_token_provider_expiration_logic() {
-        let provider = IBMCloudTokenProvider::new("apikey");
+        let provider = TokenProviderImpl::new("apikey", "<endpoint>");
         assert!(provider.expired());
 
         // If the token is expired, it will try to renew it when requesting it
@@ -174,12 +170,12 @@ mod tests {
 
     #[test]
     fn test_safe_expires_in() {
-        assert_eq!(IBMCloudTokenProvider::safe_expires_in(10), 9);
-        assert_eq!(IBMCloudTokenProvider::safe_expires_in(2), 1);
+        assert_eq!(TokenProviderImpl::safe_expires_in(10), 9);
+        assert_eq!(TokenProviderImpl::safe_expires_in(2), 1);
 
         // Corner cases
-        assert_eq!(IBMCloudTokenProvider::safe_expires_in(0), 0);
-        assert_eq!(IBMCloudTokenProvider::safe_expires_in(1), 1);
+        assert_eq!(TokenProviderImpl::safe_expires_in(0), 0);
+        assert_eq!(TokenProviderImpl::safe_expires_in(1), 1);
     }
 
     #[test]
@@ -205,7 +201,7 @@ mod tests {
                 ));
         });
 
-        let token_provider = IBMCloudTokenProvider::new_with_endpoint(
+        let token_provider = TokenProviderImpl::new(
             apikey,
             &std::format!("http://{}:{}{}", server.host(), server.port(), endpoint),
         );
