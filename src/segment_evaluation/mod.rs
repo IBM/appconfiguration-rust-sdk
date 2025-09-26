@@ -13,7 +13,8 @@
 // limitations under the License.
 
 pub(crate) mod errors;
-pub(crate) mod rule_operator;
+mod matches_attributes;
+mod rule_operator;
 
 use std::collections::HashMap;
 
@@ -21,9 +22,9 @@ use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
-use crate::segment_evaluation::rule_operator::RuleOperator;
+use crate::segment_evaluation::matches_attributes::MatchesAttributes;
 use crate::Value;
-use errors::{CheckOperatorErrorDetail, SegmentEvaluationError};
+use errors::SegmentEvaluationError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetingRules {
@@ -153,59 +154,20 @@ fn find_segment_which_applies_to_entity<'a>(
     segment_ids: &[String],
     entity: &impl Entity,
 ) -> std::result::Result<Option<&'a Segment>, SegmentEvaluationError> {
-    for segment_id in segment_ids.iter() {
-        let segment = segments
-            .get(segment_id)
-            .ok_or(SegmentEvaluationError::SegmentIdNotFound(
+    Ok(segment_ids
+        .iter()
+        .map(|segment_id| match segments.get(segment_id) {
+            Some(segment) => segment
+                .matches_attributes(&entity.get_attributes())
+                .map(|v| v.then_some(segment)),
+            None => Err(SegmentEvaluationError::SegmentIdNotFound(
                 segment_id.clone(),
-            ))?;
-        let applies = belong_to_segment(segment, entity.get_attributes())?;
-        if applies {
-            return Ok(Some(segment));
-        }
-    }
-    Ok(None)
-}
-
-fn belong_to_segment(
-    segment: &Segment,
-    attrs: HashMap<String, Value>,
-) -> std::result::Result<bool, SegmentEvaluationError> {
-    for rule in segment.rules.iter() {
-        let operator = &rule.operator;
-        let attr_name = &rule.attribute_name;
-        let attr_value = attrs.get(attr_name);
-        if attr_value.is_none() {
-            return Ok(false);
-        }
-        let rule_result = match attr_value {
-            None => {
-                println!("Warning: Operation '{attr_name}' '{operator}' '[...]' failed to evaluate: '{attr_name}' not found in entity");
-                false
-            }
-            Some(attr_value) => {
-                // FIXME: the following algorithm is too hard to read. Is it just me or do we need to simplify this?
-                // One of the values needs to match.
-                // Find a candidate (a candidate corresponds to a value which matches or which might match but the operator failed):
-                let candidate = rule
-                    .values
-                    .iter()
-                    .find_map(|value| match attr_value.operate(operator, value) {
-                        Ok(true) => Some(Ok::<_, SegmentEvaluationError>(())),
-                        Ok(false) => None,
-                        Err(e) => Some(Err((e, segment, rule, value).into())),
-                    })
-                    .transpose()?;
-                // check if the candidate is good, or if the operator failed:
-                candidate.is_some()
-            }
-        };
-        // All rules must match:
-        if !rule_result {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+            )),
+        })
+        .collect::<std::result::Result<Vec<Option<&Segment>>, _>>()?
+        .into_iter()
+        .find(|s| s.is_some())
+        .and_then(|v| v))
 }
 
 #[cfg(test)]
