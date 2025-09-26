@@ -192,9 +192,9 @@ mod tests {
             when.method(POST)
                 .path(endpoint)
                 .header("Accept", "application/json")
-                .x_www_form_urlencoded_tuple("reponse_type", "cloud_iam")
-                .x_www_form_urlencoded_tuple("grant_type", "urn:ibm:params:oauth:grant-type:apikey")
-                .x_www_form_urlencoded_tuple("apikey", apikey);
+                .form_urlencoded_tuple("reponse_type", "cloud_iam")
+                .form_urlencoded_tuple("grant_type", "urn:ibm:params:oauth:grant-type:apikey")
+                .form_urlencoded_tuple("apikey", apikey);
             then.status(200)
                 .header("content-type", "application/json")
                 .json_body(serde_json::json!(
