@@ -32,8 +32,8 @@ pub(crate) trait MatchesAttributes {
 impl MatchesAttributes for Segment {
     type Error = SegmentEvaluationError;
 
-    /// A [`Segment`] matches an [`Entity`] iif:
-    /// * ALL the rules match the entity
+    /// A [`Segment`] matches attributes iif:
+    /// * ALL the rules match the attributes
     fn matches_attributes(
         &self,
         attributes: &HashMap<String, Value>,
@@ -52,9 +52,9 @@ impl MatchesAttributes for Segment {
 impl MatchesAttributes for Rule {
     type Error = (CheckOperatorErrorDetail, String);
 
-    /// A [`Rule`] matches an [`Entity`] iif:
-    /// * the entity contains the requested attribute, AND
-    /// * the entity attribute satisfies ANY of the rule values.
+    /// A [`Rule`] matches attributes iif:
+    /// * the attributes contain the requested attribute, AND
+    /// * the attribute satisfies ANY of the rule values.
     ///
     /// TODO: What if rules.values is empty? Now it returns false
     fn matches_attributes(
