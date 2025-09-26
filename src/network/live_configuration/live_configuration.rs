@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use super::current_mode::CurrentModeOfflineReason;
 use super::update_thread_worker::UpdateThreadWorker;
 use super::{CurrentMode, Error, OfflineMode, Result};
 use crate::models::Configuration;
 use crate::network::http_client::ServerClient;
+use crate::network::live_configuration::current_mode;
 use crate::utils::{ThreadHandle, ThreadStatus};
-use crate::{ConfigurationId, ConfigurationProvider};
+use crate::{AppConfigurationOffline, ConfigurationId, ConfigurationProvider};
 
 /// A [`ConfigurationProvider`] that keeps the configuration updated with some
 /// third-party source using an asyncronous mechanism.
@@ -37,10 +38,10 @@ pub trait LiveConfiguration: ConfigurationProvider {
 pub(crate) struct LiveConfigurationImpl {
     /// Configuration object that will be returned to consumers. This is also the object
     /// that the thread in the backend will be updating.
-    configuration: Arc<Mutex<Option<Configuration>>>,
+    configuration: Arc<(Mutex<Option<Configuration>>, Condvar)>,
 
     /// Current operation mode.
-    current_mode: Arc<Mutex<CurrentMode>>,
+    current_mode: Arc<(Mutex<CurrentMode>, Condvar)>,
 
     /// Handler to the internal thread that takes care of updating the [`LiveConfigurationImpl::configuration`].
     update_thread: ThreadHandle<Result<()>>,
@@ -57,10 +58,11 @@ impl LiveConfigurationImpl {
         server_client: T,
         configuration_id: ConfigurationId,
     ) -> Self {
-        let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
-            CurrentModeOfflineReason::Initializing,
-        )));
+        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let current_mode = Arc::new((
+            Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
+            Condvar::new(),
+        ));
 
         let worker = UpdateThreadWorker::new(
             server_client,
@@ -84,9 +86,11 @@ impl LiveConfigurationImpl {
     /// configured for this object.
     fn get_configuration(&self) -> Result<Configuration> {
         // TODO: Can we return a reference instead?
-        match &*self.current_mode.lock()? {
+        let (current_mode_mutex, _) = &*self.current_mode;
+        match &*current_mode_mutex.lock()? {
             CurrentMode::Online => {
-                match &*self.configuration.lock()? {
+                let (configuration_mutex, _) = &*self.configuration;
+                match &*configuration_mutex.lock()? {
                     // We store the configuration retrieved from the server into the Arc<Mutex> before switching the flag to Online
                     None => unreachable!(),
                     Some(configuration) => Ok(configuration.clone()),
@@ -94,10 +98,13 @@ impl LiveConfigurationImpl {
             }
             CurrentMode::Offline(current_mode_offline_reason) => match &self.offline_mode {
                 OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason.clone())),
-                OfflineMode::Cache => match &*self.configuration.lock()? {
-                    None => Err(Error::ConfigurationNotYetAvailable),
-                    Some(configuration) => Ok(configuration.clone()),
-                },
+                OfflineMode::Cache => {
+                    let (configuration_mutex, _) = &*self.configuration;
+                    match &*configuration_mutex.lock()? {
+                        None => Err(Error::ConfigurationNotYetAvailable),
+                        Some(configuration) => Ok(configuration.clone()),
+                    }
+                }
                 OfflineMode::FallbackData(app_configuration_offline) => {
                     Ok(app_configuration_offline.config_snapshot.clone())
                 }
@@ -107,13 +114,16 @@ impl LiveConfigurationImpl {
                     "Thread finished with status: {:?}",
                     result
                 ))),
-                OfflineMode::Cache => match &*self.configuration.lock()? {
-                    None => Err(Error::UnrecoverableError(format!(
-                        "Initial configuration failed to retrieve: {:?}",
-                        result
-                    ))),
-                    Some(configuration) => Ok(configuration.clone()),
-                },
+                OfflineMode::Cache => {
+                    let (configuration_mutex, _) = &*self.configuration;
+                    match &*configuration_mutex.lock()? {
+                        None => Err(Error::UnrecoverableError(format!(
+                            "Initial configuration failed to retrieve: {:?}",
+                            result
+                        ))),
+                        Some(configuration) => Ok(configuration.clone()),
+                    }
+                }
                 OfflineMode::FallbackData(app_configuration_offline) => {
                     Ok(app_configuration_offline.config_snapshot.clone())
                 }
@@ -121,6 +131,8 @@ impl LiveConfigurationImpl {
         }
     }
 }
+
+fn assert_type<T>(_val: T) {}
 
 impl ConfigurationProvider for LiveConfigurationImpl {
     fn get_feature_ids(&self) -> crate::Result<Vec<String>> {
@@ -142,6 +154,35 @@ impl ConfigurationProvider for LiveConfigurationImpl {
     fn is_online(&self) -> crate::Result<bool> {
         Ok(self.get_current_mode()? == CurrentMode::Online)
     }
+
+    fn wait_until_configuration_is_available(&self) {
+        match &self.offline_mode {
+            OfflineMode::FallbackData(fallback) => {
+                // Have fallback data available.
+                // No wait required.
+                assert_type::<&AppConfigurationOffline>(fallback);
+                // NOTE: Asserting the type here, as this works only because currently offline data is allowed as fallback.
+                // Once we allow more complex fallbacks, this needs to be handled better.
+            }
+            _ => {
+                let (configuration_mutex, condition_variable) = &*self.configuration;
+                let configuration_guard = configuration_mutex.lock().unwrap();
+                let _guard = condition_variable
+                    .wait_while(configuration_guard, |configuration| configuration.is_none())
+                    .unwrap();
+            }
+        }
+    }
+
+    fn wait_until_online(&self) {
+        let (current_mode_mutex, condition_variable) = &*self.current_mode;
+        let current_mode_guard = current_mode_mutex.lock().unwrap();
+        let _guard = condition_variable
+            .wait_while(current_mode_guard, |current_mode| {
+                *current_mode != CurrentMode::Online
+            })
+            .unwrap();
+    }
 }
 
 impl LiveConfiguration for LiveConfigurationImpl {
@@ -150,7 +191,8 @@ impl LiveConfiguration for LiveConfigurationImpl {
     }
 
     fn get_current_mode(&self) -> Result<CurrentMode> {
-        Ok(self.current_mode.lock()?.clone())
+        let (current_mode_mutex, _) = &*self.current_mode;
+        Ok(current_mode_mutex.lock()?.clone())
     }
 }
 
@@ -321,9 +363,9 @@ mod tests {
     ) {
         let (tx, _) = std::sync::mpsc::channel();
         let mut cfg = LiveConfigurationImpl {
-            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
+            configuration: Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new())),
             offline_mode: OfflineMode::Fail,
-            current_mode: Arc::new(Mutex::new(CurrentMode::Online)),
+            current_mode: Arc::new((Mutex::new(CurrentMode::Online), Condvar::new())),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
@@ -363,10 +405,13 @@ mod tests {
         let (tx, _) = std::sync::mpsc::channel();
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
-            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
-            current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
-                CurrentModeOfflineReason::WebsocketClosed,
-            ))),
+            configuration: Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new())),
+            current_mode: Arc::new((
+                Mutex::new(CurrentMode::Offline(
+                    CurrentModeOfflineReason::WebsocketClosed,
+                )),
+                Condvar::new(),
+            )),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
@@ -387,13 +432,14 @@ mod tests {
         {
             cfg.offline_mode = OfflineMode::Cache;
             {
-                cfg.configuration = Arc::new(Mutex::new(None));
+                cfg.configuration = Arc::new((Mutex::new(None), Condvar::new()));
                 let r = cfg.get_configuration();
                 assert!(r.is_err());
                 assert_eq!(r.unwrap_err(), Error::ConfigurationNotYetAvailable);
             }
             {
-                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
+                cfg.configuration =
+                    Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new()));
                 let r = cfg.get_configuration();
                 assert!(r.is_ok(), "Error: {}", r.unwrap_err());
                 assert!(r.unwrap().features.is_empty());
@@ -418,8 +464,8 @@ mod tests {
         let (tx, _) = std::sync::mpsc::channel();
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
-            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
-            current_mode: Arc::new(Mutex::new(CurrentMode::Defunct(Ok(())))),
+            configuration: Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new())),
+            current_mode: Arc::new((Mutex::new(CurrentMode::Defunct(Ok(()))), Condvar::new())),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
@@ -440,7 +486,7 @@ mod tests {
         {
             cfg.offline_mode = OfflineMode::Cache;
             {
-                cfg.configuration = Arc::new(Mutex::new(None));
+                cfg.configuration = Arc::new((Mutex::new(None), Condvar::new()));
                 let r = cfg.get_configuration();
                 assert!(r.is_err());
                 assert_eq!(
@@ -451,7 +497,8 @@ mod tests {
                 );
             }
             {
-                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
+                cfg.configuration =
+                    Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new()));
                 let r = cfg.get_configuration();
                 assert!(r.is_ok(), "Error: {}", r.unwrap_err());
                 assert!(r.unwrap().features.is_empty());

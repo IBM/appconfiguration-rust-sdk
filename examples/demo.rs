@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, env, thread, time::Duration};
+use std::{collections::HashMap, env, io::Write, thread, time::Duration};
 
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, Entity, Feature,
-    OfflineMode, Property, Value,
+    AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, ConfigurationProvider,
+    Entity, Feature, OfflineMode, Property, Value,
 };
 use dotenvy::dotenv;
 use std::error::Error;
@@ -54,6 +54,10 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     let configuration = ConfigurationId::new(guid, environment_id, collection_id);
     let client =
         AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
+    print!("Waiting for initial data...");
+    std::io::stdout().flush().unwrap();
+    client.wait_until_configuration_is_available();
+    println!(" DONE");
 
     let entity = CustomerEntity {
         id: "user123".to_string(),
