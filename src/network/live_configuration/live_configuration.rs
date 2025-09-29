@@ -155,25 +155,6 @@ impl ConfigurationProvider for LiveConfigurationImpl {
         Ok(self.get_current_mode()? == CurrentMode::Online)
     }
 
-    fn wait_until_configuration_is_available(&self) {
-        match &self.offline_mode {
-            OfflineMode::FallbackData(fallback) => {
-                // Have fallback data available.
-                // No wait required.
-                assert_type::<&AppConfigurationOffline>(fallback);
-                // NOTE: Asserting the type here, as this works only because currently offline data is allowed as fallback.
-                // Once we allow more complex fallbacks, this needs to be handled better.
-            }
-            _ => {
-                let (configuration_mutex, condition_variable) = &*self.configuration;
-                let configuration_guard = configuration_mutex.lock().unwrap();
-                let _guard = condition_variable
-                    .wait_while(configuration_guard, |configuration| configuration.is_none())
-                    .unwrap();
-            }
-        }
-    }
-
     fn wait_until_online(&self) {
         let (current_mode_mutex, condition_variable) = &*self.current_mode;
         let current_mode_guard = current_mode_mutex.lock().unwrap();

@@ -61,9 +61,4 @@ impl ConfigurationProvider for AppConfigurationOffline {
         error!("Waiting for AppConfigurationOffline to get online. This will never happen.");
         std::thread::park(); // block forever
     }
-
-    fn wait_until_configuration_is_available(&self) {
-        // No wait required:
-        // AppConfigurationOffline always has a configuration available.
-    }
 }

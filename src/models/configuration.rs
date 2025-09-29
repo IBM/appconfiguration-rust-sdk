@@ -198,10 +198,6 @@ impl ConfigurationProvider for Configuration {
         error!("Waiting for Configuration to get online. This will never happen.");
         std::thread::park(); // block forever
     }
-
-    fn wait_until_configuration_is_available(&self) {
-        // No wait required
-    }
 }
 
 #[cfg(test)]
