@@ -56,7 +56,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
         AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
     print!("Waiting for initial data...");
     std::io::stdout().flush().unwrap();
-    client.wait_until_configuration_is_available();
+    client.wait_until_online();
     println!(" DONE");
 
     let entity = CustomerEntity {

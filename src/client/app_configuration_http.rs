@@ -96,11 +96,6 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     fn wait_until_online(&self) {
         self.live_configuration.wait_until_online();
     }
-
-    fn wait_until_configuration_is_available(&self) {
-        self.live_configuration
-            .wait_until_configuration_is_available();
-    }
 }
 
 #[cfg(test)]
@@ -142,10 +137,6 @@ mod tests {
         }
 
         fn wait_until_online(&self) {
-            todo!()
-        }
-
-        fn wait_until_configuration_is_available(&self) {
             todo!()
         }
     }
