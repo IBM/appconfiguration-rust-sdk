@@ -41,14 +41,14 @@ pub(crate) struct SegmentEvaluationErrorKind {
     pub(crate) source: CheckOperatorErrorDetail,
 }
 
-impl From<(CheckOperatorErrorDetail, &Segment, &Rule, &String)> for SegmentEvaluationError {
-    fn from(value: (CheckOperatorErrorDetail, &Segment, &Rule, &String)) -> Self {
+impl From<(CheckOperatorErrorDetail, &Segment, &Rule, String)> for SegmentEvaluationError {
+    fn from(value: (CheckOperatorErrorDetail, &Segment, &Rule, String)) -> Self {
         let (source, segment, segment_rule, value) = value;
         Self::SegmentEvaluationFailed(SegmentEvaluationErrorKind {
             segment_id: segment.segment_id.clone(),
             segment_rule_attribute_name: segment_rule.attribute_name.clone(),
             segment_rule_operator: segment_rule.operator.clone(),
-            value: value.clone(),
+            value: value,
             source,
         })
     }

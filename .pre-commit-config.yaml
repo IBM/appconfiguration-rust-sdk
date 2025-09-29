@@ -38,3 +38,4 @@ repos:
         # Add options for detect-secrets-hook binary. You can run `detect-secrets-hook --help` to list out all possible options.
         # add "--fail-on-unaudited" to fail pre-commit for unaudited potential secrets
         args: [--baseline, .secrets.baseline, --use-all-plugins]
+        additional_dependencies: [boxsdk<4]
