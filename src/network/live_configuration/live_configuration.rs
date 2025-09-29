@@ -337,7 +337,7 @@ mod tests {
     ) {
         let (tx, _) = std::sync::mpsc::channel();
         let mut cfg = LiveConfigurationImpl {
-            configuration: Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new())),
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             offline_mode: OfflineMode::Fail,
             current_mode: Arc::new((Mutex::new(CurrentMode::Online), Condvar::new())),
             update_thread: ThreadHandle {
@@ -379,7 +379,7 @@ mod tests {
         let (tx, _) = std::sync::mpsc::channel();
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
-            configuration: Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new())),
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new((
                 Mutex::new(CurrentMode::Offline(
                     CurrentModeOfflineReason::WebsocketClosed,
@@ -406,14 +406,13 @@ mod tests {
         {
             cfg.offline_mode = OfflineMode::Cache;
             {
-                cfg.configuration = Arc::new((Mutex::new(None), Condvar::new()));
+                cfg.configuration = Arc::new(Mutex::new(None));
                 let r = cfg.get_configuration();
                 assert!(r.is_err());
                 assert_eq!(r.unwrap_err(), Error::ConfigurationNotYetAvailable);
             }
             {
-                cfg.configuration =
-                    Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new()));
+                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
                 let r = cfg.get_configuration();
                 assert!(r.is_ok(), "Error: {}", r.unwrap_err());
                 assert!(r.unwrap().features.is_empty());
@@ -438,7 +437,7 @@ mod tests {
         let (tx, _) = std::sync::mpsc::channel();
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
-            configuration: Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new())),
+            configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             current_mode: Arc::new((Mutex::new(CurrentMode::Defunct(Ok(()))), Condvar::new())),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
@@ -460,7 +459,7 @@ mod tests {
         {
             cfg.offline_mode = OfflineMode::Cache;
             {
-                cfg.configuration = Arc::new((Mutex::new(None), Condvar::new()));
+                cfg.configuration = Arc::new(Mutex::new(None));
                 let r = cfg.get_configuration();
                 assert!(r.is_err());
                 assert_eq!(
@@ -471,8 +470,7 @@ mod tests {
                 );
             }
             {
-                cfg.configuration =
-                    Arc::new((Mutex::new(Some(Configuration::default())), Condvar::new()));
+                cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
                 let r = cfg.get_configuration();
                 assert!(r.is_ok(), "Error: {}", r.unwrap_err());
                 assert!(r.unwrap().features.is_empty());

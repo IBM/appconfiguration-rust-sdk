@@ -226,7 +226,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((
             Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
             Condvar::new(),
@@ -242,7 +242,7 @@ mod tests {
         let r = worker.update_configuration_from_server_and_current_mode();
 
         assert!(r.is_ok());
-        assert!(configuration.0.lock().unwrap().is_some());
+        assert!(configuration.lock().unwrap().is_some());
         assert_eq!(*current_mode.0.lock().unwrap(), CurrentMode::Online);
     }
 
@@ -269,7 +269,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "not used".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((
             Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
             Condvar::new(),
@@ -285,7 +285,7 @@ mod tests {
         let r = worker.update_configuration_from_server_and_current_mode();
 
         assert!(r.is_ok());
-        assert!(configuration.0.lock().unwrap().is_none());
+        assert!(configuration.lock().unwrap().is_none());
         assert_eq!(
             *current_mode.0.lock().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
@@ -312,7 +312,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let worker = UpdateThreadWorker::new(
@@ -326,7 +326,7 @@ mod tests {
 
         // check if we transition from online to offline:
         assert!(r.is_ok());
-        assert!(configuration.0.lock().unwrap().is_none());
+        assert!(configuration.lock().unwrap().is_none());
         assert_eq!(
             *current_mode.0.lock().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
@@ -390,7 +390,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((
             Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
             Condvar::new(),
@@ -408,11 +408,9 @@ mod tests {
             message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
         });
 
-        let configuration = &configuration.0;
-        let current_mode = &current_mode.0;
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_some());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(*current_mode.0.lock().unwrap(), CurrentMode::Online);
 
         // A repeated heartbeat should not re-fetch config (noop once online)
         *configuration.lock().unwrap() = None;
@@ -421,7 +419,7 @@ mod tests {
         });
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_none());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(*current_mode.0.lock().unwrap(), CurrentMode::Online);
 
         // Any other message type is a noop
         let r = worker.handle_websocket_message(WebsocketMockReader {
@@ -429,7 +427,7 @@ mod tests {
         });
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_none());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(*current_mode.0.lock().unwrap(), CurrentMode::Online);
 
         // any other text message should lead to a config update (None -> Some)
         let r = worker.handle_websocket_message(WebsocketMockReader {
@@ -437,7 +435,7 @@ mod tests {
         });
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_some());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(*current_mode.0.lock().unwrap(), CurrentMode::Online);
 
         // After websocket is closed, it is consumed and we are offline
         let r = worker.handle_websocket_message(WebsocketMockReader {
@@ -446,7 +444,7 @@ mod tests {
         assert!(r.unwrap().is_none()); // WS consumed
         assert!(configuration.lock().unwrap().is_some());
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            *current_mode.0.lock().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::WebsocketClosed)
         );
     }
@@ -471,7 +469,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((
             Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
             Condvar::new(),
@@ -526,7 +524,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let worker = UpdateThreadWorker::new(
@@ -579,7 +577,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let (tx_serverclient_call_logs, rx_serverclient_call_logs) = std::sync::mpsc::channel();
@@ -636,7 +634,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let worker = UpdateThreadWorker::new(
@@ -676,7 +674,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let worker = UpdateThreadWorker::new(
@@ -716,7 +714,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let (get_ws_tx, get_ws_rx) = std::sync::mpsc::channel();
