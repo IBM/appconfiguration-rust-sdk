@@ -38,7 +38,7 @@ pub trait LiveConfiguration: ConfigurationProvider {
 pub(crate) struct LiveConfigurationImpl {
     /// Configuration object that will be returned to consumers. This is also the object
     /// that the thread in the backend will be updating.
-    configuration: Arc<(Mutex<Option<Configuration>>, Condvar)>,
+    configuration: Arc<Mutex<Option<Configuration>>>,
 
     /// Current operation mode.
     current_mode: Arc<(Mutex<CurrentMode>, Condvar)>,
@@ -58,7 +58,7 @@ impl LiveConfigurationImpl {
         server_client: T,
         configuration_id: ConfigurationId,
     ) -> Self {
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((
             Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
             Condvar::new(),
@@ -89,8 +89,7 @@ impl LiveConfigurationImpl {
         let (current_mode_mutex, _) = &*self.current_mode;
         match &*current_mode_mutex.lock()? {
             CurrentMode::Online => {
-                let (configuration_mutex, _) = &*self.configuration;
-                match &*configuration_mutex.lock()? {
+                match &*self.configuration.lock()? {
                     // We store the configuration retrieved from the server into the Arc<Mutex> before switching the flag to Online
                     None => unreachable!(),
                     Some(configuration) => Ok(configuration.clone()),
@@ -98,13 +97,10 @@ impl LiveConfigurationImpl {
             }
             CurrentMode::Offline(current_mode_offline_reason) => match &self.offline_mode {
                 OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason.clone())),
-                OfflineMode::Cache => {
-                    let (configuration_mutex, _) = &*self.configuration;
-                    match &*configuration_mutex.lock()? {
-                        None => Err(Error::ConfigurationNotYetAvailable),
-                        Some(configuration) => Ok(configuration.clone()),
-                    }
-                }
+                OfflineMode::Cache => match &*self.configuration.lock()? {
+                    None => Err(Error::ConfigurationNotYetAvailable),
+                    Some(configuration) => Ok(configuration.clone()),
+                },
                 OfflineMode::FallbackData(app_configuration_offline) => {
                     Ok(app_configuration_offline.config_snapshot.clone())
                 }
@@ -114,16 +110,13 @@ impl LiveConfigurationImpl {
                     "Thread finished with status: {:?}",
                     result
                 ))),
-                OfflineMode::Cache => {
-                    let (configuration_mutex, _) = &*self.configuration;
-                    match &*configuration_mutex.lock()? {
-                        None => Err(Error::UnrecoverableError(format!(
-                            "Initial configuration failed to retrieve: {:?}",
-                            result
-                        ))),
-                        Some(configuration) => Ok(configuration.clone()),
-                    }
-                }
+                OfflineMode::Cache => match &*self.configuration.lock()? {
+                    None => Err(Error::UnrecoverableError(format!(
+                        "Initial configuration failed to retrieve: {:?}",
+                        result
+                    ))),
+                    Some(configuration) => Ok(configuration.clone()),
+                },
                 OfflineMode::FallbackData(app_configuration_offline) => {
                     Ok(app_configuration_offline.config_snapshot.clone())
                 }

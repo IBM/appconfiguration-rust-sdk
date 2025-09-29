@@ -29,7 +29,7 @@ pub(crate) const SERVER_HEARTBEAT: &str = "test message";
 pub(crate) struct UpdateThreadWorker<T: ServerClient> {
     server_client: T,
     configuration_id: ConfigurationId,
-    configuration: Arc<(Mutex<Option<Configuration>>, Condvar)>,
+    configuration: Arc<Mutex<Option<Configuration>>>,
     current_mode: Arc<(Mutex<CurrentMode>, Condvar)>,
 }
 
@@ -37,7 +37,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     pub(crate) fn new(
         server_client: T,
         configuration_id: ConfigurationId,
-        configuration: Arc<(Mutex<Option<Configuration>>, Condvar)>,
+        configuration: Arc<Mutex<Option<Configuration>>>,
         current_mode: Arc<(Mutex<CurrentMode>, Condvar)>,
     ) -> Self {
         Self {
@@ -107,10 +107,8 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     fn update_configuration_from_server_and_current_mode(&self) -> Result<()> {
         match self.server_client.get_configuration(&self.configuration_id) {
             Ok(config) => {
-                let (current_config_mutex, condition_variable) = &*self.configuration;
-                let mut current_config = current_config_mutex.lock()?;
+                let mut current_config = self.configuration.lock()?;
                 *current_config = Some(config);
-                condition_variable.notify_all();
 
                 let (current_mode_mutex, condition_variable) = &*self.current_mode;
                 let mut current_mode = current_mode_mutex.lock()?;
@@ -355,7 +353,7 @@ mod tests {
             }
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
-        let configuration = Arc::new((Mutex::new(None), Condvar::new()));
+        let configuration = Arc::new(Mutex::new(None));
         let current_mode = Arc::new((Mutex::new(CurrentMode::Online), Condvar::new()));
 
         let worker = UpdateThreadWorker::new(
