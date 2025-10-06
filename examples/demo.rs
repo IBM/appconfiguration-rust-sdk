@@ -54,7 +54,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     let configuration = ConfigurationId::new(guid, environment_id, collection_id);
     let client =
         AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
-    print!("Waiting for initial data...");
+    print!("Waiting to get online...");
     std::io::stdout().flush().unwrap();
     client.wait_until_online();
     println!(" DONE");

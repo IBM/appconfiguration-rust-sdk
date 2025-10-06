@@ -125,8 +125,6 @@ impl LiveConfigurationImpl {
     }
 }
 
-fn assert_type<T>(_val: T) {}
-
 impl ConfigurationProvider for LiveConfigurationImpl {
     fn get_feature_ids(&self) -> crate::Result<Vec<String>> {
         self.get_configuration()?.get_feature_ids()
