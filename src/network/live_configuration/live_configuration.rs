@@ -267,6 +267,7 @@ mod tests {
 
             // Wait for thread to do some work and then to wait on websocket
             read_msg_ping_rx.recv().unwrap();
+            //live_config.wait_until_online();
             // Blocked in socket.read_msg()
             // Expect, we get a configuration and are Online / Running state
             let config_result = live_config.get_configuration();

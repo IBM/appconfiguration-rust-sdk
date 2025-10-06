@@ -169,6 +169,7 @@ mod tests {
             );
             let (metering, metering_recv) = start_metering_mock(configuration_id);
 
+            println!("aaa");
             (
                 AppConfigurationClientHttp {
                     live_configuration: live_cfg_mock,
