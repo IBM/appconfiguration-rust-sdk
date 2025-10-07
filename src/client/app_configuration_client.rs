@@ -68,7 +68,7 @@ pub trait ConfigurationProvider {
     /// remote or not
     fn is_online(&self) -> Result<bool>;
 
-    /// For remote configurations: Blocks until it's connected to the remote.
+    /// For remote configurations: Blocks until connected to the remote.
     fn wait_until_online(&self);
 }
 

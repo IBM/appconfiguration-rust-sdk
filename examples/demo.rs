@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, env, io::Write, thread, time::Duration};
+use std::{collections::HashMap, env, thread, time::Duration};
 
 use appconfiguration::{
     AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, ConfigurationProvider,
@@ -54,8 +54,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     let configuration = ConfigurationId::new(guid, environment_id, collection_id);
     let client =
         AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
-    print!("Waiting to get online...");
-    std::io::stdout().flush().unwrap();
+    println!("Waiting to get online...");
     client.wait_until_online();
     println!(" DONE");
 
@@ -69,6 +68,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     println!("Try changing the configuraiton in the App Configuration instances.");
 
     loop {
+        println!("\n\nFEATURE FLAG OPERATIONS\n");
         match client.get_feature_proxy(&feature_id) {
             Ok(feature) => {
                 println!("Feature name: {}", feature.get_name()?);
@@ -80,6 +80,8 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
                 println!("There was an error getting the Feature Flag. Error {error}",);
             }
         }
+
+        println!("\n\nPROPERTY OPERATIONS\n");
         match client.get_property_proxy(&property_id) {
             Ok(property) => {
                 println!("Property name: {}", property.get_name()?);
