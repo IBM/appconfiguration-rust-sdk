@@ -265,9 +265,15 @@ mod tests {
                 })
                 .unwrap();
 
-            // Wait for thread to do some work and then to wait on websocket
-            read_msg_ping_rx.recv().unwrap();
-            //live_config.wait_until_online();
+            // Now live_config should eventually transition into
+            // online state. We can wait for this transition to happen:
+            live_config.wait_until_online();
+            // And assert that we are really online
+            let current_mode = live_config.get_current_mode();
+            assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+            // The initialization should have received one message from WS.
+            // We consume it. Note the `try_` here. We should not block here, as this was already asserted via the `wait_until_online()` earlier.
+            read_msg_ping_rx.try_recv().unwrap();
             // Blocked in socket.read_msg()
             // Expect, we get a configuration and are Online / Running state
             let config_result = live_config.get_configuration();
@@ -314,6 +320,12 @@ mod tests {
             assert!(matches!(thread_state, ThreadStatus::Running));
             let current_mode = live_config.get_current_mode();
             assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+        }
+
+        {
+            // After all those operations live_config should still be online.
+            // `wait_until_online` should not block:
+            live_config.wait_until_online();
         }
 
         {
