@@ -37,7 +37,7 @@ use appconfiguration::{
 
 // Create the client connecting to the server
 let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
+let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail, false)?;
 
 // Get the feature you want to evaluate for your entities
 let feature = client.get_feature("AB_testing_feature")?;

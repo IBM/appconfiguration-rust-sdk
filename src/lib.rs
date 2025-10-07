@@ -62,7 +62,7 @@
 //!
 //! // Create the client connecting to the server
 //! let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail)?;
+//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail, false)?;
 //!
 //! // Get the feature you want to evaluate for your entities
 //! let feature = client.get_feature("AB_testing_feature")?;
@@ -101,7 +101,7 @@ pub use entity::Entity;
 pub use errors::{ConfigurationDataError, Error, Result};
 pub use feature::Feature;
 pub use network::live_configuration::OfflineMode;
-pub(crate) use network::{IBMCloudTokenProvider, ServerClientImpl};
+pub(crate) use network::{ServerClientImpl, TokenProviderImpl};
 pub use property::Property;
 pub use value::Value;
 

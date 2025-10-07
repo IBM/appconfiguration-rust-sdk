@@ -63,7 +63,7 @@ pub(crate) mod tests {
     use httpmock::Method::POST;
     use httpmock::MockServer;
     use serde_json::json;
-    #[derive(Debug, Clone)]
+    #[derive(Default, Debug, Clone)]
     struct MockTokenProvider {}
 
     impl TokenProvider for MockTokenProvider {
@@ -97,7 +97,7 @@ pub(crate) mod tests {
 
         let client = MeteringClientHttp::new(
             ServiceAddress::new_without_ssl(server.host(), Some(server.port()), None),
-            Arc::new(Box::new(MockTokenProvider {})),
+            Arc::new(Box::new(MockTokenProvider::default())),
         );
 
         let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
@@ -119,7 +119,7 @@ pub(crate) mod tests {
 
         let client = MeteringClientHttp::new(
             ServiceAddress::new_without_ssl(server.host(), Some(server.port()), None),
-            Arc::new(Box::new(MockTokenProvider {})),
+            Arc::new(Box::new(MockTokenProvider::default())),
         );
 
         let data = MeteringDataJson::new("test".to_string(), "dev".to_string());
