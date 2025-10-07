@@ -64,7 +64,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
         city: "Bangalore".to_string(),
         radius: 60,
     };
-    thread::sleep(Duration::from_secs(5));
+
     println!("The information is displayed every 5 seconds.");
     println!("Try changing the configuraiton in the App Configuration instances.");
 
