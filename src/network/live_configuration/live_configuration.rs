@@ -83,7 +83,7 @@ impl LiveConfigurationImpl {
     /// configured for this object.
     fn get_configuration(&self) -> Result<Configuration> {
         // TODO: Can we return a reference instead?
-        match &self.current_mode.get()? {
+        match self.current_mode.get()? {
             CurrentMode::Online => {
                 match &*self.configuration.lock()? {
                     // We store the configuration retrieved from the server into the Arc<Mutex> before switching the flag to Online
