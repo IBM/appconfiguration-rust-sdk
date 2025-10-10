@@ -20,7 +20,9 @@ use super::CurrentMode;
 use super::{Error, Result};
 use crate::models::Configuration;
 use crate::network::http_client::{ServerClient, WebsocketReader};
+use crate::network::live_configuration::current_mode;
 use crate::network::NetworkError;
+use crate::utils::Waitable;
 use crate::ConfigurationId;
 
 pub(crate) const SERVER_HEARTBEAT: &str = "test message";
@@ -29,7 +31,7 @@ pub(crate) struct UpdateThreadWorker<T: ServerClient> {
     server_client: T,
     configuration_id: ConfigurationId,
     configuration: Arc<Mutex<Option<Configuration>>>,
-    current_mode: Arc<Mutex<CurrentMode>>,
+    current_mode: Waitable<CurrentMode>,
 }
 
 impl<T: ServerClient> UpdateThreadWorker<T> {
@@ -37,7 +39,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
         server_client: T,
         configuration_id: ConfigurationId,
         configuration: Arc<Mutex<Option<Configuration>>>,
-        current_mode: Arc<Mutex<CurrentMode>>,
+        current_mode: Waitable<CurrentMode>,
     ) -> Self {
         Self {
             server_client,
@@ -93,7 +95,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     /// [`UpdateThreadWorker::current_mode`] is set to [`CurrentMode::Defunct`].
     pub(crate) fn run(&self, thread_termination_receiver: Receiver<()>) -> Result<()> {
         let result = self.run_internal(thread_termination_receiver);
-        *self.current_mode.lock().unwrap() = CurrentMode::Defunct(result.clone());
+        let _ = self.current_mode.set(CurrentMode::Defunct(result.clone()));
         result
     }
 
@@ -103,14 +105,24 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     fn update_configuration_from_server_and_current_mode(&self) -> Result<()> {
         match self.server_client.get_configuration(&self.configuration_id) {
             Ok(config) => {
-                *self.configuration.lock()? = Some(config);
-                *self.current_mode.lock()? = CurrentMode::Online;
+                let mut current_config = self.configuration.lock()?;
+                *current_config = Some(config);
+
+                self.current_mode
+                    .set(CurrentMode::Online)
+                    .map_err(|_| Error::CannotAcquireLock)?;
+
                 Ok(())
             }
             Err(e) => {
                 Self::recoverable_error(e)?;
-                *self.current_mode.lock()? =
-                    CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration);
+
+                self.current_mode
+                    .set(CurrentMode::Offline(
+                        CurrentModeOfflineReason::FailedToGetNewConfiguration,
+                    ))
+                    .map_err(|_| Error::CannotAcquireLock)?;
+
                 Ok(())
             }
         }
@@ -128,7 +140,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
         match socket.read_msg() {
             Ok(msg) => match msg {
                 tungstenite::Message::Text(utf8_bytes) => {
-                    let current_mode_clone = self.current_mode.lock()?.clone();
+                    let current_mode_clone = self.current_mode.get()?;
                     match (utf8_bytes.as_str(), current_mode_clone) {
                         (SERVER_HEARTBEAT, CurrentMode::Offline(_)) => {
                             self.update_configuration_from_server_and_current_mode()?;
@@ -141,8 +153,11 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                     Ok(Some(socket))
                 }
                 tungstenite::Message::Close(_) => {
-                    *self.current_mode.lock()? =
-                        CurrentMode::Offline(CurrentModeOfflineReason::WebsocketClosed);
+                    self.current_mode
+                        .set(CurrentMode::Offline(
+                            CurrentModeOfflineReason::WebsocketClosed,
+                        ))
+                        .map_err(|_| Error::CannotAcquireLock)?;
                     Ok(None)
                 }
                 _ => {
@@ -151,8 +166,11 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 }
             },
             Err(_) => {
-                *self.current_mode.lock()? =
-                    CurrentMode::Offline(CurrentModeOfflineReason::WebsocketError);
+                self.current_mode
+                    .set(CurrentMode::Offline(
+                        CurrentModeOfflineReason::WebsocketError,
+                    ))
+                    .map_err(|_| Error::CannotAcquireLock)?;
                 Ok(None)
             }
         }
@@ -209,9 +227,8 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
-            CurrentModeOfflineReason::Initializing,
-        )));
+        let current_mode =
+            Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -224,7 +241,7 @@ mod tests {
 
         assert!(r.is_ok());
         assert!(configuration.lock().unwrap().is_some());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(current_mode.get().unwrap(), CurrentMode::Online);
     }
 
     #[test]
@@ -251,9 +268,8 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "not used".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
-            CurrentModeOfflineReason::Initializing,
-        )));
+        let current_mode =
+            Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -267,7 +283,7 @@ mod tests {
         assert!(r.is_ok());
         assert!(configuration.lock().unwrap().is_none());
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            current_mode.get().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
         );
     }
@@ -293,7 +309,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -308,7 +324,7 @@ mod tests {
         assert!(r.is_ok());
         assert!(configuration.lock().unwrap().is_none());
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            current_mode.get().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::FailedToGetNewConfiguration)
         );
     }
@@ -334,7 +350,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -371,9 +387,8 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
-            CurrentModeOfflineReason::Initializing,
-        )));
+        let current_mode =
+            Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -386,9 +401,10 @@ mod tests {
         let r = worker.handle_websocket_message(WebsocketMockReader {
             message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
         });
+
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_some());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(current_mode.get().unwrap(), CurrentMode::Online);
 
         // A repeated heartbeat should not re-fetch config (noop once online)
         *configuration.lock().unwrap() = None;
@@ -397,7 +413,7 @@ mod tests {
         });
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_none());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(current_mode.get().unwrap(), CurrentMode::Online);
 
         // Any other message type is a noop
         let r = worker.handle_websocket_message(WebsocketMockReader {
@@ -405,7 +421,7 @@ mod tests {
         });
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_none());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(current_mode.get().unwrap(), CurrentMode::Online);
 
         // any other text message should lead to a config update (None -> Some)
         let r = worker.handle_websocket_message(WebsocketMockReader {
@@ -413,7 +429,7 @@ mod tests {
         });
         assert!(r.unwrap().is_some());
         assert!(configuration.lock().unwrap().is_some());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Online);
+        assert_eq!(current_mode.get().unwrap(), CurrentMode::Online);
 
         // After websocket is closed, it is consumed and we are offline
         let r = worker.handle_websocket_message(WebsocketMockReader {
@@ -422,7 +438,7 @@ mod tests {
         assert!(r.unwrap().is_none()); // WS consumed
         assert!(configuration.lock().unwrap().is_some());
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            current_mode.get().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::WebsocketClosed)
         );
     }
@@ -448,9 +464,8 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
-            CurrentModeOfflineReason::Initializing,
-        )));
+        let current_mode =
+            Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -474,7 +489,7 @@ mod tests {
         assert!(r.is_err());
 
         // Additionally we check that a heartbeat when online is a noop
-        *current_mode.lock().unwrap() = CurrentMode::Online;
+        current_mode.set(CurrentMode::Online).unwrap();
         let r = worker.handle_websocket_message(WebsocketMockReader {
             message: Some(Ok(tungstenite::Message::text(SERVER_HEARTBEAT))),
         });
@@ -502,7 +517,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -523,7 +538,7 @@ mod tests {
 
         // websocket read error changes current_mode to Offline
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            current_mode.get().unwrap(),
             CurrentMode::Offline(CurrentModeOfflineReason::WebsocketError)
         );
     }
@@ -555,7 +570,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let (tx_serverclient_call_logs, rx_serverclient_call_logs) = std::sync::mpsc::channel();
         let worker = UpdateThreadWorker::new(
@@ -571,7 +586,7 @@ mod tests {
         let r = worker.run(rx_thread_terminator);
         assert!(r.is_err());
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            current_mode.get().unwrap(),
             CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
         );
 
@@ -612,7 +627,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -625,7 +640,7 @@ mod tests {
         let r = worker.run(rx);
         assert!(r.is_err());
         assert_eq!(
-            *current_mode.lock().unwrap(),
+            current_mode.get().unwrap(),
             CurrentMode::Defunct(Err(Error::UnrecoverableError("".into())))
         );
     }
@@ -652,7 +667,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let worker = UpdateThreadWorker::new(
             ServerClientMock {},
@@ -664,7 +679,7 @@ mod tests {
         drop(tx);
         let r = worker.run(rx);
         assert!(r.is_ok());
-        assert_eq!(*current_mode.lock().unwrap(), CurrentMode::Defunct(Ok(())));
+        assert_eq!(current_mode.get().unwrap(), CurrentMode::Defunct(Ok(())));
     }
 
     #[test]
@@ -689,7 +704,7 @@ mod tests {
         }
         let configuration_id = ConfigurationId::new("".into(), "environment_id".into(), "".into());
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Online));
+        let current_mode = Waitable::new(CurrentMode::Online);
 
         let (get_ws_tx, get_ws_rx) = std::sync::mpsc::channel();
 

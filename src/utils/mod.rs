@@ -13,5 +13,7 @@
 // limitations under the License.
 
 mod thread_handle;
+mod waitable;
 
 pub(crate) use thread_handle::{ThreadHandle, ThreadStatus};
+pub(crate) use waitable::Waitable;

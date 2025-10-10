@@ -22,6 +22,7 @@ use crate::ConfigurationDataError;
 use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
 use crate::ConfigurationProvider;
+use log::error;
 
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.
@@ -191,6 +192,11 @@ impl ConfigurationProvider for Configuration {
 
     fn is_online(&self) -> Result<bool> {
         Ok(false)
+    }
+
+    fn wait_until_online(&self) {
+        error!("Waiting for Configuration to get online. This will never happen.");
+        std::thread::park(); // block forever
     }
 }
 
