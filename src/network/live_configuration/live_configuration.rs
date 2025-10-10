@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 
 use super::current_mode::CurrentModeOfflineReason;
 use super::update_thread_worker::UpdateThreadWorker;
 use super::{CurrentMode, Error, OfflineMode, Result};
 use crate::models::Configuration;
 use crate::network::http_client::ServerClient;
-use crate::network::live_configuration::current_mode;
-use crate::utils::{ThreadHandle, ThreadStatus};
+use crate::utils::{ThreadHandle, ThreadStatus, Waitable};
 use crate::{AppConfigurationOffline, ConfigurationId, ConfigurationProvider};
 
 /// A [`ConfigurationProvider`] that keeps the configuration updated with some
@@ -41,7 +40,7 @@ pub(crate) struct LiveConfigurationImpl {
     configuration: Arc<Mutex<Option<Configuration>>>,
 
     /// Current operation mode.
-    current_mode: Arc<(Mutex<CurrentMode>, Condvar)>,
+    current_mode: Waitable<CurrentMode>,
 
     /// Handler to the internal thread that takes care of updating the [`LiveConfigurationImpl::configuration`].
     update_thread: ThreadHandle<Result<()>>,
@@ -59,10 +58,8 @@ impl LiveConfigurationImpl {
         configuration_id: ConfigurationId,
     ) -> Self {
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new((
-            Mutex::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing)),
-            Condvar::new(),
-        ));
+        let current_mode =
+            Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
 
         let worker = UpdateThreadWorker::new(
             server_client,
@@ -86,8 +83,7 @@ impl LiveConfigurationImpl {
     /// configured for this object.
     fn get_configuration(&self) -> Result<Configuration> {
         // TODO: Can we return a reference instead?
-        let (current_mode_mutex, _) = &*self.current_mode;
-        match &*current_mode_mutex.lock()? {
+        match &self.current_mode.get()? {
             CurrentMode::Online => {
                 match &*self.configuration.lock()? {
                     // We store the configuration retrieved from the server into the Arc<Mutex> before switching the flag to Online
@@ -147,13 +143,7 @@ impl ConfigurationProvider for LiveConfigurationImpl {
     }
 
     fn wait_until_online(&self) {
-        let (current_mode_mutex, condition_variable) = &*self.current_mode;
-        let current_mode_guard = current_mode_mutex.lock().unwrap();
-        let _guard = condition_variable
-            .wait_while(current_mode_guard, |current_mode| {
-                *current_mode != CurrentMode::Online
-            })
-            .unwrap();
+        let _ = self.current_mode.wait_for(CurrentMode::Online).unwrap();
     }
 }
 
@@ -163,8 +153,7 @@ impl LiveConfiguration for LiveConfigurationImpl {
     }
 
     fn get_current_mode(&self) -> Result<CurrentMode> {
-        let (current_mode_mutex, _) = &*self.current_mode;
-        Ok(current_mode_mutex.lock()?.clone())
+        Ok(self.current_mode.get()?)
     }
 }
 
@@ -350,7 +339,7 @@ mod tests {
         let mut cfg = LiveConfigurationImpl {
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             offline_mode: OfflineMode::Fail,
-            current_mode: Arc::new((Mutex::new(CurrentMode::Online), Condvar::new())),
+            current_mode: Waitable::new(CurrentMode::Online),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
@@ -391,11 +380,8 @@ mod tests {
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
-            current_mode: Arc::new((
-                Mutex::new(CurrentMode::Offline(
-                    CurrentModeOfflineReason::WebsocketClosed,
-                )),
-                Condvar::new(),
+            current_mode: Waitable::new(CurrentMode::Offline(
+                CurrentModeOfflineReason::WebsocketClosed,
             )),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
@@ -449,7 +435,7 @@ mod tests {
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
-            current_mode: Arc::new((Mutex::new(CurrentMode::Defunct(Ok(()))), Condvar::new())),
+            current_mode: Waitable::new(CurrentMode::Defunct(Ok(()))),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
