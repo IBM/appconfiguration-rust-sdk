@@ -154,8 +154,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                     self.current_mode
                         .set(CurrentMode::Offline(
                             CurrentModeOfflineReason::WebsocketClosed,
-                        ))
-                        .map_err(|_| Error::CannotAcquireLock)?;
+                        ))?;
                     Ok(None)
                 }
                 _ => {
