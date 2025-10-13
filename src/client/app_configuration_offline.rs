@@ -58,7 +58,6 @@ impl ConfigurationProvider for AppConfigurationOffline {
     }
 
     fn wait_until_online(&self) {
-        error!("Waiting for AppConfigurationOffline to get online. This will never happen.");
-        std::thread::park(); // block forever
+        panic!("Waiting for AppConfigurationOffline to get online. This will never happen.");
     }
 }
