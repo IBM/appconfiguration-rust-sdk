@@ -119,8 +119,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 self.current_mode
                     .set(CurrentMode::Offline(
                         CurrentModeOfflineReason::FailedToGetNewConfiguration,
-                    ))
-                    .map_err(|_| Error::CannotAcquireLock)?;
+                    ))?;
 
                 Ok(())
             }
