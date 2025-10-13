@@ -108,18 +108,16 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 let mut current_config = self.configuration.lock()?;
                 *current_config = Some(config);
 
-                self.current_mode
-                    .set(CurrentMode::Online)?;
+                self.current_mode.set(CurrentMode::Online)?;
 
                 Ok(())
             }
             Err(e) => {
                 Self::recoverable_error(e)?;
 
-                self.current_mode
-                    .set(CurrentMode::Offline(
-                        CurrentModeOfflineReason::FailedToGetNewConfiguration,
-                    ))?;
+                self.current_mode.set(CurrentMode::Offline(
+                    CurrentModeOfflineReason::FailedToGetNewConfiguration,
+                ))?;
 
                 Ok(())
             }
@@ -151,10 +149,9 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                     Ok(Some(socket))
                 }
                 tungstenite::Message::Close(_) => {
-                    self.current_mode
-                        .set(CurrentMode::Offline(
-                            CurrentModeOfflineReason::WebsocketClosed,
-                        ))?;
+                    self.current_mode.set(CurrentMode::Offline(
+                        CurrentModeOfflineReason::WebsocketClosed,
+                    ))?;
                     Ok(None)
                 }
                 _ => {
@@ -163,10 +160,9 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 }
             },
             Err(_) => {
-                self.current_mode
-                    .set(CurrentMode::Offline(
-                        CurrentModeOfflineReason::WebsocketError,
-                    ))?;
+                self.current_mode.set(CurrentMode::Offline(
+                    CurrentModeOfflineReason::WebsocketError,
+                ))?;
                 Ok(None)
             }
         }
