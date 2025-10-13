@@ -109,8 +109,7 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
                 *current_config = Some(config);
 
                 self.current_mode
-                    .set(CurrentMode::Online)
-                    .map_err(|_| Error::CannotAcquireLock)?;
+                    .set(CurrentMode::Online)?;
 
                 Ok(())
             }
