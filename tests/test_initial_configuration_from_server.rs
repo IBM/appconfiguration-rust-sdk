@@ -67,7 +67,7 @@ fn main() {
     )
     .unwrap();
 
-    common::wait_until_online(&client);
+    client.wait_until_online();
 
     let mut features = client.get_feature_ids().unwrap();
     features.sort();

@@ -67,6 +67,9 @@ pub trait ConfigurationProvider {
     /// For remote configurations, it returns whether it's connected to the
     /// remote or not
     fn is_online(&self) -> Result<bool>;
+
+    /// For remote configurations: Blocks until connected to the remote.
+    fn wait_until_online(&self);
 }
 
 /// AppConfiguration client for browsing, and evaluating features and properties.

@@ -61,7 +61,7 @@ fn main() {
     )
     .unwrap();
 
-    common::wait_until_online(&client);
+    client.wait_until_online();
 
     // Tell the server that now it can progress
     server.config_updated.send(()).unwrap();

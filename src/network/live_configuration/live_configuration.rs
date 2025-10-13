@@ -19,8 +19,8 @@ use super::update_thread_worker::UpdateThreadWorker;
 use super::{CurrentMode, Error, OfflineMode, Result};
 use crate::models::Configuration;
 use crate::network::http_client::ServerClient;
-use crate::utils::{ThreadHandle, ThreadStatus};
-use crate::{ConfigurationId, ConfigurationProvider};
+use crate::utils::{ThreadHandle, ThreadStatus, Waitable};
+use crate::{AppConfigurationOffline, ConfigurationId, ConfigurationProvider};
 
 /// A [`ConfigurationProvider`] that keeps the configuration updated with some
 /// third-party source using an asyncronous mechanism.
@@ -40,7 +40,7 @@ pub(crate) struct LiveConfigurationImpl {
     configuration: Arc<Mutex<Option<Configuration>>>,
 
     /// Current operation mode.
-    current_mode: Arc<Mutex<CurrentMode>>,
+    current_mode: Waitable<CurrentMode>,
 
     /// Handler to the internal thread that takes care of updating the [`LiveConfigurationImpl::configuration`].
     update_thread: ThreadHandle<Result<()>>,
@@ -58,9 +58,8 @@ impl LiveConfigurationImpl {
         configuration_id: ConfigurationId,
     ) -> Self {
         let configuration = Arc::new(Mutex::new(None));
-        let current_mode = Arc::new(Mutex::new(CurrentMode::Offline(
-            CurrentModeOfflineReason::Initializing,
-        )));
+        let current_mode =
+            Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
 
         let worker = UpdateThreadWorker::new(
             server_client,
@@ -84,7 +83,7 @@ impl LiveConfigurationImpl {
     /// configured for this object.
     fn get_configuration(&self) -> Result<Configuration> {
         // TODO: Can we return a reference instead?
-        match &*self.current_mode.lock()? {
+        match self.current_mode.get()? {
             CurrentMode::Online => {
                 match &*self.configuration.lock()? {
                     // We store the configuration retrieved from the server into the Arc<Mutex> before switching the flag to Online
@@ -142,6 +141,10 @@ impl ConfigurationProvider for LiveConfigurationImpl {
     fn is_online(&self) -> crate::Result<bool> {
         Ok(self.get_current_mode()? == CurrentMode::Online)
     }
+
+    fn wait_until_online(&self) {
+        let _ = self.current_mode.wait_for(CurrentMode::Online).unwrap();
+    }
 }
 
 impl LiveConfiguration for LiveConfigurationImpl {
@@ -150,7 +153,7 @@ impl LiveConfiguration for LiveConfigurationImpl {
     }
 
     fn get_current_mode(&self) -> Result<CurrentMode> {
-        Ok(self.current_mode.lock()?.clone())
+        Ok(self.current_mode.get()?)
     }
 }
 
@@ -251,8 +254,15 @@ mod tests {
                 })
                 .unwrap();
 
-            // Wait for thread to do some work and then to wait on websocket
-            read_msg_ping_rx.recv().unwrap();
+            // Now live_config should eventually transition into
+            // online state. We can wait for this transition to happen:
+            live_config.wait_until_online();
+            // And assert that we are really online
+            let current_mode = live_config.get_current_mode();
+            assert!(matches!(current_mode, Ok(CurrentMode::Online)));
+            // The initialization should have received one message from WS.
+            // We consume it. Note the `try_` here. We should not block here, as this was already asserted via the `wait_until_online()` earlier.
+            read_msg_ping_rx.try_recv().unwrap();
             // Blocked in socket.read_msg()
             // Expect, we get a configuration and are Online / Running state
             let config_result = live_config.get_configuration();
@@ -302,6 +312,12 @@ mod tests {
         }
 
         {
+            // After all those operations live_config should still be online.
+            // `wait_until_online` should not block:
+            live_config.wait_until_online();
+        }
+
+        {
             // When the client is dropped, the thread will be finished
             drop(live_config);
 
@@ -323,7 +339,7 @@ mod tests {
         let mut cfg = LiveConfigurationImpl {
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
             offline_mode: OfflineMode::Fail,
-            current_mode: Arc::new(Mutex::new(CurrentMode::Online)),
+            current_mode: Waitable::new(CurrentMode::Online),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
@@ -364,9 +380,9 @@ mod tests {
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
-            current_mode: Arc::new(Mutex::new(CurrentMode::Offline(
+            current_mode: Waitable::new(CurrentMode::Offline(
                 CurrentModeOfflineReason::WebsocketClosed,
-            ))),
+            )),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,
@@ -419,7 +435,7 @@ mod tests {
         let mut cfg = LiveConfigurationImpl {
             offline_mode: OfflineMode::Fail,
             configuration: Arc::new(Mutex::new(Some(Configuration::default()))),
-            current_mode: Arc::new(Mutex::new(CurrentMode::Defunct(Ok(())))),
+            current_mode: Waitable::new(CurrentMode::Defunct(Ok(()))),
             update_thread: ThreadHandle {
                 _thread_termination_sender: tx,
                 thread_handle: None,

@@ -58,12 +58,3 @@ pub fn handle_websocket(server: &TcpListener) -> WebSocket<TcpStream> {
         .unwrap();
     websocket
 }
-
-pub fn wait_until_online(client: &Box<dyn AppConfigurationClient>) {
-    loop {
-        if client.is_online().unwrap() {
-            break;
-        };
-        sleep(Duration::from_millis(10));
-    }
-}

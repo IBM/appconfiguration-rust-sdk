@@ -92,6 +92,10 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     fn is_online(&self) -> Result<bool> {
         self.live_configuration.is_online()
     }
+
+    fn wait_until_online(&self) {
+        self.live_configuration.wait_until_online();
+    }
 }
 
 #[cfg(test)]
@@ -129,6 +133,10 @@ mod tests {
         }
 
         fn is_online(&self) -> Result<bool> {
+            todo!()
+        }
+
+        fn wait_until_online(&self) {
             todo!()
         }
     }

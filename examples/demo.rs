@@ -15,8 +15,8 @@
 use std::{collections::HashMap, env, thread, time::Duration};
 
 use appconfiguration::{
-    AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, Entity, Feature,
-    OfflineMode, Property, Value,
+    AppConfigurationClient, AppConfigurationClientIBMCloud, ConfigurationId, ConfigurationProvider,
+    Entity, Feature, OfflineMode, Property, Value,
 };
 use dotenvy::dotenv;
 use std::error::Error;
@@ -59,6 +59,9 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
         OfflineMode::Fail,
         false,
     )?;
+    println!("Waiting to get online...");
+    client.wait_until_online();
+    println!(" DONE");
 
     let entity = CustomerEntity {
         id: "user123".to_string(),
