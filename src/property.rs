@@ -13,13 +13,17 @@
 // limitations under the License.
 
 use crate::errors::Result;
-use crate::{Entity, Value};
+use crate::{Entity, PropertyEvaluationResult, Value};
 
 /// Access to data and evaluation of IBM AppConfiguration properties
 pub trait Property {
     /// Returns the full name of the property.
     fn get_name(&self) -> Result<String>;
 
+    /// Evaluates a property for the given [`Entity`] and returns a detailed result
+    /// containing the final value and evaluation context.
+    fn get_current_value(&self, entity: &impl Entity) -> Result<PropertyEvaluationResult>;
+ 
     /// Evaluates a property for the given [`Entity`] and returns a [`Value`].
     ///
     /// Use the methods available in [`Value`] to return the actual primitive value. If
@@ -44,7 +48,9 @@ pub trait Property {
     /// #   Ok(())
     /// # }
     /// ```
-    fn get_value(&self, entity: &impl Entity) -> Result<Value>;
+    fn get_value(&self, entity: &impl Entity) -> Result<Value> {
+        Ok(self.get_current_value(entity)?.value)
+    }
 
     /// Evaluates a property for the given [`Entity`] and returns its value converted (if possible)
     /// to the given type.
@@ -67,5 +73,8 @@ pub trait Property {
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
-    ) -> Result<T>;
+    ) -> Result<T> {
+        let value = self.get_value(entity)?;
+        value.try_into()
+    }
 }

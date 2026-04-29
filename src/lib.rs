@@ -36,12 +36,64 @@
 //!
 //! **Note.-** This crate is still under heavy development. Breaking changes are expected.
 //!
-//! Create your client with the context (environment and collection) you want to connect to
+//! ## Recommended top-level SDK flow
+//!
+//! The Rust SDK now exposes a Node-style top-level wrapper through
+//! [`AppConfigurationSdk`](appconfiguration-rust-sdk/src/client/app_configuration_sdk.rs), mirroring
+//! the high-level `init()` + `setContext()` flow from the Node SDK.
 //!
 //! ```
 //! use appconfiguration::{
-//!     ConfigurationProvider, AppConfigurationClientIBMCloud,
-//!     ConfigurationId, Entity, Result, Value, Feature, OfflineMode
+//!     AppConfigurationContextOptions, AppConfigurationSdk, ConfigurationProvider, Entity, Feature,
+//!     Result, Value,
+//! };
+//! # use std::collections::HashMap;
+//! # pub struct MyEntity;
+//! # impl Entity for MyEntity {
+//! #   fn get_id(&self) -> String {
+//! #     "TrivialId".into()
+//! #   }
+//! #   fn get_attributes(&self) -> HashMap<String, Value> {
+//! #     HashMap::new()
+//! #   }
+//! # }
+//! # fn func() -> Result<()> {
+//! # let apikey: &str = "api_key";
+//! # let region: &str = "us-south";
+//! # let guid: &str = "12345678-1234-1234-1234-12345678abcd";
+//! # let environment_id: &str = "production";
+//! # let collection_id: &str = "ecommerce";
+//! let mut sdk = AppConfigurationSdk::new();
+//! sdk.use_private_endpoint(false);
+//! sdk.init(region, guid, apikey)?;
+//! sdk.set_context(
+//!     collection_id,
+//!     environment_id,
+//!     AppConfigurationContextOptions::default(),
+//! )?;
+//!
+//! let feature = sdk.get_feature("AB_testing_feature")?;
+//! let user = MyEntity;
+//! let value_for_this_user = feature.get_value(&user)?.try_into()?;
+//! if value_for_this_user {
+//!     println!("Feature {} is active for user {}", feature.get_name()?, user.get_id());
+//! } else {
+//!     println!("User {} keeps using the legacy workflow", user.get_id());
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Lower-level direct client flow
+//!
+//! The lower-level [`AppConfigurationClientIBMCloud`](appconfiguration-rust-sdk/src/client/app_configuration_ibm_cloud.rs)
+//! constructor remains available for callers that want to build directly from
+//! [`ConfigurationId`](appconfiguration-rust-sdk/src/client/app_configuration_client.rs).
+//!
+//! ```
+//! use appconfiguration::{
+//!     AppConfigurationClientIBMCloud, ConfigurationId, ConfigurationProvider, Entity, Feature,
+//!     OfflineMode, Result, Value,
 //! };
 //! # use std::collections::HashMap;
 //! # pub struct MyEntity;
@@ -59,24 +111,23 @@
 //! # let guid: String = "12345678-1234-1234-1234-12345678abcd".to_string();
 //! # let environment_id: String = "production".to_string();
 //! # let collection_id: String = "ecommerce".to_string();
-//!
-//! // Create the client connecting to the server
 //! let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail, false)?;
+//! let client = AppConfigurationClientIBMCloud::new(
+//!     &apikey,
+//!     &region,
+//!     configuration,
+//!     OfflineMode::Fail,
+//!     false,
+//! )?;
 //!
-//! // Get the feature you want to evaluate for your entities
 //! let feature = client.get_feature("AB_testing_feature")?;
-//!
-//! // Evaluate feature value for each one of your entities
-//! let user = MyEntity; // Implements Entity
-//!
+//! let user = MyEntity;
 //! let value_for_this_user = feature.get_value(&user)?.try_into()?;
 //! if value_for_this_user {
 //!     println!("Feature {} is active for user {}", feature.get_name()?, user.get_id());
 //! } else {
 //!     println!("User {} keeps using the legacy workflow", user.get_id());
 //! }
-//!
 //! # Ok(())
 //! # }
 //! ```
@@ -94,12 +145,17 @@ pub(crate) mod utils;
 mod value;
 
 pub use client::{
-    AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline,
-    ConfigurationId, ConfigurationProvider,
+    AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationContextOptions,
+    AppConfigurationOffline, AppConfigurationSdk, ConfigurationId, ConfigurationProvider,
+    RuntimeEventEmitter,
 };
 pub use entity::Entity;
 pub use errors::{ConfigurationDataError, Error, Result};
 pub use feature::Feature;
+pub use models::{
+    EvaluationContext, EvaluationRuleCondition, EvaluationRuleContext, EvaluationSegmentContext,
+    FeatureEvaluationResult, PropertyEvaluationResult, SecretManager, SecretPropertySnapshot,
+};
 pub use network::live_configuration::OfflineMode;
 pub(crate) use network::{ServerClientImpl, TokenProviderImpl};
 pub use property::Property;

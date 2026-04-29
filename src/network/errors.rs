@@ -41,6 +41,18 @@ pub enum NetworkError {
     #[error("Contact to server lost")]
     ContactToServerLost,
 
+    #[error("Websocket heartbeat timed out")]
+    WebsocketTimeout,
+
+    #[error("{0}")]
+    TokenProviderError(String),
+
+    #[error("Websocket connect request to the App Configuration server failed. Status code: {status_code}. Message: {message}")]
+    WebsocketHttpStatus {
+        status_code: u16,
+        message: String,
+    },
+
     #[error(transparent)]
     ConfigurationDataError(#[from] ConfigurationDataError),
 }

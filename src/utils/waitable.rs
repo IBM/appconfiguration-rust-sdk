@@ -1,4 +1,5 @@
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 /// Thread-safe wrapper around a value that allows threads to wait for specific conditions on that value.
 #[derive(Debug, Clone)]
@@ -42,6 +43,26 @@ impl<T> Waitable<T> {
         let guard = mutex.lock()?;
         let guard = condvar.wait_while(guard, |value| *value != expected)?;
         Ok(guard.clone())
+    }
+
+    pub fn wait_for_timeout(
+        &self,
+        expected: T,
+        timeout: Duration,
+    ) -> Result<Option<T>, std::sync::PoisonError<std::sync::MutexGuard<T>>>
+    where
+        T: Clone + PartialEq,
+    {
+        let (mutex, condvar) = &*self.inner;
+        let guard = mutex.lock()?;
+        let (guard, timeout_result) = condvar
+            .wait_timeout_while(guard, timeout, |value| *value != expected)
+            .map_err(|err| std::sync::PoisonError::new(err.into_inner().0))?;
+        if timeout_result.timed_out() && *guard != expected {
+            Ok(None)
+        } else {
+            Ok(Some(guard.clone()))
+        }
     }
 }
 

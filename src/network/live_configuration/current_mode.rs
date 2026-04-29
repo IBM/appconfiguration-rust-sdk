@@ -26,8 +26,10 @@ pub enum CurrentModeOfflineReason {
     // Request error, or configuration data was invalid
     FailedToGetNewConfiguration,
     Initializing,
+    InternetConnectivityError,
     WebsocketClosed,
     WebsocketError,
+    WebsocketHeartbeatTimeout,
 }
 
 impl std::fmt::Display for CurrentModeOfflineReason {
@@ -37,8 +39,14 @@ impl std::fmt::Display for CurrentModeOfflineReason {
                 write!(f, "FailedToGetNewConfiguration")
             }
             CurrentModeOfflineReason::Initializing => write!(f, "Initializing"),
+            CurrentModeOfflineReason::InternetConnectivityError => {
+                write!(f, "InternetConnectivityError")
+            }
             CurrentModeOfflineReason::WebsocketClosed => write!(f, "WebsocketClosed"),
             CurrentModeOfflineReason::WebsocketError => write!(f, "WebsocketError"),
+            CurrentModeOfflineReason::WebsocketHeartbeatTimeout => {
+                write!(f, "WebsocketHeartbeatTimeout")
+            }
         }
     }
 }

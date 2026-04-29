@@ -16,7 +16,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         // Offline data
         let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         mocked_data.push("data/data-dump-enterprise-plan-sdk-testing.json");
-        let offline_data = AppConfigurationOffline::new(&mocked_data, "dev")?;
+        let offline_data = AppConfigurationOffline::new(&mocked_data, "dev", "blue-charge")?;
 
         // The actual client
         let address = ServiceAddress::new_without_ssl(
@@ -27,7 +27,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let config_id = ConfigurationId::new(
             "guid".to_string(),
             "dev".to_string(),
-            "collection_id".to_string(),
+            "blue-charge".to_string(),
         );
 
         appconfiguration::test_utils::create_app_configuration_client_live(
@@ -41,10 +41,10 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // The client is not online
     assert!(!client.is_online().unwrap());
 
-    // but it retrieves the fallback data
+    // but it retrieves the fallback data (only features in blue-charge collection)
     let mut features = client.get_feature_ids().unwrap();
     features.sort();
-    assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f5", "f6"]);
+    assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f6"]);
 
     Ok(())
 }

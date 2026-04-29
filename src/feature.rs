@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::errors::Result;
-use crate::{Entity, Value};
+use crate::{Entity, FeatureEvaluationResult, Value};
 
 /// Access to data and evaluation of IBM AppConfiguration features
 pub trait Feature {
@@ -26,6 +26,10 @@ pub trait Feature {
     /// corresponding value. However, disabled features won't be evaluated and
     /// will always return the disabled value.
     fn is_enabled(&self) -> Result<bool>;
+
+    /// Evaluates a feature for the given [`Entity`] and returns a detailed result
+    /// containing the final value, effective enabled state and evaluation context.
+    fn get_current_value(&self, entity: &impl Entity) -> Result<FeatureEvaluationResult>;
 
     /// Evaluates a feature for the given [`Entity`] and returns a [`Value`].
     ///
@@ -51,7 +55,9 @@ pub trait Feature {
     /// #   Ok(())
     /// # }
     /// ```
-    fn get_value(&self, entity: &impl Entity) -> Result<Value>;
+    fn get_value(&self, entity: &impl Entity) -> Result<Value> {
+        Ok(self.get_current_value(entity)?.value)
+    }
 
     /// Evaluates a feature for the given [`Entity`] and returns its value converted (if possible)
     /// to the given type.
@@ -73,5 +79,10 @@ pub trait Feature {
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
-    ) -> Result<T>;
+    ) -> Result<T> {
+        let value = self.get_value(entity)?;
+        value.try_into()
+    }
 }
+
+// Made with Bob

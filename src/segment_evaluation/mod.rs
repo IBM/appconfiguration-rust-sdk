@@ -87,6 +87,22 @@ impl TargetingRule<'_> {
         self.segment_rule.value.is_default()
     }
 
+    pub(crate) fn order(&self) -> u32 {
+        self.segment_rule.order
+    }
+
+    pub(crate) fn uses_default_value(&self) -> bool {
+        self.segment_rule.value.is_default()
+    }
+
+    pub(crate) fn targeted_segment_ids(&self) -> Vec<Vec<String>> {
+        self.segment_rule
+            .rules
+            .iter()
+            .map(|segments| segments.segments.clone())
+            .collect()
+    }
+
     /// Returns the rollout percentage using the following logic:
     /// * If there is not rollout percentage in the [`TargetingRule`] it returns an error
     /// * If the rollout value in the [`TargetingRule`] is equal to "$default" it will return

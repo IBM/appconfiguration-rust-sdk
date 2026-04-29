@@ -16,13 +16,17 @@ use super::{NetworkError, NetworkResult, TokenProvider};
 use crate::models::Configuration;
 use crate::network::serialization::ConfigurationJson;
 use crate::ConfigurationId;
-use reqwest::blocking::Client;
+use reqwest::blocking::{Client, ClientBuilder};
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue, USER_AGENT};
 use std::sync::Arc;
+use std::time::Duration;
 
 use tungstenite::client::IntoClientRequest;
 
 use tungstenite::connect;
 use url::Url;
+
+pub(crate) const SDK_USER_AGENT: &str = concat!("appconfiguration-rust-sdk/", env!("CARGO_PKG_VERSION"));
 
 pub enum ServiceAddressProtocol {
     Http,
@@ -86,6 +90,11 @@ pub(crate) trait WebsocketReader: Send + 'static {
     /// Reads a message from the stream, if possible. If the connection have been closed,
     /// this will also return the close message
     fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message>;
+
+    /// Sets a read timeout for watchdog-like websocket supervision.
+    fn set_read_timeout(&mut self, _timeout: Option<Duration>) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader
@@ -94,11 +103,23 @@ impl<T: std::io::Read + std::io::Write + Send + Sync + 'static> WebsocketReader
     fn read_msg(&mut self) -> tungstenite::error::Result<tungstenite::Message> {
         self.read()
     }
+
 }
 
 pub trait ServerClient: Send + 'static {
-    fn get_configuration(&self, configuration_id: &ConfigurationId)
-        -> NetworkResult<Configuration>;
+    fn get_configuration(
+        &self,
+        configuration_id: &ConfigurationId,
+    ) -> NetworkResult<Configuration>;
+
+    fn get_configuration_json(
+        &self,
+        configuration_id: &ConfigurationId,
+    ) -> NetworkResult<ConfigurationJson> {
+        let configuration = self.get_configuration(configuration_id)?;
+        let _ = configuration;
+        Err(NetworkError::ProtocolError)
+    }
 
     fn get_configuration_monitoring_websocket(
         &self,
@@ -122,6 +143,31 @@ impl ServerClientImpl {
             token_provider,
         })
     }
+
+    fn build_http_client() -> NetworkResult<Client> {
+        ClientBuilder::new()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .map_err(NetworkError::ReqwestError)
+    }
+
+    fn build_default_headers(is_post: bool) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        headers.insert(USER_AGENT, HeaderValue::from_static(SDK_USER_AGENT));
+
+        if is_post {
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        }
+
+        headers
+    }
+
+    fn build_authorization_header(&self) -> NetworkResult<HeaderValue> {
+        let bearer = format!("Bearer {}", self.token_provider.get_access_token()?);
+        HeaderValue::from_str(&bearer)
+            .map_err(|_| NetworkError::InvalidHeaderValue("Authorization".to_string()))
+    }
 }
 
 impl ServerClient for ServerClientImpl {
@@ -129,31 +175,43 @@ impl ServerClient for ServerClientImpl {
         &self,
         configuration_id: &ConfigurationId,
     ) -> NetworkResult<Configuration> {
+        let config_json = self.get_configuration_json(configuration_id)?;
+
+        Ok(Configuration::new(
+            &configuration_id.environment_id,
+            &configuration_id.collection_id,
+            config_json,
+        )?)
+    }
+
+    fn get_configuration_json(
+        &self,
+        configuration_id: &ConfigurationId,
+    ) -> NetworkResult<ConfigurationJson> {
         let url = format!(
             "{}/feature/v1/instances/{}/config",
             self.service_address.base_url(ServiceAddressProtocol::Http),
             configuration_id.guid
         );
         let url = Url::parse(&url).map_err(|_| NetworkError::UrlParseError(url))?;
-        let client = Client::new();
-        let config_json = client
+        let client = Self::build_http_client()?;
+        let mut headers = Self::build_default_headers(false);
+        headers.insert(AUTHORIZATION, self.build_authorization_header()?);
+
+        client
             .get(url)
             .query(&[
                 ("action", "sdkConfig"),
                 ("environment_id", &configuration_id.environment_id),
                 ("collection_id", &configuration_id.collection_id),
             ])
-            .header("Accept", "application/json")
-            .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
-            .bearer_auth(self.token_provider.get_access_token()?)
-            .send()?
+            .headers(headers)
+            .send()
+            .map_err(NetworkError::ReqwestError)?
+            .error_for_status()
+            .map_err(NetworkError::ReqwestError)?
             .json::<ConfigurationJson>()
-            .map_err(|_| NetworkError::ProtocolError)?;
-
-        Ok(Configuration::new(
-            &configuration_id.environment_id,
-            config_json,
-        )?)
+            .map_err(|_| NetworkError::ProtocolError)
     }
 
     fn get_configuration_monitoring_websocket(
@@ -177,20 +235,21 @@ impl ServerClient for ServerClientImpl {
             .into_client_request()
             .map_err(NetworkError::TungsteniteError)?;
         let headers = request.headers_mut();
-        headers.insert(
-            "User-Agent",
-            "appconfiguration-rust-sdk/0.0.1"
-                .parse()
-                .map_err(|_| NetworkError::InvalidHeaderValue("User-Agent".to_string()))?,
-        );
-        headers.insert(
-            "Authorization",
-            format!("Bearer {}", self.token_provider.get_access_token()?)
-                .parse()
-                .map_err(|_| NetworkError::InvalidHeaderValue("Authorization".to_string()))?,
-        );
+        headers.insert(USER_AGENT, HeaderValue::from_static(SDK_USER_AGENT));
+        headers.insert(AUTHORIZATION, self.build_authorization_header()?);
 
-        let (websocket, _) = connect(request)?;
+        let (websocket, response) = connect(request).map_err(|error| match error {
+            tungstenite::Error::Http(response) => NetworkError::WebsocketHttpStatus {
+                status_code: response.status().as_u16(),
+                message: response
+                    .status()
+                    .canonical_reason()
+                    .unwrap_or("Unknown websocket HTTP error")
+                    .to_string(),
+            },
+            other => NetworkError::TungsteniteError(other),
+        })?;
+        let _ = response;
         Ok(websocket)
     }
 }

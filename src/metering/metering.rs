@@ -19,7 +19,7 @@ use crate::metering::models::{
     EvaluationData, EvaluationEvent, EvaluationEventData, MeteringKey, SubjectId,
 };
 use crate::metering::serialization::MeteringDataJson;
-use crate::metering::MeteringClient;
+use crate::metering::{MeteringClient, MeteringError};
 use crate::models::{FeatureSnapshot, PropertySnapshot};
 use crate::network::serialization::Segment;
 use crate::utils::ThreadHandle;
@@ -42,7 +42,7 @@ pub(crate) fn start_metering<T: MeteringClient>(
     transmit_interval: std::time::Duration,
     client: T,
 ) -> MeteringRecorder {
-    let (sender, receiver) = mpsc::channel();
+    let (evaluation_sender, receiver) = mpsc::channel();
 
     let thread = ThreadHandle::new(move |_terminator: mpsc::Receiver<()>| {
         let mut batcher = MeteringBatcher::new(client, config_id);
@@ -68,7 +68,7 @@ pub(crate) fn start_metering<T: MeteringClient>(
     MeteringRecorder {
         _thread: thread,
         sender: MeteringRecorderSender {
-            evaluation_event_sender: sender,
+            evaluation_event_sender: evaluation_sender,
         },
     }
 }
@@ -140,11 +140,17 @@ impl MeteringSubject for FeatureSnapshot {
     }
 }
 
+const RETRY_INITIAL_DELAY: std::time::Duration = std::time::Duration::from_secs(15);
+const RETRY_MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+const RETRY_MULTIPLIER: u32 = 2;
+
 /// The responsibility of the MeteringBatcher is to aggregate evaluation events and batch them for transmission to the server.
 struct MeteringBatcher<T: MeteringClient> {
     evaluations: std::collections::HashMap<MeteringKey, EvaluationData>,
     client: T,
     config_id: ConfigurationId,
+    retry_attempt: u32,
+    next_retry_at: Option<std::time::Instant>,
 }
 
 impl<T: MeteringClient> MeteringBatcher<T> {
@@ -153,6 +159,21 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             evaluations: std::collections::HashMap::new(),
             client,
             config_id,
+            retry_attempt: 0,
+            next_retry_at: None,
+        }
+    }
+
+    fn calculate_retry_delay(attempt: u32) -> std::time::Duration {
+        let multiplier = RETRY_MULTIPLIER.saturating_pow(attempt);
+        let delay = RETRY_INITIAL_DELAY.saturating_mul(multiplier);
+        std::cmp::min(delay, RETRY_MAX_DELAY)
+    }
+
+    fn is_retryable_error(error: &MeteringError) -> bool {
+        match error {
+            MeteringError::NetworkError(_) => true,
+            MeteringError::DataNotAccepted(status) => *status == 429 || (500..=599).contains(status),
         }
     }
 
@@ -189,6 +210,12 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             return;
         }
 
+        if let Some(next_retry_at) = self.next_retry_at {
+            if std::time::Instant::now() < next_retry_at {
+                return;
+            }
+        }
+
         let mut json_data = MeteringDataJson::new(
             self.config_id.collection_id.clone(),
             self.config_id.environment_id.clone(),
@@ -206,12 +233,30 @@ impl<T: MeteringClient> MeteringBatcher<T> {
             .client
             .push_metering_data(&self.config_id.guid, &json_data);
         match result {
+            Ok(()) => {
+                self.evaluations.clear();
+                self.retry_attempt = 0;
+                self.next_retry_at = None;
+            }
             Err(err) => {
                 warn!("Sending metering data failed: {}", err);
+                if Self::is_retryable_error(&err) {
+                    let delay = Self::calculate_retry_delay(self.retry_attempt);
+                    self.retry_attempt = self.retry_attempt.saturating_add(1);
+                    self.next_retry_at = Some(std::time::Instant::now() + delay);
+                    warn!(
+                        "Retrying metering POST in {:.2} minutes (attempt #{}, cap {:.2} minutes).",
+                        delay.as_secs_f64() / 60.0,
+                        self.retry_attempt,
+                        RETRY_MAX_DELAY.as_secs_f64() / 60.0
+                    );
+                } else {
+                    self.evaluations.clear();
+                    self.retry_attempt = 0;
+                    self.next_retry_at = None;
+                }
             }
-            _ => {}
         }
-        self.evaluations.clear();
     }
 }
 

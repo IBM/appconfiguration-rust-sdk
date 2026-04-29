@@ -13,13 +13,15 @@
 // limitations under the License.
 
 use crate::entity::Entity;
-use crate::metering::{MeteringRecorderSender, MeteringSubject};
-use crate::value::Value;
-use crate::Feature;
-
-use crate::segment_evaluation::TargetingRules;
-
 use crate::errors::Result;
+use crate::metering::{MeteringRecorderSender, MeteringSubject};
+use crate::network::serialization::Segment;
+use crate::segment_evaluation::{TargetingRule, TargetingRules};
+use crate::value::Value;
+use crate::{
+    EvaluationContext, EvaluationRuleCondition, EvaluationRuleContext, EvaluationSegmentContext,
+    Feature, FeatureEvaluationResult,
+};
 
 use std::io::Cursor;
 
@@ -61,41 +63,129 @@ impl FeatureSnapshot {
         }
     }
 
-    fn evaluate_feature_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+    fn evaluation_context(
+        segment_rule: Option<&TargetingRule<'_>>,
+        segment: Option<&Segment>,
+        rollout_percentage: Option<u32>,
+    ) -> EvaluationContext {
+        let matched_segment = segment.map(|segment| EvaluationSegmentContext {
+            segment_id: segment.segment_id.clone(),
+            name: segment.name.clone(),
+            description: segment.description.clone(),
+            tags: segment.tags.clone(),
+            rules: segment
+                .rules
+                .iter()
+                .map(|rule| EvaluationRuleCondition {
+                    attribute_name: rule.attribute_name.clone(),
+                    operator: rule.operator.clone(),
+                    values: rule.values.clone(),
+                })
+                .collect(),
+        });
+
+        let matched_rule = segment_rule.map(|segment_rule| EvaluationRuleContext {
+            order: segment_rule.order(),
+            rollout_percentage,
+            uses_default_value: segment_rule.uses_default_value(),
+            targeted_segment_ids: segment_rule.targeted_segment_ids(),
+        });
+
+        EvaluationContext {
+            matched_segment,
+            matched_rule,
+        }
+    }
+
+    fn evaluate_feature_for_entity(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<(Value, bool, String, EvaluationContext)> {
         if !self.enabled {
             self.record_evaluation(entity, None);
-            return Ok(self.disabled_value.clone());
+            return Ok((
+                self.disabled_value.clone(),
+                false,
+                "Feature is disabled. Returning disabled value.".to_string(),
+                EvaluationContext {
+                    matched_segment: None,
+                    matched_rule: None,
+                },
+            ));
         }
 
-        let (segment_rule, segment) = {
-            if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
-                // TODO: this makes only sense if there can be a rule which matches
-                //       even on empty attributes
-                // No match possible. Do not consider segment rules:
-                (None, None)
-            } else {
-                self.segment_rules
-                    .find_applicable_targeting_rule_and_segment_for_entity(entity)?
-                    .unzip()
-            }
+        let (segment_rule, segment) = if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+            (None, None)
+        } else {
+            self.segment_rules
+                .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+                .unzip()
         };
 
         self.record_evaluation(entity, segment);
 
         match segment_rule {
             Some(segment_rule) => {
-                // Get rollout percentage
                 let rollout_percentage =
                     segment_rule.rollout_percentage(self.rollout_percentage)?;
+                let context =
+                    Self::evaluation_context(Some(&segment_rule), segment, Some(rollout_percentage));
 
-                // Should rollout?
                 if Self::should_rollout(rollout_percentage, entity, &self.feature_id) {
-                    segment_rule.value(&self.enabled_value)
+                    let value = segment_rule.value(&self.enabled_value)?;
+                    Ok((
+                        value,
+                        true,
+                        format!(
+                            "Matched targeting rule order {} and rollout {}% allowed entity.",
+                            segment_rule.order(),
+                            rollout_percentage
+                        ),
+                        context,
+                    ))
                 } else {
-                    Ok(self.disabled_value.clone())
+                    Ok((
+                        self.disabled_value.clone(),
+                        false,
+                        format!(
+                            "Matched targeting rule order {} but rollout {}% excluded entity.",
+                            segment_rule.order(),
+                            rollout_percentage
+                        ),
+                        context,
+                    ))
                 }
             }
-            None => self.use_rollout_percentage_to_get_value_from_feature_directly(entity),
+            None => {
+                let is_enabled =
+                    Self::should_rollout(self.rollout_percentage, entity, &self.feature_id);
+                let value = if is_enabled {
+                    self.enabled_value.clone()
+                } else {
+                    self.disabled_value.clone()
+                };
+                let details = if is_enabled {
+                    format!(
+                        "No targeting rule matched. Feature-level rollout {}% enabled entity.",
+                        self.rollout_percentage
+                    )
+                } else {
+                    format!(
+                        "No targeting rule matched. Feature-level rollout {}% excluded entity.",
+                        self.rollout_percentage
+                    )
+                };
+
+                Ok((
+                    value,
+                    is_enabled,
+                    details,
+                    EvaluationContext {
+                        matched_segment: None,
+                        matched_rule: None,
+                    },
+                ))
+            }
         }
     }
 
@@ -131,16 +221,14 @@ impl Feature for FeatureSnapshot {
         Ok(self.enabled)
     }
 
-    fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        self.evaluate_feature_for_entity(entity)
-    }
-
-    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
-        &self,
-        entity: &impl Entity,
-    ) -> Result<T> {
-        let value = self.get_value(entity)?;
-        value.try_into()
+    fn get_current_value(&self, entity: &impl Entity) -> Result<FeatureEvaluationResult> {
+        let (value, is_enabled, details, context) = self.evaluate_feature_for_entity(entity)?;
+        Ok(FeatureEvaluationResult {
+            value,
+            is_enabled,
+            details,
+            context,
+        })
     }
 }
 

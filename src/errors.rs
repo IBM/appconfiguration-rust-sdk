@@ -26,6 +26,21 @@ pub enum Error {
         property_id: String,
     },
 
+    #[error("Secret property '{property_id}' is not configured as type SECRETREF")]
+    PropertyIsNotSecretRef { property_id: String },
+
+    #[error("Secret manager is not configured for secret property '{property_id}'")]
+    SecretManagerNotConfigured { property_id: String },
+
+    #[error("Secret reference for property '{property_id}' did not contain an 'id' field")]
+    SecretReferenceIdMissing { property_id: String },
+
+    #[error("Secret provider failed for property '{property_id}': {message}")]
+    SecretProviderError {
+        property_id: String,
+        message: String,
+    },
+
     #[error("Inner type cannot be converted to requested type")]
     MismatchType,
 
@@ -99,6 +114,12 @@ pub enum ConfigurationDataError {
     #[error("Environment '{0}' not found")]
     EnvironmentNotFound(String),
 
+    #[error("Collection '{0}' not found")]
+    CollectionNotFound(String),
+
+    #[error("Improper/Missing collections in configuration")]
+    MissingCollections,
+
     #[error("Feature `{0}` not found.")]
     FeatureNotFound(String),
 
@@ -107,6 +128,9 @@ pub enum ConfigurationDataError {
 
     #[error("Missing segments for resource '{0}'")]
     MissingSegments(String),
+
+    #[error("Improper collection format in resource '{0}'")]
+    InvalidResourceCollections(String),
 }
 
 #[derive(Debug, Error)]

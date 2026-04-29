@@ -15,17 +15,16 @@
 use std::sync::Arc;
 
 use crate::errors::Result;
-use crate::models::{FeatureSnapshot, PropertySnapshot};
+use crate::models::{FeatureSnapshot, PropertySnapshot, SecretPropertySnapshot};
 
 use crate::metering::{start_metering, MeteringClientHttp, MeteringRecorder};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
 use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
 
-use super::ConfigurationId;
+use super::{ConfigurationId, RuntimeStatus};
 
 /// AppConfiguration client implementation that connects to a server
-#[derive(Debug)]
 pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
     metering: MeteringRecorder,
@@ -89,12 +88,34 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
         Ok(property)
     }
 
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        self.live_configuration.get_secret_property(property_id)
+    }
+
+    fn is_connected(&self) -> Result<bool> {
+        self.live_configuration.is_connected()
+    }
+
     fn is_online(&self) -> Result<bool> {
         self.live_configuration.is_online()
     }
 
+    fn get_runtime_status(&self) -> Result<Option<RuntimeStatus>> {
+        self.live_configuration.get_runtime_status()
+    }
+
     fn wait_until_online(&self) {
         self.live_configuration.wait_until_online();
+    }
+
+    fn cleanup(&mut self) -> Result<()> {
+        LiveConfiguration::cleanup(&mut self.live_configuration)
+            .map_err(crate::Error::from)
+    }
+
+    fn cleanup_with_cache_clear(&mut self) -> Result<()> {
+        LiveConfiguration::cleanup_with_cache_clear(&mut self.live_configuration)
+            .map_err(crate::Error::from)
     }
 }
 
@@ -132,12 +153,24 @@ mod tests {
             self.configuration.get_property(property_id)
         }
 
+        fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+            self.configuration.get_secret_property(property_id)
+        }
+
         fn is_online(&self) -> Result<bool> {
             todo!()
         }
 
         fn wait_until_online(&self) {
             todo!()
+        }
+
+        fn cleanup(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn cleanup_with_cache_clear(&mut self) -> Result<()> {
+            Ok(())
         }
     }
     impl LiveConfiguration for LiveConfigurationMock {
@@ -149,6 +182,14 @@ mod tests {
 
         fn get_current_mode(&self) -> crate::network::live_configuration::Result<CurrentMode> {
             todo!()
+        }
+
+        fn cleanup(&mut self) -> crate::network::live_configuration::Result<()> {
+            Ok(())
+        }
+
+        fn cleanup_with_cache_clear(&mut self) -> crate::network::live_configuration::Result<()> {
+            Ok(())
         }
     }
 

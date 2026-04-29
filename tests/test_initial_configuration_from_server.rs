@@ -1,9 +1,12 @@
 use appconfiguration::{ConfigurationId, OfflineMode, ServiceAddress};
 
-use std::net::TcpListener;
+use std::io::{BufRead, BufReader, Write};
+use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
+use tungstenite::WebSocket;
 
 mod common;
 
@@ -19,10 +22,42 @@ fn server_thread() -> ServerHandle {
     let server = TcpListener::bind(("127.0.0.1", 0)).expect("Failed to bind");
     let port = server.local_addr().unwrap().port();
     spawn(move || {
-        // notify client that config changed
-        let mut websocket = common::handle_websocket(&server);
+        eprintln!("Server thread started, waiting for websocket connection...");
+        // Accept first connection - this will be the websocket
+        let (stream, _) = server.accept().unwrap();
+        eprintln!("Websocket connection accepted");
+        let mut websocket = tungstenite::accept(stream).unwrap();
+        websocket
+            .send(tungstenite::Message::text("test message".to_string()))
+            .unwrap();
 
-        common::handle_config_request_enterprise_example(&server);
+        eprintln!("Waiting for HTTP config request...");
+        // Accept second connection - this will be the HTTP config request
+        let (mut stream, _) = server.accept().unwrap();
+        eprintln!("HTTP config request accepted");
+        let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        mocked_data.push("data/data-dump-enterprise-plan-sdk-testing.json");
+        let json_payload = std::fs::read_to_string(mocked_data).unwrap();
+        
+        {
+            let buf_reader = BufReader::new(&stream);
+            let _http_request: Vec<_> = buf_reader
+                .lines()
+                .map(|result| result.unwrap())
+                .take_while(|line| !line.is_empty())
+                .collect();
+        }
+        
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            json_payload.len(),
+            json_payload
+        );
+        eprintln!("Sending HTTP response, {} bytes", response.len());
+        stream.write_all(response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+        drop(stream); // Close the connection
+        eprintln!("HTTP response sent successfully and connection closed");
 
         // Wait until the client has already tested the first configuration
         update_config_rx.recv().unwrap();
@@ -34,8 +69,44 @@ fn server_thread() -> ServerHandle {
             ))
             .unwrap();
 
-        // client will request changed config asynchronously
-        common::handle_config_request_trivial_config(&server);
+        // Accept third connection - updated config request
+        let (mut stream, _) = server.accept().unwrap();
+        let json_payload = serde_json::json!({
+            "environments": [
+                {
+                    "name": "Dev",
+                    "environment_id": "dev",
+                    "features": [],
+                    "properties": []
+                }
+            ],
+            "segments": [],
+            "collections": [
+                {
+                    "collection_id": "blue-charge",
+                    "name": "Blue Charge"
+                }
+            ]
+        });
+        
+        {
+            let buf_reader = BufReader::new(&stream);
+            let _http_request: Vec<_> = buf_reader
+                .lines()
+                .map(|result| result.unwrap())
+                .take_while(|line| !line.is_empty())
+                .collect();
+        }
+        
+        let json_str = json_payload.to_string();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            json_str.len(),
+            json_str
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+        drop(stream); // Close the connection
 
         let _ = receiver.recv();
     });
@@ -58,7 +129,7 @@ fn main() {
     let config_id = ConfigurationId::new(
         "guid".to_string(),
         "dev".to_string(),
-        "collection_id".to_string(),
+        "blue-charge".to_string(),
     );
     let client = appconfiguration::test_utils::create_app_configuration_client_live(
         address,
@@ -71,7 +142,7 @@ fn main() {
 
     let mut features = client.get_feature_ids().unwrap();
     features.sort();
-    assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f5", "f6"]);
+    assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f6"]);
 
     // Tell the server that now it can actually send the new config
     server.config_updated.send(()).unwrap();

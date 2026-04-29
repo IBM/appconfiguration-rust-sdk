@@ -25,7 +25,6 @@ fn test_get_property_ids(client_enterprise: Box<dyn AppConfigurationClient>) {
         vec![
             "p1".to_string(),
             "p2".to_string(),
-            "p3".to_string(),
             "p4".to_string(),
         ]
     );

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::entity::Entity;
-use crate::{Feature, Value};
+use crate::{Feature, FeatureEvaluationResult, Value};
 
 use super::AppConfigurationClient;
 use crate::models::FeatureSnapshot;
@@ -44,16 +44,12 @@ impl Feature for FeatureProxy<'_> {
         self.client.get_feature(&self.feature_id)?.is_enabled()
     }
 
-    fn get_value(&self, entity: &impl Entity) -> crate::errors::Result<Value> {
-        self.client.get_feature(&self.feature_id)?.get_value(entity)
-    }
-
-    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
+    fn get_current_value(
         &self,
         entity: &impl Entity,
-    ) -> crate::errors::Result<T> {
+    ) -> crate::errors::Result<FeatureEvaluationResult> {
         self.client
             .get_feature(&self.feature_id)?
-            .get_value_into(entity)
+            .get_current_value(entity)
     }
 }

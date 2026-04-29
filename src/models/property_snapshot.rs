@@ -13,18 +13,23 @@
 // limitations under the License.
 
 use crate::entity::Entity;
-use crate::metering::{MeteringRecorderSender, MeteringSubject};
-use crate::value::Value;
-use crate::Property;
-
 use crate::errors::Result;
-use crate::segment_evaluation::TargetingRules;
+use crate::metering::{MeteringRecorderSender, MeteringSubject};
+use crate::network::serialization::Segment;
+use crate::segment_evaluation::{TargetingRule, TargetingRules};
+use crate::value::Value;
+use crate::network::serialization::ValueType;
+use crate::{
+    EvaluationContext, EvaluationRuleCondition, EvaluationRuleContext, EvaluationSegmentContext,
+    Property, PropertyEvaluationResult,
+};
 
 /// Provides a snapshot of a [`Property`].
 #[derive(Debug)]
 pub struct PropertySnapshot {
     value: Value,
     segment_rules: TargetingRules,
+    value_type: ValueType,
     pub(crate) name: String,
     pub(crate) property_id: String,
     pub(crate) metering: Option<MeteringRecorderSender>,
@@ -34,6 +39,7 @@ impl PropertySnapshot {
     pub(crate) fn new(
         value: Value,
         segment_rules: TargetingRules,
+        value_type: ValueType,
         name: &str,
         property_id: &str,
         metering: Option<MeteringRecorderSender>,
@@ -41,31 +47,85 @@ impl PropertySnapshot {
         Self {
             value,
             segment_rules,
+            value_type,
             name: name.to_string(),
             property_id: property_id.to_string(),
             metering,
         }
     }
 
-    fn evaluate_property_for_entity(&self, entity: &impl Entity) -> Result<Value> {
-        let (segment_rule, segment) = {
-            if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
-                // TODO: this makes only sense if there can be a rule which matches
-                //       even on empty attributes
-                // No match possible. Do not consider segment rules:
-                (None, None)
-            } else {
-                self.segment_rules
-                    .find_applicable_targeting_rule_and_segment_for_entity(entity)?
-                    .unzip()
-            }
+    pub fn is_secret_ref(&self) -> bool {
+        matches!(self.value_type, ValueType::SecretRef)
+    }
+
+    fn evaluation_context(
+        segment_rule: Option<&TargetingRule<'_>>,
+        segment: Option<&Segment>,
+    ) -> EvaluationContext {
+        let matched_segment = segment.map(|segment| EvaluationSegmentContext {
+            segment_id: segment.segment_id.clone(),
+            name: segment.name.clone(),
+            description: segment.description.clone(),
+            tags: segment.tags.clone(),
+            rules: segment
+                .rules
+                .iter()
+                .map(|rule| EvaluationRuleCondition {
+                    attribute_name: rule.attribute_name.clone(),
+                    operator: rule.operator.clone(),
+                    values: rule.values.clone(),
+                })
+                .collect(),
+        });
+
+        let matched_rule = segment_rule.map(|segment_rule| EvaluationRuleContext {
+            order: segment_rule.order(),
+            rollout_percentage: None,
+            uses_default_value: segment_rule.uses_default_value(),
+            targeted_segment_ids: segment_rule.targeted_segment_ids(),
+        });
+
+        EvaluationContext {
+            matched_segment,
+            matched_rule,
+        }
+    }
+
+    fn evaluate_property_for_entity(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<(Value, String, EvaluationContext)> {
+        let (segment_rule, segment) = if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
+            (None, None)
+        } else {
+            self.segment_rules
+                .find_applicable_targeting_rule_and_segment_for_entity(entity)?
+                .unzip()
         };
 
         self.record_evaluation(entity, segment);
 
         match segment_rule {
-            Some(segment_rule) => segment_rule.value(&self.value),
-            None => Ok(self.value.clone()),
+            Some(segment_rule) => {
+                let context = Self::evaluation_context(Some(&segment_rule), segment);
+                let value = segment_rule.value(&self.value)?;
+                Ok((
+                    value,
+                    format!(
+                        "Matched targeting rule order {} for property evaluation.",
+                        segment_rule.order()
+                    ),
+                    context,
+                ))
+            }
+            None => Ok((
+                self.value.clone(),
+                "No targeting rule matched. Returning property default value.".to_string(),
+                EvaluationContext {
+                    matched_segment: None,
+                    matched_rule: None,
+                },
+            )),
         }
     }
 }
@@ -75,16 +135,13 @@ impl Property for PropertySnapshot {
         Ok(self.name.clone())
     }
 
-    fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        self.evaluate_property_for_entity(entity)
-    }
-
-    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
-        &self,
-        entity: &impl Entity,
-    ) -> Result<T> {
-        let value = self.get_value(entity)?;
-        value.try_into()
+    fn get_current_value(&self, entity: &impl Entity) -> Result<PropertyEvaluationResult> {
+        let (value, details, context) = self.evaluate_property_for_entity(entity)?;
+        Ok(PropertyEvaluationResult {
+            value,
+            details,
+            context,
+        })
     }
 }
 
@@ -119,7 +176,14 @@ pub mod tests {
                 serde_json::Value::Number((100).into()),
             );
             let segment_rules = TargetingRules::new(segments, segment_rules, ValueType::Numeric);
-            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", "f1", None)
+            PropertySnapshot::new(
+                Value::Int64(-42),
+                segment_rules,
+                ValueType::Numeric,
+                "F1",
+                "f1",
+                None,
+            )
         };
 
         // Both segment rules match. Expect the one with smaller order to be used:

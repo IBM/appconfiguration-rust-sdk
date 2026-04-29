@@ -12,43 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::Segment;
 use crate::network::serialization::environment::Environment;
-use crate::{errors::DeserializationError, Error, Result};
+use crate::network::CacheFile;
+use crate::{Error, Result};
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub(crate) struct Collection {
+    pub collection_id: String,
+}
 
 /// Represents AppConfig data in a structure intended for data exchange
 /// (typically JSON encoded) used by
 /// - AppConfig Server REST API (/config endpoint)
 /// - AppConfig database dumps (via Web GUI)
 /// - Offline configuration files used in offline-mode
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct ConfigurationJson {
     pub environments: Vec<Environment>,
+    pub collections: Option<Vec<Collection>>,
     pub segments: Vec<Segment>,
 }
 
 impl ConfigurationJson {
     /// Parses a ConfigurationJson from a file
     pub(crate) fn new(filepath: &std::path::Path) -> Result<Self> {
-        let file = std::fs::File::open(filepath).map_err(|_| {
-            Error::Other(format!(
-                "File '{}' doesn't exist or cannot be read",
-                filepath.display()
-            ))
-        })?;
-        let reader = std::io::BufReader::new(file);
+        CacheFile::read_json_file(filepath)
+    }
 
-        serde_json::from_reader(reader).map_err(|e| {
-            Error::DeserializationError(DeserializationError {
-                string: format!(
-                    "Error deserializing Configuration from file '{}'",
-                    filepath.display()
-                ),
-                source: e.into(),
-            })
-        })
+    pub(crate) fn write_to_file(&self, filepath: &std::path::Path) -> Result<()> {
+        CacheFile::write_json_file(self, filepath)
     }
 }
 
@@ -82,7 +77,7 @@ pub(crate) mod fixtures {
             .expect("file should open read only");
         let config_json: ConfigurationJson =
             serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
-        Configuration::new("dev", config_json).unwrap()
+        Configuration::new("dev", "blue-charge", config_json).unwrap()
     }
 
     #[fixture]
@@ -101,12 +96,17 @@ pub(crate) mod fixtures {
                     segment_rules: Vec::new(),
                     enabled: true,
                     rollout_percentage: 0,
+                    collections: None,
+                    experiment: None,
                 }],
                 properties: Vec::new(),
             }],
+            collections: Some(vec![Collection {
+                collection_id: "collection_id".to_string(),
+            }]),
             segments: Vec::new(),
         };
-        Configuration::new(&environment_id, config_json).unwrap()
+        Configuration::new(&environment_id, "collection_id", config_json).unwrap()
     }
 
     #[fixture]
@@ -123,12 +123,16 @@ pub(crate) mod fixtures {
                     value: ConfigValue(serde_json::Value::Number(42.into())),
                     segment_rules: Vec::new(),
                     tags: None,
+                    collections: None,
                 }],
                 features: Vec::new(),
             }],
+            collections: Some(vec![Collection {
+                collection_id: "collection_id".to_string(),
+            }]),
             segments: Vec::new(),
         };
-        Configuration::new(&environment_id, config_json).unwrap()
+        Configuration::new(&environment_id, "collection_id", config_json).unwrap()
     }
 
     #[fixture]
@@ -167,6 +171,8 @@ pub(crate) mod fixtures {
                     segment_rules: segment_rules.clone(),
                     enabled: true,
                     rollout_percentage: 100,
+                    collections: None,
+                    experiment: None,
                 }],
                 properties: vec![Property {
                     name: "P1".to_string(),
@@ -176,8 +182,12 @@ pub(crate) mod fixtures {
                     value: ConfigValue(serde_json::Value::Number((-42).into())),
                     segment_rules,
                     tags: None,
+                    collections: None,
                 }],
             }],
+            collections: Some(vec![Collection {
+                collection_id: "collection_id".to_string(),
+            }]),
             segments: vec![
                 Segment {
                     name: "".into(),
@@ -203,6 +213,6 @@ pub(crate) mod fixtures {
                 },
             ],
         };
-        Configuration::new(&environment_id, config_json).unwrap()
+        Configuration::new(&environment_id, "collection_id", config_json).unwrap()
     }
 }

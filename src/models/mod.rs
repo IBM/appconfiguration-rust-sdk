@@ -22,9 +22,16 @@
 //!
 
 mod configuration;
+mod evaluation_result;
 mod feature_snapshot;
 mod property_snapshot;
+mod secret_property;
 
 pub(crate) use configuration::Configuration;
+pub use evaluation_result::{
+    EvaluationContext, EvaluationRuleCondition, EvaluationRuleContext, EvaluationSegmentContext,
+    FeatureEvaluationResult, PropertyEvaluationResult,
+};
 pub(crate) use feature_snapshot::FeatureSnapshot;
 pub(crate) use property_snapshot::PropertySnapshot;
+pub use secret_property::{SecretManager, SecretPropertySnapshot};

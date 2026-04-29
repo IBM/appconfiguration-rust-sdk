@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::metering::serialization::MeteringDataJson;
 use crate::metering::{MeteringClient, MeteringError, MeteringResult};
+use crate::network::http_client::SDK_USER_AGENT;
 use crate::network::NetworkError;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 use reqwest::blocking::Client;
@@ -37,7 +38,7 @@ impl MeteringClient for MeteringClientHttp {
         let client = Client::new();
         let r = client
             .post(url)
-            .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
+            .header("User-Agent", SDK_USER_AGENT)
             .bearer_auth(self.token_provider.get_access_token()?)
             .json(data)
             .send();
@@ -48,12 +49,13 @@ impl MeteringClient for MeteringClientHttp {
                 if status.is_success() {
                     Ok(())
                 } else {
-                    Err(MeteringError::DataNotAccepted(status.to_string()))
+                    Err(MeteringError::DataNotAccepted(status.as_u16()))
                 }
             }
             Err(e) => Err(NetworkError::ReqwestError(e).into()),
         }
     }
+
 }
 
 #[cfg(test)]

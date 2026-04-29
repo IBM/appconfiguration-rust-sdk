@@ -16,8 +16,7 @@ use crate::Property;
 
 use super::AppConfigurationClient;
 use crate::models::PropertySnapshot;
-use crate::value::Value;
-use crate::Entity;
+use crate::{Entity, PropertyEvaluationResult};
 
 /// Provides live-updated data for a given [`Property`].
 pub struct PropertyProxy<'a> {
@@ -44,18 +43,12 @@ impl Property for PropertyProxy<'_> {
         self.client.get_property(&self.property_id)?.get_name()
     }
 
-    fn get_value(&self, entity: &impl Entity) -> crate::errors::Result<Value> {
-        self.client
-            .get_property(&self.property_id)?
-            .get_value(entity)
-    }
-
-    fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
+    fn get_current_value(
         &self,
         entity: &impl Entity,
-    ) -> crate::errors::Result<T> {
+    ) -> crate::errors::Result<PropertyEvaluationResult> {
         self.client
             .get_property(&self.property_id)?
-            .get_value_into(entity)
+            .get_current_value(entity)
     }
 }

@@ -14,6 +14,7 @@
 
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ThreadStatus<ResultType> {
@@ -85,6 +86,51 @@ impl<ResultType: Send + Clone + 'static> ThreadHandle<ResultType> {
                 None => unreachable!(),
             },
         }
+    }
+
+    pub(crate) fn shutdown(
+        &mut self,
+        join_timeout: Duration,
+    ) -> std::result::Result<ThreadStatus<ResultType>, String> {
+        if let Some(cached_status) = &self.finished_thread_status_cached {
+            return Ok(cached_status.clone());
+        }
+
+        let Some(thread_handle) = self.thread_handle.take() else {
+            return Err("Thread handle missing without cached status".to_string());
+        };
+
+        self._thread_termination_sender
+            .send(())
+            .map_err(|_| "Failed to signal thread termination".to_string())?;
+
+        let start = std::time::Instant::now();
+        let mut thread_handle = thread_handle;
+        while !thread_handle.is_finished() {
+            if start.elapsed() >= join_timeout {
+                self.thread_handle = Some(thread_handle);
+                return Err(format!(
+                    "Timed out waiting {:?} for worker thread termination",
+                    join_timeout
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+
+        let thread_finished_status = match thread_handle.join() {
+            Ok(r) => ThreadStatus::Finished(r),
+            Err(e) => {
+                if let Some(panic_msg) = e.downcast_ref::<String>() {
+                    ThreadStatus::FailedInternalError(format!("Thread panicked: {}", panic_msg))
+                } else if let Some(panic_msg) = e.downcast_ref::<&str>() {
+                    ThreadStatus::FailedInternalError(format!("Thread panicked: {}", panic_msg))
+                } else {
+                    ThreadStatus::FailedInternalError("Thread panicked".to_string())
+                }
+            }
+        };
+        self.finished_thread_status_cached = Some(thread_finished_status.clone());
+        Ok(thread_finished_status)
     }
 }
 

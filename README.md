@@ -27,20 +27,33 @@ from your [IBMCloud account](https://cloud.ibm.com/).
 
 **Note.-** This crate is still under heavy development. Breaking changes are expected.
 
-Create your client with the context (environment and collection) you want to connect to
+### Recommended top-level SDK flow
+
+The Rust SDK now provides a Node-style top-level wrapper through [`AppConfigurationSdk`](appconfiguration-rust-sdk/src/client/app_configuration_sdk.rs:34), following the same high-level pattern as the Node SDK:
+- create the SDK
+- optionally configure private-endpoint behavior
+- call `init`
+- call `set_context`
+- evaluate features and properties
 
 ```rust
 use appconfiguration::{
-    ConfigurationProvider, AppConfigurationClientIBMCloud,
-    ConfigurationId, Entity, Result, Value, Feature, OfflineMode
+    AppConfigurationContextOptions, AppConfigurationSdk, ConfigurationProvider, Entity, Result,
+    Value,
 };
 
-// Create the client connecting to the server
-let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail, false)?;
+// Create the top-level SDK wrapper
+let mut sdk = AppConfigurationSdk::new();
+sdk.use_private_endpoint(false);
+sdk.init(region, guid, apikey)?;
+sdk.set_context(
+    collection_id,
+    environment_id,
+    AppConfigurationContextOptions::default(),
+)?;
 
 // Get the feature you want to evaluate for your entities
-let feature = client.get_feature("AB_testing_feature")?;
+let feature = sdk.get_feature("AB_testing_feature")?;
 
 // Evaluate feature value for each one of your entities
 let user = MyEntity; // Implements Entity
@@ -51,7 +64,36 @@ if value_for_this_user {
 } else {
     println!("User {} keeps using the legacy workflow", user.get_id());
 }
+```
 
+### Lower-level direct client flow
+
+The lower-level constructor is still available for callers that want to create the IBM Cloud client directly.
+
+```rust
+use appconfiguration::{
+    AppConfigurationClientIBMCloud, ConfigurationId, ConfigurationProvider, Entity, OfflineMode,
+    Result, Value,
+};
+
+let configuration = ConfigurationId::new(guid, environment_id, collection_id);
+let client = AppConfigurationClientIBMCloud::new(
+    &apikey,
+    &region,
+    configuration,
+    OfflineMode::Fail,
+    false,
+)?;
+
+let feature = client.get_feature("AB_testing_feature")?;
+let user = MyEntity;
+
+let value_for_this_user = feature.get_value(&user)?.try_into()?;
+if value_for_this_user {
+    println!("Feature {} is active for user {}", feature.get_name()?, user.get_id());
+} else {
+    println!("User {} keeps using the legacy workflow", user.get_id());
+}
 ```
 
 

@@ -13,9 +13,11 @@
 // limitations under the License.
 
 pub mod errors;
+pub(crate) mod cache_file;
 pub(crate) mod http_client;
 mod token_provider;
 
+pub(crate) use cache_file::CacheFile;
 pub(crate) use http_client::ServerClientImpl;
 pub use http_client::ServiceAddress;
 pub(crate) use http_client::ServiceAddressProtocol;

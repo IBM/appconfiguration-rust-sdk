@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::network::serialization::config_value::ConfigValue;
 use crate::network::serialization::segments::Segments;
 
 /// Associates a Feature/Property to one or more Segments
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub(crate) struct SegmentRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments

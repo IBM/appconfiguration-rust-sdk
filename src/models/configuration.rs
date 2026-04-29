@@ -15,12 +15,16 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
-use crate::network::serialization::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
+use crate::network::serialization::{
+    Collection, ConfigurationJson, Feature, Property, Segment, SegmentRule, ValueType,
+};
+use crate::network::CacheFile;
 use crate::segment_evaluation::TargetingRules;
 use crate::ConfigurationDataError;
 
 use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
+use super::secret_property::SecretPropertySnapshot;
 use crate::ConfigurationProvider;
 use log::error;
 
@@ -37,8 +41,23 @@ impl Configuration {
     /// Constructs the Configuration, by consuming and filtering data in exchange format
     pub fn new(
         environment_id: &str,
+        collection_id: &str,
         configuration: ConfigurationJson,
     ) -> std::result::Result<Self, ConfigurationDataError> {
+        let collections = configuration
+            .collections
+            .as_ref()
+            .ok_or(ConfigurationDataError::MissingCollections)?;
+
+        if !collections
+            .iter()
+            .any(|collection| collection.collection_id == collection_id)
+        {
+            return Err(ConfigurationDataError::CollectionNotFound(
+                collection_id.to_string(),
+            ));
+        }
+
         let environment = configuration
             .environments
             .into_iter()
@@ -46,11 +65,11 @@ impl Configuration {
             .ok_or(ConfigurationDataError::EnvironmentNotFound(
                 environment_id.to_string(),
             ))?;
-        // FIXME: why not filtering for collection here?
 
         let features = environment
             .features
             .into_iter()
+            .filter(|feature| Self::resource_belongs_to_collection(&feature.collections, collection_id))
             .map(|mut feature| {
                 feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
 
@@ -77,6 +96,9 @@ impl Configuration {
         let properties = environment
             .properties
             .into_iter()
+            .filter(|property| {
+                Self::resource_belongs_to_collection(&property.collections, collection_id)
+            })
             .map(|mut property| {
                 property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
 
@@ -105,9 +127,25 @@ impl Configuration {
         })
     }
 
-    pub fn from_file(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
-        let configuration = ConfigurationJson::new(filepath)?;
-        Ok(Configuration::new(environment_id, configuration)?)
+    pub fn from_file(
+        filepath: &std::path::Path,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Result<Self> {
+        let configuration = CacheFile::read_json_file(filepath)?;
+        Ok(Configuration::new(environment_id, collection_id, configuration)?)
+    }
+
+    fn resource_belongs_to_collection(
+        collections: &Option<Vec<Collection>>,
+        collection_id: &str,
+    ) -> bool {
+        match collections {
+            None => true,
+            Some(collections) => collections
+                .iter()
+                .any(|collection| collection.collection_id == collection_id),
+        }
     }
 
     /// Returns a mapping of segment ID to `Segment` for all segments referenced
@@ -184,9 +222,24 @@ impl ConfigurationProvider for Configuration {
         Ok(PropertySnapshot::new(
             value,
             segment_rules.clone(),
+            property.r#type,
             &property.name,
             &property.property_id,
             None,
+        ))
+    }
+
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        let property = self.get_property(property_id)?;
+        if !property.is_secret_ref() {
+            return Err(crate::Error::PropertyIsNotSecretRef {
+                property_id: property_id.to_string(),
+            });
+        }
+
+        Ok(SecretPropertySnapshot::new(
+            property,
+            property_id.to_string(),
         ))
     }
 
@@ -195,7 +248,15 @@ impl ConfigurationProvider for Configuration {
     }
 
     fn wait_until_online(&self) {
-        panic!("Waiting for Configuration to get online. This will never happen.");
+        log::warn!("wait_until_online() called on static configuration; returning immediately");
+    }
+
+    fn cleanup(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn cleanup_with_cache_clear(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -216,7 +277,7 @@ mod tests {
         let config_json: ConfigurationJson =
             serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
 
-        let result = Configuration::new("does_for_sure_not_exist", config_json);
+        let result = Configuration::new("does_for_sure_not_exist", "blue-charge", config_json);
         assert!(result.is_err());
 
         assert!(matches!(

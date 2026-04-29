@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::errors::Result;
-use crate::models::{Configuration, FeatureSnapshot, PropertySnapshot};
+use crate::models::{Configuration, FeatureSnapshot, PropertySnapshot, SecretPropertySnapshot};
 use crate::ConfigurationProvider;
 use log::error;
 
@@ -30,8 +30,13 @@ impl AppConfigurationOffline {
     ///
     /// * `filepath` - The file with the configuration.
     /// * `environment_id` - ID of the environment to use from the configuration file.
-    pub fn new(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
-        let config_snapshot = Configuration::from_file(filepath, environment_id)?;
+    /// * `collection_id` - ID of the collection to use from the configuration file.
+    pub fn new(
+        filepath: &std::path::Path,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Result<Self> {
+        let config_snapshot = Configuration::from_file(filepath, environment_id, collection_id)?;
         Ok(Self { config_snapshot })
     }
 }
@@ -53,11 +58,23 @@ impl ConfigurationProvider for AppConfigurationOffline {
         self.config_snapshot.get_property(property_id)
     }
 
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        self.config_snapshot.get_secret_property(property_id)
+    }
+
     fn is_online(&self) -> Result<bool> {
         Ok(false)
     }
 
     fn wait_until_online(&self) {
-        panic!("Waiting for AppConfigurationOffline to get online. This will never happen.");
+        log::warn!("wait_until_online() called on offline configuration; returning immediately");
+    }
+
+    fn cleanup(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn cleanup_with_cache_clear(&mut self) -> Result<()> {
+        Ok(())
     }
 }

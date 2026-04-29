@@ -61,3 +61,4 @@ impl MeteringDataJson {
         self.usages.push(usage);
     }
 }
+

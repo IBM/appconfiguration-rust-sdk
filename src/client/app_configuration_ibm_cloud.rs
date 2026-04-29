@@ -13,16 +13,15 @@
 // limitations under the License.
 
 use crate::errors::Result;
-use crate::models::{FeatureSnapshot, PropertySnapshot};
+use crate::models::{FeatureSnapshot, PropertySnapshot, SecretManager, SecretPropertySnapshot};
 use crate::network::live_configuration::LiveConfigurationImpl;
 use crate::network::ServiceAddress;
 use crate::{ConfigurationProvider, OfflineMode, TokenProviderImpl};
 
-use super::ConfigurationId;
+use super::{ConfigurationId, RuntimeEventListener, RuntimeStatus};
 use crate::client::app_configuration_http::AppConfigurationClientHttp;
 
 /// AppConfiguration client connection to IBM Cloud.
-#[derive(Debug)]
 pub struct AppConfigurationClientIBMCloud {
     client: AppConfigurationClientHttp<LiveConfigurationImpl>,
 }
@@ -78,6 +77,20 @@ impl AppConfigurationClientIBMCloud {
         };
         TokenProviderImpl::new(apikey, &format!("https://{host}/identity/token"))
     }
+    /// Resolves a secret-reference property using the provided entity and secret manager.
+    ///
+    /// This mirrors the Node SDK top-level [`getSecret()`](appconfiguration-node-sdk/lib/AppConfiguration.js:260)
+    /// convenience flow on the concrete IBM Cloud client surface.
+    pub fn get_secret(
+        &self,
+        property_id: &str,
+        entity: &impl crate::Entity,
+        secret_manager: &impl SecretManager,
+    ) -> Result<String> {
+        self.client
+            .get_secret_property(property_id)?
+            .get_current_value(entity, secret_manager)
+    }
 }
 
 impl ConfigurationProvider for AppConfigurationClientIBMCloud {
@@ -97,12 +110,36 @@ impl ConfigurationProvider for AppConfigurationClientIBMCloud {
         self.client.get_property(property_id)
     }
 
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        self.client.get_secret_property(property_id)
+    }
+
+    fn is_connected(&self) -> Result<bool> {
+        self.client.is_connected()
+    }
+
     fn is_online(&self) -> Result<bool> {
         self.client.is_online()
     }
 
+    fn get_runtime_status(&self) -> Result<Option<RuntimeStatus>> {
+        self.client.get_runtime_status()
+    }
+
+    fn add_runtime_event_listener(&self, listener: RuntimeEventListener) -> Result<()> {
+        self.client.add_runtime_event_listener(listener)
+    }
+
     fn wait_until_online(&self) {
         self.client.wait_until_online();
+    }
+
+    fn cleanup(&mut self) -> Result<()> {
+        self.client.cleanup()
+    }
+
+    fn cleanup_with_cache_clear(&mut self) -> Result<()> {
+        self.client.cleanup_with_cache_clear()
     }
 }
 
