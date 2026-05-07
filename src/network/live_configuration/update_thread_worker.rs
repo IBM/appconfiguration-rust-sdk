@@ -17,7 +17,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::Duration;
 
 use super::current_mode::CurrentModeOfflineReason;
@@ -25,8 +24,6 @@ use super::CurrentMode;
 use super::{Error, Result};
 use crate::models::Configuration;
 use crate::network::http_client::{ServerClient, WebsocketReader};
-use crate::network::serialization::ConfigurationJson;
-use crate::network::live_configuration::current_mode;
 use crate::network::NetworkError;
 use crate::utils::Waitable;
 use crate::client::{RuntimeEvent, RuntimeEventKind, RuntimeEventListener, RuntimeMode, RuntimeStatus};

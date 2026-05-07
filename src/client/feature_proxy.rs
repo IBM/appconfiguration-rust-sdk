@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::entity::Entity;
-use crate::{Feature, FeatureEvaluationResult, Value};
+use crate::{Feature, FeatureEvaluationResult};
 
 use super::AppConfigurationClient;
 use crate::models::FeatureSnapshot;

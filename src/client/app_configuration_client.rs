@@ -188,7 +188,7 @@ pub trait AppConfigurationClient: ConfigurationProvider {
     ///
     /// This proxied property will envaluate entities using the latest information
     /// available if the client implementation support some kind of live-updates.
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy>;
+    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy<'_>>;
 
     /// Records a custom experiment/event metric for an entity.
     ///
@@ -204,7 +204,7 @@ impl<T: ConfigurationProvider> AppConfigurationClient for T {
         Ok(FeatureProxy::new(self, feature_id.to_string()))
     }
 
-    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy> {
+    fn get_property_proxy(&self, property_id: &str) -> Result<PropertyProxy<'_>> {
         let _ = self.get_property(property_id)?;
         Ok(PropertyProxy::new(self, property_id.to_string()))
     }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -27,7 +27,7 @@ use crate::utils::{ThreadHandle, ThreadStatus, Waitable};
 use crate::client::{
     RuntimeEvent, RuntimeEventKind, RuntimeEventListener, RuntimeMode, RuntimeStatus,
 };
-use crate::{AppConfigurationOffline, ConfigurationId, ConfigurationProvider};
+use crate::{ConfigurationId, ConfigurationProvider};
 
 /// A [`ConfigurationProvider`] that keeps the configuration updated with some
 /// third-party source using an asyncronous mechanism.
@@ -67,7 +67,7 @@ pub(crate) struct LiveConfigurationImpl {
 
 impl LiveConfigurationImpl {
     fn read_persistent_cache_configuration(
-        path: &PathBuf,
+        path: &Path,
         environment_id: &str,
         collection_id: &str,
     ) -> Option<Configuration> {

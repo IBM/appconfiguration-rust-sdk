@@ -105,7 +105,7 @@ impl<ResultType: Send + Clone + 'static> ThreadHandle<ResultType> {
             .map_err(|_| "Failed to signal thread termination".to_string())?;
 
         let start = std::time::Instant::now();
-        let mut thread_handle = thread_handle;
+        let thread_handle = thread_handle;
         while !thread_handle.is_finished() {
             if start.elapsed() >= join_timeout {
                 self.thread_handle = Some(thread_handle);

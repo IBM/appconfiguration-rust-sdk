@@ -1,11 +1,8 @@
-use appconfiguration::AppConfigurationClient;
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 
-use std::thread::sleep;
-use std::time::Duration;
 use tungstenite::WebSocket;
 
 pub fn handle_config_request_trivial_config(server: &TcpListener) {

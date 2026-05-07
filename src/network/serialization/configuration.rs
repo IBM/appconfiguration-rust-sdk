@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::Segment;
 use crate::network::serialization::environment::Environment;
 use crate::network::CacheFile;
-use crate::{Error, Result};
+use crate::Result;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub(crate) struct Collection {

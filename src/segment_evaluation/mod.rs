@@ -56,7 +56,7 @@ impl TargetingRules {
     pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
         entity: &impl Entity,
-    ) -> Result<Option<(TargetingRule, &Segment)>> {
+    ) -> Result<Option<(TargetingRule<'_>, &Segment)>> {
         for segment_rule in self.segment_rules.iter() {
             if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(
                 &self.segments,

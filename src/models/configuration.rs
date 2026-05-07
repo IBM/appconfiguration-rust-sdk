@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::errors::Result;
 use crate::network::serialization::{
-    Collection, ConfigurationJson, Feature, Property, Segment, SegmentRule, ValueType,
+    Collection, ConfigurationJson, Feature, Property, Segment, SegmentRule,
 };
 use crate::network::CacheFile;
 use crate::segment_evaluation::TargetingRules;
@@ -26,7 +26,6 @@ use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
 use super::secret_property::SecretPropertySnapshot;
 use crate::ConfigurationProvider;
-use log::error;
 
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.

@@ -14,7 +14,7 @@ impl<T> Waitable<T> {
         }
     }
 
-    pub fn set(&self, value: T) -> Result<(), std::sync::PoisonError<std::sync::MutexGuard<T>>> {
+    pub fn set(&self, value: T) -> Result<(), std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> {
         let (mutex, condvar) = &*self.inner;
         let mut guard = mutex.lock()?;
         *guard = value;
@@ -22,7 +22,7 @@ impl<T> Waitable<T> {
         Ok(())
     }
 
-    pub fn get(&self) -> Result<T, std::sync::PoisonError<std::sync::MutexGuard<T>>>
+    pub fn get(&self) -> Result<T, std::sync::PoisonError<std::sync::MutexGuard<'_, T>>>
     where
         T: Clone,
     {
@@ -35,7 +35,7 @@ impl<T> Waitable<T> {
     pub fn wait_for(
         &self,
         expected: T,
-    ) -> Result<T, std::sync::PoisonError<std::sync::MutexGuard<T>>>
+    ) -> Result<T, std::sync::PoisonError<std::sync::MutexGuard<'_, T>>>
     where
         T: Clone + PartialEq,
     {
@@ -49,7 +49,7 @@ impl<T> Waitable<T> {
         &self,
         expected: T,
         timeout: Duration,
-    ) -> Result<Option<T>, std::sync::PoisonError<std::sync::MutexGuard<T>>>
+    ) -> Result<Option<T>, std::sync::PoisonError<std::sync::MutexGuard<'_, T>>>
     where
         T: Clone + PartialEq,
     {

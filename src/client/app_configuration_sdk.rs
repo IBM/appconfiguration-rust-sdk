@@ -203,7 +203,7 @@ impl AppConfigurationSdk {
 
         let runtime_emitter = self.runtime_emitter.clone();
         client.add_runtime_event_listener(Arc::new(move |event: RuntimeEvent| {
-            runtime_emitter.emit(event);
+            let _ = runtime_emitter.emit(event);
         }))?;
         self.client = Some(client);
         Ok(())

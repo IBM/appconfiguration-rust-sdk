@@ -1,12 +1,11 @@
 use appconfiguration::{ConfigurationId, OfflineMode, ServiceAddress};
 
 use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
-use tungstenite::WebSocket;
 
 mod common;
 

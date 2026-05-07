@@ -48,7 +48,7 @@ impl From<(CheckOperatorErrorDetail, &Segment, &Rule, String)> for SegmentEvalua
             segment_id: segment.segment_id.clone(),
             segment_rule_attribute_name: segment_rule.attribute_name.clone(),
             segment_rule_operator: segment_rule.operator.clone(),
-            value: value,
+            value,
             source,
         })
     }

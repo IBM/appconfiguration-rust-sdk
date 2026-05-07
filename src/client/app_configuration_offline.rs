@@ -15,7 +15,6 @@
 use crate::errors::Result;
 use crate::models::{Configuration, FeatureSnapshot, PropertySnapshot, SecretPropertySnapshot};
 use crate::ConfigurationProvider;
-use log::error;
 
 /// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
