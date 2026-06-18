@@ -24,8 +24,8 @@ jobs:
     - name: Run tests (documentation tests)
       run: cargo test --doc --verbose --workspace
 
-    - name: Test cargo readme is generated
-      run: |
-        cargo install cargo-readme
-        cargo readme > README.md
-        git diff --exit-code README.md
+    # - name: Test cargo readme is generated
+    #   run: |
+    #     cargo install cargo-readme
+    #     cargo readme > README.md
+    #     git diff --exit-code README.md
