@@ -28,6 +28,8 @@ pub enum CurrentModeOfflineReason {
     Initializing,
     WebsocketClosed,
     WebsocketError,
+    InternetConnectivityError,
+    WebsocketHeartbeatTimeout,
 }
 
 impl std::fmt::Display for CurrentModeOfflineReason {
@@ -39,6 +41,12 @@ impl std::fmt::Display for CurrentModeOfflineReason {
             CurrentModeOfflineReason::Initializing => write!(f, "Initializing"),
             CurrentModeOfflineReason::WebsocketClosed => write!(f, "WebsocketClosed"),
             CurrentModeOfflineReason::WebsocketError => write!(f, "WebsocketError"),
+            CurrentModeOfflineReason::InternetConnectivityError => {
+                write!(f, "InternetConnectivityError")
+            }
+            CurrentModeOfflineReason::WebsocketHeartbeatTimeout => {
+                write!(f, "WebsocketHeartbeatTimeout")
+            }
         }
     }
 }

@@ -39,9 +39,9 @@
 //! Create your client with the context (environment and collection) you want to connect to
 //!
 //! ```
-//! use appconfiguration::{
+//! use ibm_appconfiguration_rust_sdk::{
 //!     ConfigurationProvider, AppConfigurationClientIBMCloud,
-//!     ConfigurationId, Entity, Result, Value, Feature, OfflineMode
+//!     ConfigurationId, Entity, Result, Value, Feature, OfflineMode, RuntimeEventEmitter
 //! };
 //! # use std::collections::HashMap;
 //! # pub struct MyEntity;
@@ -62,7 +62,7 @@
 //!
 //! // Create the client connecting to the server
 //! let configuration = ConfigurationId::new(guid, environment_id, collection_id);
-//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail, false)?;
+//! let client = AppConfigurationClientIBMCloud::new(&apikey, &region, configuration, OfflineMode::Fail, false, Default::default(), RuntimeEventEmitter::new())?;
 //!
 //! // Get the feature you want to evaluate for your entities
 //! let feature = client.get_feature("AB_testing_feature")?;
@@ -70,9 +70,9 @@
 //! // Evaluate feature value for each one of your entities
 //! let user = MyEntity; // Implements Entity
 //!
-//! let value_for_this_user = feature.get_value(&user)?.try_into()?;
+//! let value_for_this_user: bool = feature.get_current_value(&user)?.value.try_into()?;
 //! if value_for_this_user {
-//!     println!("Feature {} is active for user {}", feature.get_name()?, user.get_id());
+//!     println!("Feature {} is active for user {}", feature.get_feature_name()?, user.get_id());
 //! } else {
 //!     println!("User {} keeps using the legacy workflow", user.get_id());
 //! }
@@ -94,12 +94,20 @@ pub(crate) mod utils;
 mod value;
 
 pub use client::{
-    AppConfigurationClient, AppConfigurationClientIBMCloud, AppConfigurationOffline,
-    ConfigurationId, ConfigurationProvider,
+    AppConfiguration, AppConfigurationClient, AppConfigurationClientIBMCloud,
+    AppConfigurationContextOptions, AppConfigurationOffline, ConfigurationId,
+    ConfigurationProvider, ResolvedUrls, RuntimeEvent, RuntimeEventEmitter, RuntimeEventKind,
+    RuntimeMode, RuntimeStatus,
 };
 pub use entity::Entity;
 pub use errors::{ConfigurationDataError, Error, Result};
 pub use feature::Feature;
+pub use models::{
+    EvaluationContext, EvaluationRuleCondition, EvaluationRuleContext, EvaluationSegmentContext,
+    FeatureEvaluationDetails, FeatureEvaluationResult, PropertyEvaluationDetails,
+    PropertyEvaluationResult, SecretManager, SecretPropertySnapshot,
+};
+pub use network::live_configuration::CurrentModeOfflineReason;
 pub use network::live_configuration::OfflineMode;
 pub(crate) use network::{ServerClientImpl, TokenProviderImpl};
 pub use property::Property;

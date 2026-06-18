@@ -23,22 +23,22 @@ use crate::{Feature, Property, Value};
 fn test_get_a_specific_feature(client_enterprise: Box<dyn AppConfigurationClient>) {
     let specific_feature = client_enterprise.get_feature_proxy("f1").unwrap();
 
-    let name = specific_feature.get_name().unwrap();
+    let name = specific_feature.get_feature_name().unwrap();
     let is_enabled = specific_feature.is_enabled().unwrap();
-    let value = specific_feature.get_value(&TrivialEntity).unwrap();
+    let value = specific_feature.get_current_value(&TrivialEntity).unwrap();
 
     assert_eq!(name, "F1".to_string());
     assert!(is_enabled);
-    assert!(matches!(value, Value::Int64(ref v) if v == &5));
+    assert!(matches!(value.value, Value::Int64(ref v) if v == &5));
 }
 
 #[rstest]
 fn test_get_a_specific_property(client_enterprise: Box<dyn AppConfigurationClient>) {
     let property = client_enterprise.get_property_proxy("p1").unwrap();
 
-    let name = property.get_name().unwrap();
-    let value = property.get_value(&TrivialEntity).unwrap();
+    let name = property.get_property_name().unwrap();
+    let value = property.get_current_value(&TrivialEntity).unwrap();
 
     assert_eq!(name, "p1");
-    assert!(matches!(value, Value::Int64(ref v) if v == &5));
+    assert!(matches!(value.value, Value::Int64(ref v) if v == &5));
 }

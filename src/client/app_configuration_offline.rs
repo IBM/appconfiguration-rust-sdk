@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::errors::Result;
-use crate::models::{Configuration, FeatureSnapshot, PropertySnapshot};
 use crate::ConfigurationProvider;
-use log::error;
+use crate::errors::Result;
+use crate::models::{Configuration, FeatureSnapshot, PropertySnapshot, SecretPropertySnapshot};
 
 /// AppConfiguration client using a local file with a configuration snapshot
 #[derive(Debug)]
@@ -30,8 +29,12 @@ impl AppConfigurationOffline {
     ///
     /// * `filepath` - The file with the configuration.
     /// * `environment_id` - ID of the environment to use from the configuration file.
-    pub fn new(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
-        let config_snapshot = Configuration::from_file(filepath, environment_id)?;
+    pub fn new(
+        filepath: &std::path::Path,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Result<Self> {
+        let config_snapshot = Configuration::from_file(filepath, environment_id, collection_id)?;
         Ok(Self { config_snapshot })
     }
 }
@@ -57,7 +60,20 @@ impl ConfigurationProvider for AppConfigurationOffline {
         Ok(false)
     }
 
-    fn wait_until_online(&self) {
-        panic!("Waiting for AppConfigurationOffline to get online. This will never happen.");
+    fn wait_until_online(&self) -> bool {
+        // AppConfigurationOffline never connects to a remote server;
+        // waiting for "online" is meaningless — return false immediately.
+        false
+    }
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        self.config_snapshot.get_secret_property(property_id)
+    }
+
+    fn clean_up(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn clean_up_with_cache_clear(&mut self) -> Result<()> {
+        Ok(())
     }
 }

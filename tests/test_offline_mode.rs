@@ -1,4 +1,20 @@
-use appconfiguration::{AppConfigurationOffline, ConfigurationId, OfflineMode, ServiceAddress};
+// Copyright 2026 IBM Corp. All Rights Reserved.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//       http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use ibm_appconfiguration_rust_sdk::{
+    AppConfigurationOffline, ConfigurationId, OfflineMode, ServiceAddress,
+};
 
 use std::net::TcpListener;
 
@@ -16,7 +32,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         // Offline data
         let mut mocked_data = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         mocked_data.push("data/data-dump-enterprise-plan-sdk-testing.json");
-        let offline_data = AppConfigurationOffline::new(&mocked_data, "dev")?;
+        let offline_data = AppConfigurationOffline::new(&mocked_data, "dev", "blue-charge")?;
 
         // The actual client
         let address = ServiceAddress::new_without_ssl(
@@ -30,7 +46,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             "collection_id".to_string(),
         );
 
-        appconfiguration::test_utils::create_app_configuration_client_live(
+        ibm_appconfiguration_rust_sdk::test_utils::create_app_configuration_client_live(
             address,
             config_id,
             OfflineMode::FallbackData(offline_data),
@@ -44,7 +60,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // but it retrieves the fallback data
     let mut features = client.get_feature_ids().unwrap();
     features.sort();
-    assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f5", "f6"]);
+    assert_eq!(features, vec!["f1", "f2", "f3", "f4", "f6"]);
 
     Ok(())
 }

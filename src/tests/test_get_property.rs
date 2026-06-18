@@ -16,12 +16,11 @@ use std::collections::HashMap;
 
 use crate::client::{AppConfigurationClient, AppConfigurationOffline};
 use crate::models::Configuration;
-use crate::{ConfigurationProvider, Value};
+use crate::{ConfigurationProvider, Property, Value};
 use rstest::*;
 
 use super::client_enterprise;
 use crate::network::serialization::fixtures::configuration_unordered_segment_rules;
-use crate::property::Property;
 
 #[rstest]
 fn test_get_property_doesnt_exist(client_enterprise: Box<dyn AppConfigurationClient>) {
@@ -46,7 +45,7 @@ fn test_get_property_ordered(configuration_unordered_segment_rules: Configuratio
     let value = client
         .get_property("f1")
         .unwrap()
-        .get_value(&entity)
+        .get_current_value(&entity)
         .unwrap();
-    assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
+    assert!(matches!(value.value, Value::Int64(ref v) if v == &(-49)));
 }

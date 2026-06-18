@@ -24,7 +24,7 @@ pub(crate) use client::MeteringClient;
 pub(crate) use client_http::MeteringClientHttp;
 pub(crate) use errors::MeteringError;
 pub(crate) use metering::{
-    start_metering, MeteringRecorder, MeteringRecorderSender, MeteringSubject,
+    MeteringRecorder, MeteringRecorderSender, MeteringSubject, start_metering,
 };
 
 pub type MeteringResult<T> = std::result::Result<T, errors::MeteringError>;

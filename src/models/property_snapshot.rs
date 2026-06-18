@@ -15,9 +15,11 @@
 use crate::entity::Entity;
 use crate::metering::{MeteringRecorderSender, MeteringSubject};
 use crate::value::Value;
-use crate::Property;
+use crate::{Property, PropertyEvaluationResult};
 
 use crate::errors::Result;
+use crate::models::evaluation_result::PropertyEvaluationDetails;
+use crate::network::serialization::ValueType;
 use crate::segment_evaluation::TargetingRules;
 
 /// Provides a snapshot of a [`Property`].
@@ -25,6 +27,9 @@ use crate::segment_evaluation::TargetingRules;
 pub struct PropertySnapshot {
     value: Value,
     segment_rules: TargetingRules,
+    value_type: ValueType,
+    r#type: String,
+    format: Option<String>,
     pub(crate) name: String,
     pub(crate) property_id: String,
     pub(crate) metering: Option<MeteringRecorderSender>,
@@ -34,6 +39,9 @@ impl PropertySnapshot {
     pub(crate) fn new(
         value: Value,
         segment_rules: TargetingRules,
+        value_type: ValueType,
+        r#type: String,
+        format: Option<String>,
         name: &str,
         property_id: &str,
         metering: Option<MeteringRecorderSender>,
@@ -41,13 +49,19 @@ impl PropertySnapshot {
         Self {
             value,
             segment_rules,
+            value_type,
+            r#type,
+            format,
             name: name.to_string(),
             property_id: property_id.to_string(),
             metering,
         }
     }
 
-    fn evaluate_property_for_entity(&self, entity: &impl Entity) -> Result<Value> {
+    fn evaluate_property_for_entity(
+        &self,
+        entity: &impl Entity,
+    ) -> Result<(Value, PropertyEvaluationDetails)> {
         let (segment_rule, segment) = {
             if self.segment_rules.is_empty() || entity.get_attributes().is_empty() {
                 // TODO: this makes only sense if there can be a rule which matches
@@ -64,26 +78,69 @@ impl PropertySnapshot {
         self.record_evaluation(entity, segment);
 
         match segment_rule {
-            Some(segment_rule) => segment_rule.value(&self.value),
-            None => Ok(self.value.clone()),
+            Some(segment_rule) => {
+                let segment_name = segment.map(|s| s.name.clone());
+                let value = segment_rule.value(&self.value)?;
+                Ok((
+                    value,
+                    PropertyEvaluationDetails {
+                        value_type: "SEGMENT_VALUE".to_string(),
+                        reason: format!(
+                            "Matched targeting rule order {} for property evaluation.",
+                            segment_rule.order()
+                        ),
+                        segment_name,
+                    },
+                ))
+            }
+            None => Ok((
+                self.value.clone(),
+                PropertyEvaluationDetails {
+                    value_type: "DEFAULT_VALUE".to_string(),
+                    reason: "No targeting rule matched. Returning property default value."
+                        .to_string(),
+                    segment_name: None,
+                },
+            )),
         }
+    }
+
+    pub fn is_secret_ref(&self) -> bool {
+        matches!(self.value_type, ValueType::SecretRef)
     }
 }
 
 impl Property for PropertySnapshot {
-    fn get_name(&self) -> Result<String> {
+    fn get_property_name(&self) -> Result<String> {
         Ok(self.name.clone())
     }
 
-    fn get_value(&self, entity: &impl Entity) -> Result<Value> {
-        self.evaluate_property_for_entity(entity)
+    fn get_property_id(&self) -> Result<String> {
+        Ok(self.property_id.clone())
+    }
+
+    fn get_property_data_type(&self) -> Result<String> {
+        Ok(self.r#type.clone())
+    }
+
+    fn get_property_data_format(&self) -> Result<Option<String>> {
+        // If the Format is null or undefined for a String type, we default it to TEXT
+        if self.format.is_none() && self.r#type == "STRING" {
+            return Ok(Some("TEXT".to_string()));
+        }
+        Ok(self.format.clone())
+    }
+
+    fn get_current_value(&self, entity: &impl Entity) -> Result<PropertyEvaluationResult> {
+        let (value, details) = self.evaluate_property_for_entity(entity)?;
+        Ok(PropertyEvaluationResult { value, details })
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
     ) -> Result<T> {
-        let value = self.get_value(entity)?;
+        let value = self.get_current_value(entity).map(|r| r.value)?;
         value.try_into()
     }
 }
@@ -118,8 +175,18 @@ pub mod tests {
                 serde_json::Value::String("$default".into()),
                 serde_json::Value::Number((100).into()),
             );
-            let segment_rules = TargetingRules::new(segments, segment_rules, ValueType::Numeric);
-            PropertySnapshot::new(Value::Int64(-42), segment_rules, "F1", "f1", None)
+            let segment_rules =
+                TargetingRules::new(segments, segment_rules, ValueType::Numeric, None);
+            PropertySnapshot::new(
+                Value::Int64(-42),
+                segment_rules,
+                ValueType::Numeric,
+                "NUMERIC".to_string(),
+                None,
+                "F1",
+                "f1",
+                None,
+            )
         };
 
         // Both segment rules match. Expect the one with smaller order to be used:
@@ -127,7 +194,7 @@ pub mod tests {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("heinz".to_string()))]),
         };
-        let value = property.get_value(&entity).unwrap();
-        assert!(matches!(value, Value::Int64(ref v) if v == &(-42)));
+        let value = property.get_current_value(&entity).unwrap();
+        assert!(matches!(value.value, Value::Int64(ref v) if v == &(-42)));
     }
 }

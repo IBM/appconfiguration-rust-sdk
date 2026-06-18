@@ -14,15 +14,17 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::errors::Result;
-use crate::network::serialization::{ConfigurationJson, Feature, Property, Segment, SegmentRule};
-use crate::segment_evaluation::TargetingRules;
 use crate::ConfigurationDataError;
+use crate::errors::Result;
+use crate::network::serialization::{
+    Collection, ConfigurationJson, Feature, Property, Segment, SegmentRule,
+};
+use crate::segment_evaluation::TargetingRules;
 
 use super::feature_snapshot::FeatureSnapshot;
 use super::property_snapshot::PropertySnapshot;
+use super::secret_property::SecretPropertySnapshot;
 use crate::ConfigurationProvider;
-use log::error;
 
 /// Represents all the configuration data needed for the client to perform
 /// feature/propery evaluation.
@@ -37,6 +39,7 @@ impl Configuration {
     /// Constructs the Configuration, by consuming and filtering data in exchange format
     pub fn new(
         environment_id: &str,
+        collection_id: &str,
         configuration: ConfigurationJson,
     ) -> std::result::Result<Self, ConfigurationDataError> {
         let environment = configuration
@@ -46,29 +49,35 @@ impl Configuration {
             .ok_or(ConfigurationDataError::EnvironmentNotFound(
                 environment_id.to_string(),
             ))?;
-        // FIXME: why not filtering for collection here?
 
         let features = environment
             .features
             .into_iter()
+            .filter(|feature| {
+                Self::resource_belongs_to_collection(&feature.collections, collection_id)
+            })
             .map(|mut feature| {
                 feature.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
 
                 // Get the segment rules that apply to this feature
-                let segments = Self::get_segments_for_segment_rules(
+                let (segments, referenced_segment_count) = Self::get_segments_for_segment_rules(
                     &configuration.segments,
                     &feature.segment_rules,
                 );
 
                 // Integrity DB check: all segment_ids should be available in the snapshot
-                if feature.segment_rules.len() != segments.len() {
+                if referenced_segment_count != segments.len() {
                     return Err(ConfigurationDataError::MissingSegments(
                         feature.feature_id.to_string(),
                     ));
                 }
 
-                let segment_rules =
-                    TargetingRules::new(segments, feature.segment_rules.clone(), feature.r#type);
+                let segment_rules = TargetingRules::new(
+                    segments,
+                    feature.segment_rules.clone(),
+                    feature.r#type,
+                    Some(&feature.feature_id),
+                );
 
                 Ok((feature.feature_id.clone(), (feature, segment_rules)))
             })
@@ -77,24 +86,31 @@ impl Configuration {
         let properties = environment
             .properties
             .into_iter()
+            .filter(|property| {
+                Self::resource_belongs_to_collection(&property.collections, collection_id)
+            })
             .map(|mut property| {
                 property.segment_rules.sort_by(|a, b| a.order.cmp(&b.order));
 
                 // Get the segment rules that apply to this property
-                let segments = Self::get_segments_for_segment_rules(
+                let (segments, referenced_segment_count) = Self::get_segments_for_segment_rules(
                     &configuration.segments,
                     &property.segment_rules,
                 );
 
                 // Integrity DB check: all segment_ids should be available in the snapshot
-                if property.segment_rules.len() != segments.len() {
+                if referenced_segment_count != segments.len() {
                     return Err(ConfigurationDataError::MissingSegments(
                         property.property_id.to_string(),
                     ));
                 }
 
-                let segment_rules =
-                    TargetingRules::new(segments, property.segment_rules.clone(), property.r#type);
+                let segment_rules = TargetingRules::new(
+                    segments,
+                    property.segment_rules.clone(),
+                    property.r#type,
+                    None,
+                );
                 Ok((property.property_id.clone(), (property, segment_rules)))
             })
             .collect::<std::result::Result<_, _>>()?;
@@ -105,9 +121,17 @@ impl Configuration {
         })
     }
 
-    pub fn from_file(filepath: &std::path::Path, environment_id: &str) -> Result<Self> {
+    pub fn from_file(
+        filepath: &std::path::Path,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Result<Self> {
         let configuration = ConfigurationJson::new(filepath)?;
-        Ok(Configuration::new(environment_id, configuration)?)
+        Ok(Configuration::new(
+            environment_id,
+            collection_id,
+            configuration,
+        )?)
     }
 
     /// Returns a mapping of segment ID to `Segment` for all segments referenced
@@ -115,7 +139,7 @@ impl Configuration {
     fn get_segments_for_segment_rules(
         segments: &[Segment],
         segment_rules: &[SegmentRule],
-    ) -> HashMap<String, Segment> {
+    ) -> (HashMap<String, Segment>, usize) {
         let referenced_segment_ids = segment_rules
             .iter()
             .flat_map(|targeting_rule| {
@@ -127,11 +151,15 @@ impl Configuration {
             .cloned()
             .collect::<HashSet<String>>();
 
-        segments
+        let referenced_count = referenced_segment_ids.len();
+
+        let found = segments
             .iter()
             .filter(|&segment| referenced_segment_ids.contains(&segment.segment_id))
             .map(|segment| (segment.segment_id.clone(), segment.clone()))
-            .collect()
+            .collect();
+
+        (found, referenced_count)
     }
 
     pub(crate) fn get_feature_ids_refs(&self) -> Vec<&String> {
@@ -140,6 +168,18 @@ impl Configuration {
 
     pub(crate) fn get_property_ids_refs(&self) -> Vec<&String> {
         self.properties.keys().collect()
+    }
+
+    fn resource_belongs_to_collection(
+        collections: &Option<Vec<Collection>>,
+        collection_id: &str,
+    ) -> bool {
+        match collections {
+            None => true,
+            Some(collections) => collections
+                .iter()
+                .any(|collection| collection.collection_id == collection_id),
+        }
     }
 }
 
@@ -157,13 +197,18 @@ impl ConfigurationProvider for Configuration {
 
         let enabled_value = (feature.r#type, feature.enabled_value.clone()).try_into()?;
         let disabled_value = (feature.r#type, feature.disabled_value.clone()).try_into()?;
+        let feature_type = feature.r#type.to_string();
         Ok(FeatureSnapshot::new(
             feature.enabled,
             enabled_value,
             disabled_value,
             feature.rollout_percentage,
+            feature.rollout_type.clone(),
+            feature.rollout_configuration.clone(),
             &feature.name,
             feature_id,
+            feature_type,
+            feature.format.clone(),
             segment_rules.clone(),
             None,
         ))
@@ -181,9 +226,13 @@ impl ConfigurationProvider for Configuration {
             .ok_or_else(|| ConfigurationDataError::PropertyNotFound(property_id.to_string()))?;
 
         let value = (property.r#type, property.value.clone()).try_into()?;
+        let property_type = format!("{:?}", property.r#type).to_uppercase();
         Ok(PropertySnapshot::new(
             value,
             segment_rules.clone(),
+            property.r#type,
+            property_type,
+            property.format.clone(),
             &property.name,
             &property.property_id,
             None,
@@ -194,8 +243,30 @@ impl ConfigurationProvider for Configuration {
         Ok(false)
     }
 
-    fn wait_until_online(&self) {
-        panic!("Waiting for Configuration to get online. This will never happen.");
+    fn wait_until_online(&self) -> bool {
+        // Configuration is a static snapshot, never backed by a live connection.
+        false
+    }
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        let property = self.get_property(property_id)?;
+        if !property.is_secret_ref() {
+            return Err(crate::Error::PropertyIsNotSecretRef {
+                property_id: property_id.to_string(),
+            });
+        }
+
+        Ok(SecretPropertySnapshot::new(
+            property,
+            property_id.to_string(),
+        ))
+    }
+
+    fn clean_up(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn clean_up_with_cache_clear(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -204,8 +275,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::network::serialization::fixtures::example_configuration_enterprise_path;
     use crate::network::serialization::ConfigurationJson;
+    use crate::network::serialization::fixtures::example_configuration_enterprise_path;
 
     use rstest::*;
 
@@ -216,7 +287,7 @@ mod tests {
         let config_json: ConfigurationJson =
             serde_json::from_reader(content).expect("Error parsing JSON into Configuration");
 
-        let result = Configuration::new("does_for_sure_not_exist", config_json);
+        let result = Configuration::new("does_for_sure_not_exist", "blue-charge", config_json);
         assert!(result.is_err());
 
         assert!(matches!(

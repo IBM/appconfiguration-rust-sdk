@@ -25,7 +25,9 @@ pub enum Error {
     #[error("Cannot acquire lock")]
     CannotAcquireLock,
 
-    #[error("Connection to server lost: {0}")]
+    #[error(
+        "SDK is currently offline (reason: {0}). Configuration data is unavailable until the connection is restored."
+    )]
     Offline(CurrentModeOfflineReason),
 
     #[error("Thread failed with internal error: {0}")]

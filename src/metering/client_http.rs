@@ -1,8 +1,22 @@
+// Copyright 2026 IBM Corp. All Rights Reserved.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//       http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 use std::sync::Arc;
 
 use crate::metering::serialization::MeteringDataJson;
 use crate::metering::{MeteringClient, MeteringError, MeteringResult};
 use crate::network::NetworkError;
+use crate::network::http_client::SDK_USER_AGENT;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
 use reqwest::blocking::Client;
 use url::Url;
@@ -37,7 +51,7 @@ impl MeteringClient for MeteringClientHttp {
         let client = Client::new();
         let r = client
             .post(url)
-            .header("User-Agent", "appconfiguration-rust-sdk/0.0.1")
+            .header("User-Agent", SDK_USER_AGENT)
             .bearer_auth(self.token_provider.get_access_token()?)
             .json(data)
             .send();

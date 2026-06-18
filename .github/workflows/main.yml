@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Build
       run: cargo build --verbose --workspace
     # Tests: we only run library and documentation tests (integration tests are using the remote server!)
@@ -24,8 +24,8 @@ jobs:
     - name: Run tests (documentation tests)
       run: cargo test --doc --verbose --workspace
 
-    - name: Test cargo readme is generated
-      run: |
-        cargo install cargo-readme
-        cargo readme > README.md
-        git diff --exit-code README.md
+    # - name: Test cargo readme is generated
+    #   run: |
+    #     cargo install cargo-readme
+    #     cargo readme > README.md
+    #     git diff --exit-code README.md

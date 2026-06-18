@@ -5,19 +5,17 @@ permissions:
   contents: write
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
 
-  # Release unpublished packages.
+  # Release unpublished packages on-demand.
   release-plz-release:
     name: Release-plz release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install Release-plz
@@ -30,7 +28,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  # Create a PR with the new versions and changelog, preparing the next release.
+  # Optional: You can still run this manually to preview/prep your next release.
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
@@ -39,7 +37,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install Release-plz

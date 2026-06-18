@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub(crate) mod cache_file;
+pub(crate) mod connectivity;
 pub mod errors;
 pub(crate) mod http_client;
 mod token_provider;
@@ -22,7 +24,7 @@ pub(crate) use http_client::ServiceAddressProtocol;
 pub use token_provider::TokenProvider;
 pub(crate) use token_provider::TokenProviderImpl;
 pub(crate) mod live_configuration;
-
+pub(crate) use cache_file::CacheFile;
 pub use errors::NetworkError;
 pub type NetworkResult<T> = std::result::Result<T, NetworkError>;
 
