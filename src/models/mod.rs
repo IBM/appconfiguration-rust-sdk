@@ -22,9 +22,21 @@
 //!
 
 mod configuration;
+mod evaluation_result;
 mod feature_snapshot;
 mod property_snapshot;
+mod rollout_configuration;
+mod secret_property;
 
 pub(crate) use configuration::Configuration;
+pub use evaluation_result::{
+    EvaluationContext, EvaluationRuleCondition, EvaluationRuleContext, EvaluationSegmentContext,
+    FeatureEvaluationDetails, FeatureEvaluationResult, PropertyEvaluationDetails,
+    PropertyEvaluationResult,
+};
 pub(crate) use feature_snapshot::FeatureSnapshot;
 pub(crate) use property_snapshot::PropertySnapshot;
+#[allow(unused_imports)] // used in rollout_parser tests via crate::models::RolloutPhase
+pub(crate) use rollout_configuration::RolloutPhase;
+pub(crate) use rollout_configuration::{DELIMITER, ROLLOUT_TYPE_PROGRESSIVE, RolloutConfiguration};
+pub use secret_property::{SecretManager, SecretPropertySnapshot};

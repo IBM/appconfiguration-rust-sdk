@@ -1,3 +1,17 @@
+// Copyright 2026 IBM Corp. All Rights Reserved.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//       http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::sync::PoisonError;
 
 use thiserror::Error;
@@ -12,18 +26,37 @@ pub enum Error {
     #[error("Cannot acquire snapshot lock")]
     CannotAcquireLock,
 
-    #[error("Feature '{feature_id}' does not exist in environment '{environment_id}' and collection '{collection_id}'")]
+    #[error(
+        "Feature '{feature_id}' does not exist in environment '{environment_id}' and collection '{collection_id}'"
+    )]
     FeatureDoesNotExist {
         collection_id: String,
         environment_id: String,
         feature_id: String,
     },
 
-    #[error("Property '{property_id}' does not exist in environment '{environment_id}' and collection '{collection_id}'")]
+    #[error(
+        "Property '{property_id}' does not exist in environment '{environment_id}' and collection '{collection_id}'"
+    )]
     PropertyDoesNotExist {
         collection_id: String,
         environment_id: String,
         property_id: String,
+    },
+
+    #[error("Secret property '{property_id}' is not configured as type SECRETREF")]
+    PropertyIsNotSecretRef { property_id: String },
+
+    #[error("Secret manager is not configured for secret property '{property_id}'")]
+    SecretManagerNotConfigured { property_id: String },
+
+    #[error("Secret reference for property '{property_id}' did not contain an 'id' field")]
+    SecretReferenceIdMissing { property_id: String },
+
+    #[error("Secret provider failed for property '{property_id}': {message}")]
+    SecretProviderError {
+        property_id: String,
+        message: String,
     },
 
     #[error("Inner type cannot be converted to requested type")]
@@ -99,6 +132,12 @@ pub enum ConfigurationDataError {
     #[error("Environment '{0}' not found")]
     EnvironmentNotFound(String),
 
+    #[error("Collection '{0}' not found")]
+    CollectionNotFound(String),
+
+    #[error("Improper/Missing collections in configuration")]
+    MissingCollections,
+
     #[error("Feature `{0}` not found.")]
     FeatureNotFound(String),
 
@@ -107,6 +146,9 @@ pub enum ConfigurationDataError {
 
     #[error("Missing segments for resource '{0}'")]
     MissingSegments(String),
+
+    #[error("Improper collection format in resource '{0}'")]
+    InvalidResourceCollections(String),
 }
 
 #[derive(Debug, Error)]
@@ -123,7 +165,7 @@ impl<T> From<PoisonError<T>> for ConfigurationAccessError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-pub struct LiveConfigurationError(crate::network::live_configuration::Error);
+pub struct LiveConfigurationError(pub(crate) crate::network::live_configuration::Error);
 
 impl From<crate::network::live_configuration::Error> for Error {
     fn from(value: crate::network::live_configuration::Error) -> Self {

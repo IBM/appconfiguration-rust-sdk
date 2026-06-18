@@ -15,10 +15,10 @@
 use std::collections::HashMap;
 
 use super::errors::CheckOperatorErrorDetail;
+use crate::Value;
 use crate::network::serialization::{Rule, Segment};
 use crate::segment_evaluation::errors::SegmentEvaluationError;
 use crate::segment_evaluation::rule_operator::RuleOperator;
-use crate::Value;
 
 pub(crate) trait MatchesAttributes {
     type Error;
@@ -61,18 +61,29 @@ impl MatchesAttributes for Rule {
         &self,
         attributes: &HashMap<String, Value>,
     ) -> std::result::Result<bool, Self::Error> {
+        const NEGATION_OPERATORS: &[&str] =
+            &["isNot", "notContains", "notStartsWith", "notEndsWith"];
+
         attributes
             .get(&self.attribute_name)
             .map_or(Ok(false), |attr_value| {
-                self.values
+                let results = self
+                    .values
                     .iter()
                     .map(|value| {
                         attr_value
                             .operate(&self.operator, value)
                             .map_err(|e| (e, value.to_owned()))
                     })
-                    .collect::<std::result::Result<Vec<bool>, _>>()
-                    .map(|v| v.iter().any(|&x| x))
+                    .collect::<std::result::Result<Vec<bool>, _>>()?;
+
+                if NEGATION_OPERATORS.contains(&self.operator.as_str()) {
+                    // ALL values must individually satisfy the negation
+                    Ok(results.iter().all(|&x| x))
+                } else {
+                    // ANY single value match is sufficient
+                    Ok(results.iter().any(|&x| x))
+                }
             })
     }
 }

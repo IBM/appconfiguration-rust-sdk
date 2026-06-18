@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub(crate) struct Segments {
     pub segments: Vec<String>,
 }

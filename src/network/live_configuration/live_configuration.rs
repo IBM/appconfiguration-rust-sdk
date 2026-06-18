@@ -12,28 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use super::current_mode::CurrentModeOfflineReason;
 use super::update_thread_worker::UpdateThreadWorker;
 use super::{CurrentMode, Error, OfflineMode, Result};
+use crate::client::{RuntimeEventListener, RuntimeMode, RuntimeStatus};
+use crate::errors::DeserializationError;
 use crate::models::Configuration;
+use crate::network::CacheFile;
 use crate::network::http_client::ServerClient;
 use crate::utils::{ThreadHandle, ThreadStatus, Waitable};
-use crate::{AppConfigurationOffline, ConfigurationId, ConfigurationProvider};
+use crate::{ConfigurationId, ConfigurationProvider};
 
 /// A [`ConfigurationProvider`] that keeps the configuration updated with some
 /// third-party source using an asyncronous mechanism.
 pub trait LiveConfiguration: ConfigurationProvider {
     /// Utility method to know the current status of the inner thread that keeps
     /// the configuration synced with the server.
+    #[allow(dead_code)]
     fn get_thread_status(&mut self) -> ThreadStatus<Result<()>>;
 
     /// Utility method to get the current operating mode of the object.
     fn get_current_mode(&self) -> Result<CurrentMode>;
+
+    /// Stops the live runtime thread and resets in-memory state.
+    fn clean_up(&mut self) -> Result<()>;
+
+    /// Stops the live runtime thread, resets in-memory state, and clears any
+    /// SDK-managed persistent cache file.
+    fn clean_up_with_cache_clear(&mut self) -> Result<()>;
 }
 
-#[derive(Debug)]
 pub(crate) struct LiveConfigurationImpl {
     /// Configuration object that will be returned to consumers. This is also the object
     /// that the thread in the backend will be updating.
@@ -47,26 +59,79 @@ pub(crate) struct LiveConfigurationImpl {
 
     /// Behaviour while the server is offline
     offline_mode: OfflineMode,
+
+    runtime_event_listeners: Arc<Mutex<Vec<RuntimeEventListener>>>,
+}
+
+impl std::fmt::Debug for LiveConfigurationImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LiveConfigurationImpl")
+            .field("configuration", &self.configuration)
+            .field("current_mode", &self.current_mode)
+            .field("update_thread", &self.update_thread)
+            .field("offline_mode", &self.offline_mode)
+            .field(
+                "runtime_event_listeners",
+                &format!(
+                    "[{} listeners]",
+                    self.runtime_event_listeners
+                        .lock()
+                        .map(|l| l.len())
+                        .unwrap_or(0)
+                ),
+            )
+            .finish()
+    }
 }
 
 impl LiveConfigurationImpl {
     /// Creates a new [`LiveConfigurationImpl`] object and starts a thread running an instance
     /// of [`UpdateThreadWorker`].
+    ///
+
     pub fn new<T: ServerClient>(
         offline_mode: OfflineMode,
         server_client: T,
         configuration_id: ConfigurationId,
+        initial_listeners: Vec<RuntimeEventListener>,
     ) -> Self {
-        let configuration = Arc::new(Mutex::new(None));
+        let (preloaded_configuration, persistent_cache_path) =
+            Self::preload_configuration(&offline_mode);
+        let configuration = Arc::new(Mutex::new(preloaded_configuration));
+        let runtime_event_listeners = Arc::new(Mutex::new(initial_listeners));
+
+        if matches!(offline_mode, OfflineMode::FallbackData(_)) {
+            let current_mode = Waitable::new(CurrentMode::Defunct(Ok(())));
+            let update_thread = ThreadHandle::new(move |_| Ok(()));
+            drop(server_client);
+            return Self {
+                configuration,
+                update_thread,
+                current_mode,
+                offline_mode,
+                runtime_event_listeners,
+            };
+        }
+
         let current_mode =
             Waitable::new(CurrentMode::Offline(CurrentModeOfflineReason::Initializing));
-
-        let worker = UpdateThreadWorker::new(
-            server_client,
-            configuration_id,
-            configuration.clone(),
-            current_mode.clone(),
-        );
+        let worker = match persistent_cache_path {
+            Some(path) => UpdateThreadWorker::new(
+                server_client,
+                configuration_id,
+                configuration.clone(),
+                current_mode.clone(),
+                runtime_event_listeners.clone(),
+            )
+            .with_persistent_cache_file(path),
+            None => UpdateThreadWorker::new(
+                server_client,
+                configuration_id,
+                configuration.clone(),
+                current_mode.clone(),
+                runtime_event_listeners.clone(),
+            ),
+        };
 
         let update_thread =
             ThreadHandle::new(move |terminator_receiver| worker.run(terminator_receiver));
@@ -76,11 +141,93 @@ impl LiveConfigurationImpl {
             update_thread,
             current_mode,
             offline_mode,
+            runtime_event_listeners,
+        }
+    }
+
+    fn read_persistent_cache_configuration(
+        path: &Path,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Option<Configuration> {
+        let contents = CacheFile::read_persistent_cache_string(path);
+        if contents.is_empty() {
+            return None;
+        }
+
+        serde_json::from_str::<crate::network::serialization::ConfigurationJson>(&contents)
+            .map_err(|e| {
+                crate::Error::DeserializationError(DeserializationError {
+                    string: format!(
+                        "Error deserializing Configuration from file '{}'",
+                        path.display()
+                    ),
+                    source: e.into(),
+                })
+            })
+            .and_then(|configuration_json| {
+                Configuration::new(environment_id, collection_id, configuration_json)
+                    .map_err(crate::Error::from)
+            })
+            .ok()
+    }
+
+    fn read_bootstrap_configuration(
+        path: &PathBuf,
+        environment_id: &str,
+        collection_id: &str,
+    ) -> Option<Configuration> {
+        CacheFile::read_bootstrap_string(path)
+            .and_then(|contents| {
+                serde_json::from_str::<crate::network::serialization::ConfigurationJson>(&contents)
+                    .map_err(|e| {
+                        crate::Error::DeserializationError(DeserializationError {
+                            string: format!(
+                                "Error deserializing Configuration from file '{}'",
+                                path.display()
+                            ),
+                            source: e.into(),
+                        })
+                    })
+            })
+            .and_then(|configuration_json| {
+                Configuration::new(environment_id, collection_id, configuration_json)
+                    .map_err(crate::Error::from)
+            })
+            .ok()
+    }
+
+    fn preload_configuration(
+        offline_mode: &OfflineMode,
+    ) -> (Option<Configuration>, Option<PathBuf>) {
+        match offline_mode {
+            OfflineMode::PersistentCacheFile {
+                path,
+                environment_id,
+                collection_id,
+            } => (
+                Self::read_persistent_cache_configuration(path, environment_id, collection_id),
+                Some(path.clone()),
+            ),
+            OfflineMode::BootstrapFile {
+                path,
+                environment_id,
+                collection_id,
+            } => (
+                Self::read_bootstrap_configuration(path, environment_id, collection_id),
+                None,
+            ),
+            OfflineMode::FallbackData(app_configuration_offline) => (
+                Some(app_configuration_offline.config_snapshot.clone()),
+                None,
+            ),
+            OfflineMode::Fail | OfflineMode::Cache => (None, None),
         }
     }
 
     /// Returns the current [`Configuration`] after considering the [`CurrentMode`] and the [`OfflineMode`]
     /// configured for this object.
+    ///
     fn get_configuration(&self) -> Result<Configuration> {
         // TODO: Can we return a reference instead?
         match self.current_mode.get()? {
@@ -91,32 +238,73 @@ impl LiveConfigurationImpl {
                     Some(configuration) => Ok(configuration.clone()),
                 }
             }
-            CurrentMode::Offline(current_mode_offline_reason) => match &self.offline_mode {
-                OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason.clone())),
-                OfflineMode::Cache => match &*self.configuration.lock()? {
-                    None => Err(Error::ConfigurationNotYetAvailable),
-                    Some(configuration) => Ok(configuration.clone()),
-                },
-                OfflineMode::FallbackData(app_configuration_offline) => {
-                    Ok(app_configuration_offline.config_snapshot.clone())
+            CurrentMode::Offline(current_mode_offline_reason) => {
+                // Priority 1: always try the in-memory cache first — the background thread
+                // preserves the last successful fetch across reconnect cycles.
+                if let Some(configuration) = &*self.configuration.lock()? {
+                    log::debug!(
+                        "[OFFLINE] Serving stale in-memory config while reconnecting (reason: {})",
+                        current_mode_offline_reason
+                    );
+                    return Ok(configuration.clone());
                 }
-            },
-            CurrentMode::Defunct(result) => match &self.offline_mode {
-                OfflineMode::Fail => Err(Error::ThreadInternalError(format!(
-                    "Thread finished with status: {:?}",
-                    result
-                ))),
-                OfflineMode::Cache => match &*self.configuration.lock()? {
-                    None => Err(Error::UnrecoverableError(format!(
+
+                // Priority 2: no in-memory config yet — fall back to the configured strategy.
+                match &self.offline_mode {
+                    OfflineMode::Fail => Err(Error::Offline(current_mode_offline_reason)),
+                    OfflineMode::Cache => Err(Error::ConfigurationNotYetAvailable),
+                    OfflineMode::FallbackData(app_configuration_offline) => {
+                        Ok(app_configuration_offline.config_snapshot.clone())
+                    }
+                    OfflineMode::PersistentCacheFile {
+                        path,
+                        environment_id,
+                        collection_id,
+                    }
+                    | OfflineMode::BootstrapFile {
+                        path,
+                        environment_id,
+                        collection_id,
+                    } => Configuration::from_file(path, environment_id, collection_id)
+                        .map_err(|err| Error::UnrecoverableError(err.to_string())),
+                }
+            }
+            CurrentMode::Defunct(result) => {
+                // Same strategy: serve stale in-memory config when the thread has exited
+                // (e.g. after clean_up()) but a valid configuration is still held in memory.
+                if let Some(configuration) = &*self.configuration.lock()? {
+                    log::debug!(
+                        "[DEFUNCT] Serving stale in-memory config (thread result: {:?})",
+                        result
+                    );
+                    return Ok(configuration.clone());
+                }
+
+                match &self.offline_mode {
+                    OfflineMode::Fail => Err(Error::ThreadInternalError(format!(
+                        "Thread finished with status: {:?}",
+                        result
+                    ))),
+                    OfflineMode::Cache => Err(Error::UnrecoverableError(format!(
                         "Initial configuration failed to retrieve: {:?}",
                         result
                     ))),
-                    Some(configuration) => Ok(configuration.clone()),
-                },
-                OfflineMode::FallbackData(app_configuration_offline) => {
-                    Ok(app_configuration_offline.config_snapshot.clone())
+                    OfflineMode::FallbackData(app_configuration_offline) => {
+                        Ok(app_configuration_offline.config_snapshot.clone())
+                    }
+                    OfflineMode::PersistentCacheFile {
+                        path,
+                        environment_id,
+                        collection_id,
+                    }
+                    | OfflineMode::BootstrapFile {
+                        path,
+                        environment_id,
+                        collection_id,
+                    } => Configuration::from_file(path, environment_id, collection_id)
+                        .map_err(|err| Error::UnrecoverableError(err.to_string())),
                 }
-            },
+            }
         }
     }
 }
@@ -142,8 +330,61 @@ impl ConfigurationProvider for LiveConfigurationImpl {
         Ok(self.get_current_mode()? == CurrentMode::Online)
     }
 
-    fn wait_until_online(&self) {
-        let _ = self.current_mode.wait_for(CurrentMode::Online).unwrap();
+    fn wait_until_online(&self) -> bool {
+        if let Ok(CurrentMode::Defunct(Ok(()))) = self.current_mode.get() {
+            if let OfflineMode::FallbackData(_) = &self.offline_mode {
+                return true;
+            }
+        }
+        self.current_mode
+            .wait_for_timeout(CurrentMode::Online, Duration::from_secs(30))
+            .is_ok()
+    }
+
+    fn get_secret_property(
+        &self,
+        property_id: &str,
+    ) -> crate::Result<crate::models::SecretPropertySnapshot> {
+        self.get_configuration()?.get_secret_property(property_id)
+    }
+
+    fn is_connected(&self) -> crate::Result<bool> {
+        Ok(self.get_current_mode()? == CurrentMode::Online)
+    }
+
+    fn get_runtime_status(&self) -> crate::Result<Option<RuntimeStatus>> {
+        let mode = self.get_current_mode()?;
+        let status = match mode {
+            CurrentMode::Online => RuntimeStatus {
+                is_connected: true,
+                mode: Some(RuntimeMode::Online),
+                offline_reason: None,
+            },
+            CurrentMode::Offline(reason) => RuntimeStatus {
+                is_connected: false,
+                mode: Some(RuntimeMode::Offline),
+                offline_reason: Some(reason),
+            },
+            CurrentMode::Defunct(_) => RuntimeStatus {
+                is_connected: false,
+                mode: Some(RuntimeMode::Defunct),
+                offline_reason: None,
+            },
+        };
+        Ok(Some(status))
+    }
+
+    fn add_runtime_event_listener(&self, listener: RuntimeEventListener) -> crate::Result<()> {
+        self.runtime_event_listeners.lock()?.push(listener);
+        Ok(())
+    }
+
+    fn clean_up(&mut self) -> crate::Result<()> {
+        LiveConfiguration::clean_up(self).map_err(crate::Error::from)
+    }
+
+    fn clean_up_with_cache_clear(&mut self) -> crate::Result<()> {
+        LiveConfiguration::clean_up_with_cache_clear(self).map_err(crate::Error::from)
     }
 }
 
@@ -155,6 +396,38 @@ impl LiveConfiguration for LiveConfigurationImpl {
     fn get_current_mode(&self) -> Result<CurrentMode> {
         Ok(self.current_mode.get()?)
     }
+
+    fn clean_up(&mut self) -> Result<()> {
+        match self.update_thread.shutdown(Duration::from_secs(5)) {
+            Ok(_) => {}
+            Err(err) => {
+                return Err(Error::UnrecoverableError(format!(
+                    "Failed to stop live configuration worker: {err}"
+                )));
+            }
+        }
+
+        self.current_mode
+            .set(CurrentMode::Defunct(Ok(())))
+            .map_err(Error::from)?;
+        let mut configuration = self.configuration.lock()?;
+        *configuration = None;
+        Ok(())
+    }
+
+    fn clean_up_with_cache_clear(&mut self) -> Result<()> {
+        LiveConfiguration::clean_up(self)?;
+        if let OfflineMode::PersistentCacheFile { path, .. } = &self.offline_mode {
+            CacheFile::delete_file_data(path);
+        }
+        Ok(())
+    }
+}
+
+impl Drop for LiveConfigurationImpl {
+    fn drop(&mut self) {
+        let _ = LiveConfiguration::clean_up(self);
+    }
 }
 
 #[cfg(test)]
@@ -164,14 +437,14 @@ mod tests {
 
     use rstest::rstest;
 
-    use crate::network::serialization::fixtures::{
-        configuration_property1_enabled, example_configuration_enterprise_path,
-    };
+    use crate::network::serialization::fixtures::example_configuration_enterprise_path;
 
+    use crate::AppConfigurationOffline;
+    use crate::network::NetworkError::ProtocolError;
+    use crate::network::NetworkResult;
     use crate::network::http_client::WebsocketReader;
     use crate::network::live_configuration::update_thread_worker::SERVER_HEARTBEAT;
-    use crate::network::NetworkResult;
-    use crate::AppConfigurationOffline;
+    use crate::network::serialization::ConfigurationJson;
 
     use super::*;
 
@@ -186,9 +459,12 @@ mod tests {
                 self.tx.send(()).unwrap();
                 Ok(self.rx.recv().unwrap())
             }
+            fn flush_socket(&mut self) -> tungstenite::error::Result<()> {
+                Ok(())
+            }
         }
         struct ServerClientMock {
-            rx: mpsc::Receiver<Configuration>,
+            rx: mpsc::Receiver<ConfigurationJson>,
             websocket_rx: mpsc::Receiver<WebsocketReaderMock>,
         }
         impl ServerClient for ServerClientMock {
@@ -196,6 +472,13 @@ mod tests {
                 &self,
                 _configuration_id: &ConfigurationId,
             ) -> NetworkResult<Configuration> {
+                Err(ProtocolError)
+            }
+
+            fn get_configuration_json(
+                &self,
+                _configuration_id: &ConfigurationId,
+            ) -> NetworkResult<ConfigurationJson> {
                 Ok(self.rx.recv().unwrap())
             }
 
@@ -215,9 +498,9 @@ mod tests {
         };
 
         let configuration_id =
-            crate::ConfigurationId::new("".into(), "environment_id".into(), "".into());
+            crate::ConfigurationId::new("".into(), "environment_id".into(), "collection_id".into());
         let mut live_config =
-            LiveConfigurationImpl::new(OfflineMode::Fail, server_client, configuration_id);
+            LiveConfigurationImpl::new(OfflineMode::Fail, server_client, configuration_id, vec![]);
 
         {
             // Blocked beginning of get_configuration_from_server()
@@ -243,7 +526,7 @@ mod tests {
         let (read_msg_tx, read_msg_rx) = mpsc::channel();
         let (read_msg_ping_tx, read_msg_ping_rx) = mpsc::channel();
         let configuration =
-            crate::network::serialization::fixtures::configuration_feature1_enabled();
+            crate::network::serialization::fixtures::configuration_json_feature1_enabled();
         let config = {
             // allow thread to start (unblock)
             get_configuration_tx.send(configuration).unwrap();
@@ -262,7 +545,9 @@ mod tests {
             assert!(matches!(current_mode, Ok(CurrentMode::Online)));
             // The initialization should have received one message from WS.
             // We consume it. Note the `try_` here. We should not block here, as this was already asserted via the `wait_until_online()` earlier.
-            read_msg_ping_rx.try_recv().unwrap();
+            read_msg_ping_rx
+                .recv_timeout(Duration::from_secs(1))
+                .unwrap();
             // Blocked in socket.read_msg()
             // Expect, we get a configuration and are Online / Running state
             let config_result = live_config.get_configuration();
@@ -296,7 +581,8 @@ mod tests {
             // Send any message via the websocket (it will be interpreted as new config is available).
             read_msg_tx.send(tungstenite::Message::text("")).unwrap();
             // Send the new configuration
-            let configuration = configuration_property1_enabled();
+            let configuration =
+                crate::network::serialization::fixtures::configuration_json_property1_enabled();
             get_configuration_tx.send(configuration).unwrap();
             // Wait for thread to do some work and then to wait on websocket
             read_msg_ping_rx.recv().unwrap();
@@ -345,6 +631,7 @@ mod tests {
                 thread_handle: None,
                 finished_thread_status_cached: None,
             },
+            runtime_event_listeners: Arc::new(Mutex::new(Vec::new())),
         };
 
         {
@@ -362,9 +649,12 @@ mod tests {
         }
 
         {
-            let offline =
-                AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev")
-                    .unwrap();
+            let offline = AppConfigurationOffline::new(
+                &example_configuration_enterprise_path,
+                "dev",
+                "blue-charge",
+            )
+            .unwrap();
             cfg.offline_mode = OfflineMode::FallbackData(offline);
             let r = cfg.get_configuration();
             assert!(r.is_ok(), "Error: {}", r.unwrap_err());
@@ -388,12 +678,30 @@ mod tests {
                 thread_handle: None,
                 finished_thread_status_cached: None,
             },
+            runtime_event_listeners: Arc::new(Mutex::new(Vec::new())),
         };
+
+        // OfflineMode::Fail WITH a previously-fetched in-memory cache → serve stale config
 
         {
             cfg.offline_mode = OfflineMode::Fail;
+            cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
             let r = cfg.get_configuration();
-            assert!(r.is_err(), "Error: {}", r.unwrap_err());
+            assert!(
+                r.is_ok(),
+                "OfflineMode::Fail must serve stale in-memory config while reconnecting"
+            );
+            assert!(r.unwrap().features.is_empty());
+        }
+        // OfflineMode::Fail WITHOUT any cached configuration → error (never connected)
+        {
+            cfg.offline_mode = OfflineMode::Fail;
+            cfg.configuration = Arc::new(Mutex::new(None));
+            let r = cfg.get_configuration();
+            assert!(
+                r.is_err(),
+                "Should error when no cached config was ever fetched"
+            );
             assert_eq!(
                 r.unwrap_err(),
                 Error::Offline(CurrentModeOfflineReason::WebsocketClosed)
@@ -403,12 +711,14 @@ mod tests {
         {
             cfg.offline_mode = OfflineMode::Cache;
             {
+                // No in-memory config yet → ConfigurationNotYetAvailable
                 cfg.configuration = Arc::new(Mutex::new(None));
                 let r = cfg.get_configuration();
                 assert!(r.is_err());
                 assert_eq!(r.unwrap_err(), Error::ConfigurationNotYetAvailable);
             }
             {
+                // In-memory config exists → served via priority-1 stale-cache path
                 cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
                 let r = cfg.get_configuration();
                 assert!(r.is_ok(), "Error: {}", r.unwrap_err());
@@ -417,13 +727,18 @@ mod tests {
         }
 
         {
-            let offline =
-                AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev")
-                    .unwrap();
+            // FallbackData with no in-memory config → falls back to FallbackData source
+            let offline = AppConfigurationOffline::new(
+                &example_configuration_enterprise_path,
+                "dev",
+                "blue-charge",
+            )
+            .unwrap();
             cfg.offline_mode = OfflineMode::FallbackData(offline);
+            cfg.configuration = Arc::new(Mutex::new(None));
             let r = cfg.get_configuration();
             assert!(r.is_ok(), "Error: {}", r.unwrap_err());
-            assert_eq!(r.unwrap().features.len(), 6);
+            assert_eq!(r.unwrap().features.len(), 5);
         }
     }
 
@@ -441,12 +756,28 @@ mod tests {
                 thread_handle: None,
                 finished_thread_status_cached: None,
             },
+            runtime_event_listeners: Arc::new(Mutex::new(Vec::new())),
         };
 
+        // OfflineMode::Fail WITH a stale in-memory config → serve it (thread may have
+        // exited cleanly, e.g. after clean_up(), but config is still valid in RAM).
         {
             cfg.offline_mode = OfflineMode::Fail;
+            cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
             let r = cfg.get_configuration();
-            assert!(r.is_err(), "Error: {}", r.unwrap_err());
+            assert!(
+                r.is_ok(),
+                "OfflineMode::Fail must serve stale in-memory config even when thread is defunct"
+            );
+            assert!(r.unwrap().features.is_empty());
+        }
+
+        // OfflineMode::Fail WITHOUT any cached configuration → error
+        {
+            cfg.offline_mode = OfflineMode::Fail;
+            cfg.configuration = Arc::new(Mutex::new(None));
+            let r = cfg.get_configuration();
+            assert!(r.is_err(), "Should error when no cached config available");
             assert_eq!(
                 r.unwrap_err(),
                 Error::ThreadInternalError("Thread finished with status: Ok(())".to_string())
@@ -456,6 +787,7 @@ mod tests {
         {
             cfg.offline_mode = OfflineMode::Cache;
             {
+                // No in-memory config and thread is defunct → UnrecoverableError
                 cfg.configuration = Arc::new(Mutex::new(None));
                 let r = cfg.get_configuration();
                 assert!(r.is_err());
@@ -467,6 +799,7 @@ mod tests {
                 );
             }
             {
+                // In-memory config exists → served via priority-1 stale-cache path
                 cfg.configuration = Arc::new(Mutex::new(Some(Configuration::default())));
                 let r = cfg.get_configuration();
                 assert!(r.is_ok(), "Error: {}", r.unwrap_err());
@@ -475,13 +808,18 @@ mod tests {
         }
 
         {
-            let offline =
-                AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev")
-                    .unwrap();
+            // FallbackData with no in-memory config → falls back to FallbackData source
+            let offline = AppConfigurationOffline::new(
+                &example_configuration_enterprise_path,
+                "dev",
+                "blue-charge",
+            )
+            .unwrap();
             cfg.offline_mode = OfflineMode::FallbackData(offline);
+            cfg.configuration = Arc::new(Mutex::new(None));
             let r = cfg.get_configuration();
             assert!(r.is_ok(), "Error: {}", r.unwrap_err());
-            assert_eq!(r.unwrap().features.len(), 6);
+            assert_eq!(r.unwrap().features.len(), 5);
         }
     }
 }

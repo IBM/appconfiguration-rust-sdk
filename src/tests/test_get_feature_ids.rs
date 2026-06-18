@@ -27,7 +27,6 @@ fn test_get_feature_ids(client_enterprise: Box<dyn AppConfigurationClient>) {
             "f2".to_string(),
             "f3".to_string(),
             "f4".to_string(),
-            "f5".to_string(),
             "f6".to_string()
         ]
     );

@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod rollout_parser;
 mod thread_handle;
 mod waitable;
 
+pub(crate) use rollout_parser::{
+    get_current_rollout_percentage, parse_rollout_configuration_phases,
+};
 pub(crate) use thread_handle::{ThreadHandle, ThreadStatus};
 pub(crate) use waitable::Waitable;

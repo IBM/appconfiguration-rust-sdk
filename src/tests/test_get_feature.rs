@@ -46,7 +46,7 @@ fn test_get_feature_ordered(configuration_unordered_segment_rules: Configuration
     let value = client
         .get_feature("f1")
         .unwrap()
-        .get_value(&entity)
+        .get_current_value(&entity)
         .unwrap();
-    assert!(matches!(value, Value::Int64(ref v) if v == &(-49)));
+    assert!(matches!(value.value, Value::Int64(ref v) if v == &(-49)));
 }

@@ -14,16 +14,18 @@
 
 use std::fmt::Display;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) enum ValueType {
-    #[serde(rename(deserialize = "NUMERIC"))]
+    #[serde(rename(serialize = "NUMERIC", deserialize = "NUMERIC"))]
     Numeric,
-    #[serde(rename(deserialize = "BOOLEAN"))]
+    #[serde(rename(serialize = "BOOLEAN", deserialize = "BOOLEAN"))]
     Boolean,
-    #[serde(rename(deserialize = "STRING"))]
+    #[serde(rename(serialize = "STRING", deserialize = "STRING"))]
     String,
+    #[serde(rename(serialize = "SECRETREF", deserialize = "SECRETREF"))]
+    SecretRef,
 }
 
 impl Display for ValueType {
@@ -32,6 +34,7 @@ impl Display for ValueType {
             Self::Numeric => "NUMERIC",
             Self::Boolean => "BOOLEAN",
             Self::String => "STRING",
+            Self::SecretRef => "SECRETREF",
         };
         write!(f, "{label}")
     }

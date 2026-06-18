@@ -15,14 +15,16 @@
 use std::sync::Arc;
 
 use crate::errors::Result;
-use crate::models::{FeatureSnapshot, PropertySnapshot};
+use crate::models::{FeatureSnapshot, PropertySnapshot, SecretPropertySnapshot};
 
-use crate::metering::{start_metering, MeteringClientHttp, MeteringRecorder};
+use crate::metering::{MeteringClientHttp, MeteringRecorder, start_metering};
 use crate::network::live_configuration::{LiveConfiguration, LiveConfigurationImpl};
 use crate::network::{ServiceAddress, TokenProvider};
-use crate::{ConfigurationProvider, OfflineMode, ServerClientImpl};
+use crate::{
+    ConfigurationProvider, OfflineMode, RuntimeEvent, RuntimeEventEmitter, ServerClientImpl,
+};
 
-use super::ConfigurationId;
+use super::{ConfigurationId, RuntimeStatus};
 
 /// AppConfiguration client implementation that connects to a server
 #[derive(Debug)]
@@ -48,6 +50,7 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         token_provider: Box<dyn TokenProvider>,
         configuration_id: ConfigurationId,
         offline_mode: OfflineMode,
+        runtime_emitter: RuntimeEventEmitter,
     ) -> Result<Self> {
         let token_provider = Arc::new(token_provider);
         let server_client = ServerClientImpl::new(service_address.clone(), token_provider.clone())?;
@@ -59,8 +62,14 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
             metering_client,
         );
 
+        // Pre-seed the forwarding listener BEFORE the background thread starts.
+        // This guarantees Connected + first RefreshSuccess are never missed.
+        let bridge = Arc::new(move |event: RuntimeEvent| {
+            let _ = runtime_emitter.emit(event);
+        });
+
         let live_configuration =
-            LiveConfigurationImpl::new(offline_mode, server_client, configuration_id);
+            LiveConfigurationImpl::new(offline_mode, server_client, configuration_id, vec![bridge]);
         Ok(Self {
             live_configuration,
             metering,
@@ -93,8 +102,29 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
         self.live_configuration.is_online()
     }
 
-    fn wait_until_online(&self) {
-        self.live_configuration.wait_until_online();
+    fn wait_until_online(&self) -> bool {
+        self.live_configuration.wait_until_online()
+    }
+
+    fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+        self.live_configuration.get_secret_property(property_id)
+    }
+
+    fn is_connected(&self) -> Result<bool> {
+        self.live_configuration.is_connected()
+    }
+
+    fn get_runtime_status(&self) -> Result<Option<RuntimeStatus>> {
+        self.live_configuration.get_runtime_status()
+    }
+
+    fn clean_up(&mut self) -> Result<()> {
+        LiveConfiguration::clean_up(&mut self.live_configuration).map_err(crate::Error::from)
+    }
+
+    fn clean_up_with_cache_clear(&mut self) -> Result<()> {
+        LiveConfiguration::clean_up_with_cache_clear(&mut self.live_configuration)
+            .map_err(crate::Error::from)
     }
 }
 
@@ -120,6 +150,10 @@ mod tests {
             self.configuration.get_feature_ids()
         }
 
+        fn get_secret_property(&self, property_id: &str) -> Result<SecretPropertySnapshot> {
+            self.configuration.get_secret_property(property_id)
+        }
+
         fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
             self.configuration.get_feature(feature_id)
         }
@@ -136,8 +170,16 @@ mod tests {
             todo!()
         }
 
-        fn wait_until_online(&self) {
+        fn wait_until_online(&self) -> bool {
             todo!()
+        }
+
+        fn clean_up(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn clean_up_with_cache_clear(&mut self) -> Result<()> {
+            Ok(())
         }
     }
     impl LiveConfiguration for LiveConfigurationMock {
@@ -149,6 +191,14 @@ mod tests {
 
         fn get_current_mode(&self) -> crate::network::live_configuration::Result<CurrentMode> {
             todo!()
+        }
+
+        fn clean_up(&mut self) -> crate::network::live_configuration::Result<()> {
+            Ok(())
+        }
+
+        fn clean_up_with_cache_clear(&mut self) -> crate::network::live_configuration::Result<()> {
+            Ok(())
         }
     }
 
@@ -181,20 +231,20 @@ mod tests {
         let feature = client.get_feature("f1").unwrap();
 
         let entity = crate::entity::tests::TrivialEntity {};
-        let feature_value1 = feature.get_value(&entity).unwrap();
+        let feature_value1 = feature.get_current_value(&entity).unwrap();
 
         // We simulate an update of the configuration:
         client.live_configuration = LiveConfigurationMock {
             configuration: configuration_feature1_enabled,
         };
         // The feature value should not have changed (as we did not retrieve it again)
-        let feature_value2 = feature.get_value(&entity).unwrap();
+        let feature_value2 = feature.get_current_value(&entity).unwrap();
         assert_eq!(feature_value2, feature_value1);
 
         // Now we retrieve the feature again:
         let feature = client.get_feature("f1").unwrap();
         // And expect the updated value
-        let feature_value3 = feature.get_value(&entity).unwrap();
+        let feature_value3 = feature.get_current_value(&entity).unwrap();
         assert_ne!(feature_value3, feature_value1);
 
         // We evaluated the property 3 times (for two different configurations)
@@ -244,20 +294,20 @@ mod tests {
         let property = client.get_property("p1").unwrap();
 
         let entity = crate::entity::tests::TrivialEntity {};
-        let property_value1 = property.get_value(&entity).unwrap();
+        let property_value1 = property.get_current_value(&entity).unwrap();
 
         // We simulate an update of the configuration:
         client.live_configuration = LiveConfigurationMock {
             configuration: configuration_property1_enabled,
         };
         // The property value should not have changed (as we did not retrieve it again)
-        let property_value2 = property.get_value(&entity).unwrap();
+        let property_value2 = property.get_current_value(&entity).unwrap();
         assert_eq!(property_value2, property_value1);
 
         // Now we retrieve the property again:
         let property = client.get_property("p1").unwrap();
         // And expect the updated value
-        let property_value3 = property.get_value(&entity).unwrap();
+        let property_value3 = property.get_current_value(&entity).unwrap();
         assert_ne!(property_value3, property_value1);
 
         // We evaluated the property 3 times (for two different configurations)

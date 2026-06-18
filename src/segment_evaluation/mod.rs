@@ -16,21 +16,27 @@ pub(crate) mod errors;
 mod matches_attributes;
 mod rule_operator;
 
-use std::collections::HashMap;
-
+use crate::Value;
 use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
+use crate::models::{DELIMITER, ROLLOUT_TYPE_PROGRESSIVE};
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
 use crate::segment_evaluation::matches_attributes::MatchesAttributes;
-use crate::Value;
+use crate::utils::{get_current_rollout_percentage, parse_rollout_configuration_phases};
+use chrono::Utc;
 use errors::SegmentEvaluationError;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetingRules {
     segment_rules: Vec<SegmentRule>,
     segments: HashMap<String, Segment>,
     r#type: ValueType,
+    /// Map of segment rule rollout configurations (key: feature_id + DELIMITER + rule_id)
+    rollout_config_map: HashMap<String, BTreeMap<i64, u32>>,
+    /// Feature ID for this targeting rules (needed for progressive rollout)
+    feature_id: String,
 }
 
 impl TargetingRules {
@@ -38,11 +44,33 @@ impl TargetingRules {
         segments: HashMap<String, Segment>,
         segment_rules: Vec<SegmentRule>,
         r#type: ValueType,
+        feature_id: Option<&str>,
     ) -> Self {
+        let mut rollout_config_map = HashMap::new();
+
+        if let Some(feature_id) = feature_id {
+            for segment_rule in &segment_rules {
+                if segment_rule.rollout_type.as_deref() != Some(ROLLOUT_TYPE_PROGRESSIVE) {
+                    continue;
+                }
+
+                if let Some(rollout_config) = &segment_rule.rollout_configuration {
+                    if let Some(rule_id) = &segment_rule.rule_id {
+                        let key = format!("{}{}{}", feature_id, DELIMITER, rule_id);
+                        if let Ok(btree) = parse_rollout_configuration_phases(rollout_config) {
+                            rollout_config_map.insert(key, btree);
+                        }
+                    }
+                }
+            }
+        }
+
         Self {
             segments,
             segment_rules,
             r#type,
+            rollout_config_map,
+            feature_id: feature_id.unwrap_or_default().to_string(),
         }
     }
 
@@ -56,7 +84,7 @@ impl TargetingRules {
     pub(crate) fn find_applicable_targeting_rule_and_segment_for_entity(
         &self,
         entity: &impl Entity,
-    ) -> Result<Option<(TargetingRule, &Segment)>> {
+    ) -> Result<Option<(TargetingRule<'_>, &Segment)>> {
         for segment_rule in self.segment_rules.iter() {
             if let Some(segment) = find_segment_of_targeting_rule_which_applies_to_entity(
                 &self.segments,
@@ -67,6 +95,8 @@ impl TargetingRules {
                     TargetingRule {
                         segment_rule,
                         r#type: self.r#type,
+                        rollout_config_map: &self.rollout_config_map,
+                        feature_id: self.feature_id.clone(),
                     },
                     segment,
                 )));
@@ -80,11 +110,27 @@ impl TargetingRules {
 pub(crate) struct TargetingRule<'a> {
     segment_rule: &'a SegmentRule,
     r#type: ValueType,
+    rollout_config_map: &'a HashMap<String, BTreeMap<i64, u32>>,
+    feature_id: String,
 }
 
 impl TargetingRule<'_> {
     fn is_default(&self) -> bool {
         self.segment_rule.value.is_default()
+    }
+
+    pub(crate) fn order(&self) -> u32 {
+        self.segment_rule.order
+    }
+
+    pub(crate) fn entity_id_for_hash(&self, entity_id: String) -> String {
+        if self.segment_rule.rollout_type.as_deref() == Some(ROLLOUT_TYPE_PROGRESSIVE) {
+            if let Some(rollout_config) = &self.segment_rule.rollout_configuration {
+                // Append start_at for entity-stability in progressive rollout
+                return format!("{}{}", entity_id, rollout_config.start_at);
+            }
+        }
+        entity_id
     }
 
     /// Returns the rollout percentage using the following logic:
@@ -93,6 +139,16 @@ impl TargetingRule<'_> {
     ///   the given `default` argument.
     /// * Otherwise it will return the rollout value from the [`TargetingRule`] converted to u32
     pub(crate) fn rollout_percentage(&self, default: u32) -> Result<u32> {
+        if self.segment_rule.rollout_type.as_deref() == Some(ROLLOUT_TYPE_PROGRESSIVE) {
+            if let Some(rule_id) = &self.segment_rule.rule_id {
+                let key = format!("{}{}{}", self.feature_id, DELIMITER, rule_id);
+                if let Some(btree) = self.rollout_config_map.get(&key) {
+                    let current_time_ms = Utc::now().timestamp_millis();
+                    return Ok(get_current_rollout_percentage(btree, current_time_ms));
+                }
+            }
+        }
+
         self.segment_rule
             .rollout_percentage
             .as_ref()
@@ -186,7 +242,7 @@ pub mod tests {
         some_segment_rules: Vec<SegmentRule>,
     ) {
         let segment_rules =
-            TargetingRules::new(some_segments, some_segment_rules, ValueType::String);
+            TargetingRules::new(some_segments, some_segment_rules, ValueType::String, None);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from("peter".to_string()))]),
@@ -234,7 +290,7 @@ pub mod tests {
         some_segment_rules: Vec<SegmentRule>,
     ) {
         let segment_rules =
-            TargetingRules::new(some_segments, some_segment_rules, ValueType::String);
+            TargetingRules::new(some_segments, some_segment_rules, ValueType::String, None);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name2".into(), Value::from("heinz".to_string()))]),
@@ -262,6 +318,7 @@ pub mod tests {
             some_segments,
             segment_rules_with_invalid_segment_id,
             ValueType::String,
+            None,
         );
         let rule = segment_rules.find_applicable_targeting_rule_and_segment_for_entity(&entity);
         // Error message should look something like this:
@@ -287,7 +344,7 @@ pub mod tests {
         some_segment_rules: Vec<SegmentRule>,
     ) {
         let segment_rules =
-            TargetingRules::new(some_segments, some_segment_rules, ValueType::String);
+            TargetingRules::new(some_segments, some_segment_rules, ValueType::String, None);
         let entity = crate::tests::GenericEntity {
             id: "a2".into(),
             attributes: HashMap::from([("name".into(), Value::from(42.0))]),

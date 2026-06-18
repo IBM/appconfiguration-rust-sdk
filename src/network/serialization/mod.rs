@@ -26,7 +26,7 @@ mod segment_rule;
 mod segments;
 mod value_type;
 
-pub(crate) use configuration::ConfigurationJson;
+pub(crate) use configuration::{Collection, ConfigurationJson};
 pub(crate) use feature::Feature;
 pub(crate) use property::Property;
 pub(crate) use rule::Rule;
@@ -61,7 +61,7 @@ impl TryFrom<(ValueType, config_value::ConfigValue)> for Value {
                 .as_boolean()
                 .map(Value::Boolean)
                 .ok_or(crate::Error::MismatchType),
-            ValueType::String => value
+            ValueType::String | ValueType::SecretRef => value
                 .as_string()
                 .map(Value::String)
                 .ok_or(crate::Error::MismatchType),

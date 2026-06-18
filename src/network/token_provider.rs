@@ -15,7 +15,9 @@
 use std::{cmp::max, collections::HashMap, sync::RwLock};
 
 use super::{NetworkError, NetworkResult};
-use reqwest::blocking::Client;
+use crate::network::http_client::SDK_USER_AGENT;
+use reqwest::blocking::{Client, ClientBuilder};
+use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 
 pub trait TokenProvider: std::fmt::Debug + Send + Sync {
@@ -69,6 +71,20 @@ impl TokenProviderImpl {
         }
     }
 
+    fn build_http_client() -> NetworkResult<Client> {
+        ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(NetworkError::ReqwestError)
+    }
+
+    fn build_default_headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        headers.insert(USER_AGENT, HeaderValue::from_static(SDK_USER_AGENT));
+        headers
+    }
+
     // Renews the stored token.
     //
     // It will use 90% of the expires_in value returned by the server
@@ -77,22 +93,35 @@ impl TokenProviderImpl {
     // It returns new expiration time (unix time)
     fn renew_token(&self) -> NetworkResult<u64> {
         let mut form_data = HashMap::new();
-        form_data.insert("reponse_type".to_string(), "cloud_iam".to_string());
+        form_data.insert("response_type".to_string(), "cloud_iam".to_string());
         form_data.insert(
             "grant_type".to_string(),
             "urn:ibm:params:oauth:grant-type:apikey".to_string(),
         );
         form_data.insert("apikey".to_string(), self.apikey.to_string());
 
-        let client = Client::new();
+        let client = Self::build_http_client()?;
         let new_token = client
             .post(&self.endpoint)
-            .header("Accept", "application/json")
+            .headers(Self::build_default_headers())
             .form(&form_data)
             .send()
-            .map_err(NetworkError::ReqwestError)?
+            .and_then(|response| response.error_for_status())
+            .map_err(|error| {
+                NetworkError::TokenProviderError(format!(
+                    "Failed to get authentication token for websocket connect. Error {error}"
+                ))
+            })?
             .json::<AccessTokenResponse>()
-            .map_err(NetworkError::ReqwestError)?; // FIXME: This is a deserialization error (extract it from Reqwest)
+            .map_err(|error| {
+                if error.is_decode() {
+                    NetworkError::DeserializationError(format!(
+                        "Failed to deserialize authentication token response. Error {error}"
+                    ))
+                } else {
+                    NetworkError::ReqwestError(error)
+                }
+            })?;
 
         let mut access_token = self.access_token.write()?;
         Ok(access_token.renew(
@@ -153,7 +182,7 @@ mod tests {
         // If the token is expired, it will try to renew it when requesting it
         assert!(matches!(
             provider.get_access_token().unwrap_err(),
-            NetworkError::ReqwestError(_)
+            NetworkError::TokenProviderError(_) | NetworkError::ReqwestError(_)
         ));
 
         // If it has not expired, it will just return the token
@@ -188,7 +217,7 @@ mod tests {
             when.method(POST)
                 .path(endpoint)
                 .header("Accept", "application/json")
-                .form_urlencoded_tuple("reponse_type", "cloud_iam")
+                .form_urlencoded_tuple("response_type", "cloud_iam")
                 .form_urlencoded_tuple("grant_type", "urn:ibm:params:oauth:grant-type:apikey")
                 .form_urlencoded_tuple("apikey", apikey);
             then.status(200)
