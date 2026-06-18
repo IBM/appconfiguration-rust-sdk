@@ -19,6 +19,6 @@ pub enum MeteringError {
     #[error(transparent)]
     NetworkError(#[from] crate::network::NetworkError),
 
-    #[error("Metering data was rejected: {0}")]
+    #[error("Metering data was rejected with status {0}")]
     DataNotAccepted(String),
 }

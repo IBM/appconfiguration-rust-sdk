@@ -18,7 +18,7 @@ mod live_configuration;
 mod offline_mode;
 mod update_thread_worker;
 
-pub(crate) use current_mode::CurrentMode;
+pub use current_mode::{CurrentMode, CurrentModeOfflineReason};
 pub(crate) use errors::{Error, Result};
 pub use live_configuration::LiveConfiguration;
 pub(crate) use live_configuration::LiveConfigurationImpl;

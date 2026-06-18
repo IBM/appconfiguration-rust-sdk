@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::entity::Entity;
-use crate::{Feature, Value};
-
 use super::AppConfigurationClient;
+use crate::entity::Entity;
 use crate::models::FeatureSnapshot;
-
+use crate::value::Value;
+use crate::{Feature, FeatureEvaluationResult};
 /// Provides live-updated data for a given [`Feature`].
 pub struct FeatureProxy<'a> {
     client: &'a dyn AppConfigurationClient,
@@ -36,16 +35,39 @@ impl<'a> FeatureProxy<'a> {
 }
 
 impl Feature for FeatureProxy<'_> {
-    fn get_name(&self) -> crate::errors::Result<String> {
-        self.client.get_feature(&self.feature_id)?.get_name()
+    fn get_feature_name(&self) -> crate::errors::Result<String> {
+        self.client
+            .get_feature(&self.feature_id)?
+            .get_feature_name()
     }
 
     fn is_enabled(&self) -> crate::errors::Result<bool> {
         self.client.get_feature(&self.feature_id)?.is_enabled()
     }
 
-    fn get_value(&self, entity: &impl Entity) -> crate::errors::Result<Value> {
-        self.client.get_feature(&self.feature_id)?.get_value(entity)
+    fn get_feature_id(&self) -> crate::errors::Result<String> {
+        self.client.get_feature(&self.feature_id)?.get_feature_id()
+    }
+
+    fn get_feature_data_type(&self) -> crate::errors::Result<String> {
+        self.client
+            .get_feature(&self.feature_id)?
+            .get_feature_data_type()
+    }
+
+    fn get_feature_data_format(&self) -> crate::errors::Result<Option<String>> {
+        self.client
+            .get_feature(&self.feature_id)?
+            .get_feature_data_format()
+    }
+
+    fn get_current_value(
+        &self,
+        entity: &impl Entity,
+    ) -> crate::errors::Result<FeatureEvaluationResult> {
+        self.client
+            .get_feature(&self.feature_id)?
+            .get_current_value(entity)
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(

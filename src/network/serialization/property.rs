@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::{SegmentRule, ValueType};
 use crate::network::serialization::config_value::ConfigValue;
+use crate::network::serialization::configuration::Collection;
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub(crate) struct Property {
     pub name: String,
     pub property_id: String,
@@ -26,4 +27,5 @@ pub(crate) struct Property {
     pub format: Option<String>,
     pub value: ConfigValue,
     pub segment_rules: Vec<SegmentRule>,
+    pub collections: Option<Vec<Collection>>,
 }

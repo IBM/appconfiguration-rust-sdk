@@ -80,22 +80,24 @@ impl RuleOperator for Value {
     }
 
     fn greater_than(&self, value: &str) -> std::result::Result<bool, CheckOperatorErrorDetail> {
+        let threshold: f64 = value.parse()?;
         match self {
             // TODO: Go implementation also compares strings (by parsing them as floats). Do we need this?
             //       https://github.com/IBM/appconfiguration-go-sdk/blob/master/lib/internal/models/Rule.go#L82
             // TODO: we could have numbers not representable as f64, maybe we should try to parse it to i64 and u64 too?
-            Value::Float64(data) => Ok(*data > value.parse()?),
-            Value::UInt64(data) => Ok(*data > value.parse()?),
-            Value::Int64(data) => Ok(*data > value.parse()?),
+            Value::Float64(data) => Ok(*data > threshold),
+            Value::UInt64(data) => Ok((*data as f64) > threshold),
+            Value::Int64(data) => Ok((*data as f64) > threshold),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         }
     }
 
     fn lesser_than(&self, value: &str) -> std::result::Result<bool, CheckOperatorErrorDetail> {
+        let threshold: f64 = value.parse()?;
         match self {
-            Value::Float64(data) => Ok(*data < value.parse()?),
-            Value::UInt64(data) => Ok(*data < value.parse()?),
-            Value::Int64(data) => Ok(*data < value.parse()?),
+            Value::Float64(data) => Ok(*data < threshold),
+            Value::UInt64(data) => Ok((*data as f64) < threshold),
+            Value::Int64(data) => Ok((*data as f64) < threshold),
             _ => Err(CheckOperatorErrorDetail::EntityAttrNotANumber),
         }
     }

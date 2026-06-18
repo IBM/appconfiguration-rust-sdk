@@ -13,12 +13,19 @@
 // limitations under the License.
 
 use crate::errors::Result;
-use crate::{Entity, Value};
+use crate::{Entity, PropertyEvaluationResult, Value};
 
 /// Access to data and evaluation of IBM AppConfiguration properties
 pub trait Property {
-    /// Returns the full name of the property.
-    fn get_name(&self) -> Result<String>;
+    fn get_property_name(&self) -> Result<String>;
+
+    fn get_property_id(&self) -> Result<String>;
+
+    fn get_property_data_type(&self) -> Result<String>;
+
+    fn get_property_data_format(&self) -> Result<Option<String>>;
+
+    fn get_current_value(&self, entity: &impl Entity) -> Result<PropertyEvaluationResult>;
 
     /// Evaluates a property for the given [`Entity`] and returns a [`Value`].
     ///
@@ -29,10 +36,10 @@ pub trait Property {
     /// # Examples
     ///
     /// ```
-    /// # use appconfiguration::{AppConfigurationClient, Property, Result, Entity, Value};
+    /// # use ibm_appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity, Value};
     /// # fn doctest_get_value(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_property")?;
-    ///     let value: Value = property.get_value(entity)?;
+    ///     let value: Value = property.get_current_value(entity)?.value;
     ///
     ///     match value {
     ///         Value::Float64(v) => println!("f64 with value {v}"),
@@ -44,7 +51,6 @@ pub trait Property {
     /// #   Ok(())
     /// # }
     /// ```
-    fn get_value(&self, entity: &impl Entity) -> Result<Value>;
 
     /// Evaluates a property for the given [`Entity`] and returns its value converted (if possible)
     /// to the given type.
@@ -52,7 +58,7 @@ pub trait Property {
     /// # Examples
     ///
     /// ```
-    /// # use appconfiguration::{AppConfigurationClient, Property, Result, Entity};
+    /// # use ibm_appconfiguration_rust_sdk::{AppConfigurationClient, Property, Result, Entity};
     /// # fn doctest_get_value_into(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let property = client.get_property("my_bool_feature")?;
     ///     let value: bool = property.get_value_into(entity)?;
@@ -67,5 +73,8 @@ pub trait Property {
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
-    ) -> Result<T>;
+    ) -> Result<T> {
+        let value = self.get_current_value(entity).map(|r| r.value)?;
+        value.try_into()
+    }
 }

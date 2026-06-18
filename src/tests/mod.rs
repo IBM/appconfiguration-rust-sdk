@@ -47,5 +47,8 @@ impl Entity for GenericEntity {
 fn client_enterprise(
     example_configuration_enterprise_path: PathBuf,
 ) -> Box<dyn AppConfigurationClient> {
-    Box::new(AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev").unwrap())
+    Box::new(
+        AppConfigurationOffline::new(&example_configuration_enterprise_path, "dev", "blue-charge")
+            .unwrap(),
+    )
 }

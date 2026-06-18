@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use crate::errors::Result;
-use crate::{Entity, Value};
+use crate::{Entity, FeatureEvaluationResult, Value};
 
 /// Access to data and evaluation of IBM AppConfiguration features
 pub trait Feature {
     /// Returns the full name of the feature.
-    fn get_name(&self) -> Result<String>;
+    fn get_feature_name(&self) -> Result<String>;
 
     /// Returns if the feature is enabled or not.
     ///
@@ -36,12 +36,12 @@ pub trait Feature {
     /// # Examples
     ///
     /// ```
-    /// # use appconfiguration::{AppConfigurationClient, Feature, Result, Entity, Value};
+    /// # use ibm_appconfiguration_rust_sdk::{AppConfigurationClient, Feature, Result, Entity, Value};
     /// # fn doctest_get_value(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let feature = client.get_feature("my_feature")?;
-    ///     let value: Value = feature.get_value(entity)?;
+    ///     let result = feature.get_current_value(entity)?;
     ///
-    ///     match value {
+    ///     match result.value {
     ///         Value::Float64(v) => println!("f64 with value {v}"),
     ///         Value::UInt64(v) => println!("u64 with value {v}"),
     ///         Value::Int64(v) => println!("i64 with value {v}"),
@@ -51,15 +51,13 @@ pub trait Feature {
     /// #   Ok(())
     /// # }
     /// ```
-    fn get_value(&self, entity: &impl Entity) -> Result<Value>;
-
     /// Evaluates a feature for the given [`Entity`] and returns its value converted (if possible)
     /// to the given type.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use appconfiguration::{AppConfigurationClient, Feature, Result, Entity};
+    /// # use ibm_appconfiguration_rust_sdk::{AppConfigurationClient, Feature, Result, Entity};
     /// # fn doctest_get_value_into(client: impl AppConfigurationClient, entity: &impl Entity) -> Result<()> {
     ///     let feature = client.get_feature("my_f64_feature")?;
     ///     let value: f64 = feature.get_value_into(entity)?;
@@ -70,8 +68,20 @@ pub trait Feature {
     /// #   Ok(())
     /// # }
     /// ```
+
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,
-    ) -> Result<T>;
+    ) -> Result<T> {
+        let value = self.get_current_value(entity).map(|r| r.value)?;
+        value.try_into()
+    }
+
+    fn get_feature_id(&self) -> Result<String>;
+
+    fn get_feature_data_type(&self) -> Result<String>;
+
+    fn get_feature_data_format(&self) -> Result<Option<String>>;
+
+    fn get_current_value(&self, entity: &impl Entity) -> Result<FeatureEvaluationResult>;
 }

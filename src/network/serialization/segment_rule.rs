@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Deserialize;
-
+use crate::models::RolloutConfiguration;
 use crate::network::serialization::config_value::ConfigValue;
 use crate::network::serialization::segments::Segments;
+use serde::{Deserialize, Serialize};
 
 /// Associates a Feature/Property to one or more Segments
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub(crate) struct SegmentRule {
     /// The list of targeted segments
     /// NOTE: no rules by itself, but the rules are found in the segments
@@ -28,6 +28,9 @@ pub(crate) struct SegmentRule {
     pub value: ConfigValue,
     pub order: u32,
     pub rollout_percentage: Option<ConfigValue>,
+    pub rule_id: Option<String>,
+    pub rollout_type: Option<String>,
+    pub rollout_configuration: Option<RolloutConfiguration>,
 }
 
 #[cfg(test)]
@@ -48,6 +51,9 @@ pub mod fixtures {
             value: ConfigValue(value),
             order: 0,
             rollout_percentage: Some(ConfigValue(rollout_percentage)),
+            rule_id: None,
+            rollout_type: None,
+            rollout_configuration: None,
         }]
     }
 
@@ -60,6 +66,9 @@ pub mod fixtures {
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((50).into()))),
+            rule_id: None,
+            rollout_type: None,
+            rollout_configuration: None,
         }]
     }
 
@@ -77,6 +86,9 @@ pub mod fixtures {
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+            rule_id: None,
+            rollout_type: None,
+            rollout_configuration: None,
         }]
     }
 
@@ -89,6 +101,9 @@ pub mod fixtures {
             value: ConfigValue(serde_json::Value::Number((-48).into())),
             order: 0,
             rollout_percentage: Some(ConfigValue(serde_json::Value::Number((100).into()))),
+            rule_id: None,
+            rollout_type: None,
+            rollout_configuration: None,
         }]
     }
 }

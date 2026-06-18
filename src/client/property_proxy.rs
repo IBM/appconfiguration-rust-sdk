@@ -17,7 +17,7 @@ use crate::Property;
 use super::AppConfigurationClient;
 use crate::models::PropertySnapshot;
 use crate::value::Value;
-use crate::Entity;
+use crate::{Entity, PropertyEvaluationResult};
 
 /// Provides live-updated data for a given [`Property`].
 pub struct PropertyProxy<'a> {
@@ -40,14 +40,37 @@ impl<'a> PropertyProxy<'a> {
 }
 
 impl Property for PropertyProxy<'_> {
-    fn get_name(&self) -> crate::errors::Result<String> {
-        self.client.get_property(&self.property_id)?.get_name()
-    }
-
-    fn get_value(&self, entity: &impl Entity) -> crate::errors::Result<Value> {
+    fn get_property_name(&self) -> crate::errors::Result<String> {
         self.client
             .get_property(&self.property_id)?
-            .get_value(entity)
+            .get_property_name()
+    }
+
+    fn get_property_id(&self) -> crate::errors::Result<String> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_property_id()
+    }
+
+    fn get_property_data_type(&self) -> crate::errors::Result<String> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_property_data_type()
+    }
+
+    fn get_property_data_format(&self) -> crate::errors::Result<Option<String>> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_property_data_format()
+    }
+
+    fn get_current_value(
+        &self,
+        entity: &impl Entity,
+    ) -> crate::errors::Result<PropertyEvaluationResult> {
+        self.client
+            .get_property(&self.property_id)?
+            .get_current_value(entity)
     }
 
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
