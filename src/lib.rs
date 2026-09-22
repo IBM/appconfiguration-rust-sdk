@@ -81,6 +81,19 @@
 //! # }
 //! ```
 //!
+
+// Exactly one TLS feature must be enabled and propagated to `reqwest`
+#[cfg(not(any(feature = "rustls-default", feature = "rustls-no-provider")))]
+compile_error!(
+    "No TLS backend selected: enable either the `rustls-default` or the `rustls-no-provider` feature"
+);
+
+#[cfg(all(feature = "rustls-default", feature = "rustls-no-provider"))]
+compile_error!(
+    "Both features `rustls-default` and `rustls-no-provider` are enabled: If you want to use your
+    own TLS backend, add `default-features = false` and enable `rustls-no-provider` or disable feature `rustls-no-provider`."
+);
+
 mod client;
 mod entity;
 mod errors;

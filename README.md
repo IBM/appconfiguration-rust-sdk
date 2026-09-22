@@ -36,6 +36,22 @@ Add the SDK to your `Cargo.toml`:
 ibm-appconfiguration-rust-sdk = "0.1.0-rc.0"
 ```
 
+### TLS
+
+By default the SDK uses `rustls` with the `aws-lc-rs` crypto provider, which works out of the box
+and needs no further setup.
+
+If your application already installs a `rustls` crypto provider (for example `ring`), use the
+`rustls-no-provider` feature instead to avoid pulling in a second one:
+
+```toml
+[dependencies]
+ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["rustls-no-provider"] }
+```
+
+With this feature your application is responsible for installing a process-wide default provider
+(e.g. via `CryptoProvider::install_default()`) before the first request.
+
 ## Import the SDK
 
 ```rust
