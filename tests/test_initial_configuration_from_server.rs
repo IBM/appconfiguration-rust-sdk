@@ -134,6 +134,7 @@ fn server_thread() -> ServerHandle {
 
 #[test]
 fn main() {
+    common::install_test_crypto_provider();
     let server = server_thread();
 
     let address = ServiceAddress::new_without_ssl(

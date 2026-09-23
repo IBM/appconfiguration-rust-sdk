@@ -18,6 +18,23 @@ use std::path::PathBuf;
 
 use tungstenite::WebSocket;
 
+/// Install a minimal rustls crypto provider so that reqwest can build clients
+/// when the crate is compiled with `--features tls-rustls-no-provider`.
+///
+/// With that feature active rustls has no baked-in provider; it panics on
+/// `Client` construction unless one is registered first.  These integration
+/// tests talk to a local TCP server over plain HTTP/WS, so they need no real
+/// TLS, but reqwest still requires the provider to be present.
+///
+/// Call this as the very first line of every integration test's `main()`.
+/// `.ok()` silently ignores "already installed" when tests share a process.
+pub fn install_test_crypto_provider() {
+    #[cfg(feature = "tls-rustls-no-provider")]
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .ok();
+}
+
 pub fn handle_config_request_trivial_config(server: &TcpListener) {
     let json_payload = serde_json::json!({
         "environments": [

@@ -9,6 +9,7 @@ IBM Cloud App Configuration SDK is used to perform feature flag and property eva
 
 - [Overview](#overview)
 - [Installation](#installation)
+- [TLS / Crypto backends](#tls--crypto-backends)
 - [Import the SDK](#import-the-sdk)
 - [Usage](#usage)
 - [Adding URLs to your allowlist](#adding-urls-to-your-allowlist)
@@ -35,6 +36,55 @@ Add the SDK to your `Cargo.toml`:
 [dependencies]
 ibm-appconfiguration-rust-sdk = "0.1.0-rc.0"
 ```
+
+## TLS / Crypto backends
+
+The SDK communicates with IBM Cloud over HTTPS and WSS. You can choose which TLS and
+cryptography stack is compiled in by selecting one of the following Cargo features.
+
+| Feature | TLS stack | Crypto | Build requirements |
+|---|---|---|---|
+| `tls-native-tls` **(default)** | OS-provided (OpenSSL / SChannel / SecureTransport) | System library | None — uses what's already installed |
+| `tls-rustls-aws-lc-rs` | rustls (pure-Rust TLS) | aws-lc-rs (BoringSSL fork) | `cmake` (and sometimes `go`) |
+| `tls-rustls-no-provider` | rustls (pure-Rust TLS) | None compiled in — **you supply it** | None |
+
+### Using the default (native-tls)
+
+No action needed. The default feature uses the TLS library already present on your OS:
+
+```toml
+[dependencies]
+ibm-appconfiguration-rust-sdk = "0.1.0-rc.0"
+```
+
+### Switching to rustls + aws-lc-rs
+
+Requires `cmake` (and sometimes `go`) to be available on the build machine.
+
+```toml
+[dependencies]
+ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["tls-rustls-aws-lc-rs"] }
+```
+
+### Bringing your own crypto provider (FIPS, HSM, etc.)
+
+Use `tls-rustls-no-provider` and register your crypto provider before initialising the SDK:
+
+```toml
+[dependencies]
+ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["tls-rustls-no-provider"] }
+rustls = "0.23"
+```
+
+```rust
+// In your application's startup code, before creating the SDK client:
+rustls::crypto::ring::default_provider()
+    .install_default()
+    .expect("Failed to install rustls crypto provider");
+```
+
+Replace `ring::default_provider()` with any compatible `CryptoProvider` — for example an
+OpenSSL-backed FIPS module or an HSM-backed provider.
 
 ## Import the SDK
 

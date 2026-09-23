@@ -18,7 +18,7 @@ use crate::metering::{MeteringClient, MeteringError, MeteringResult};
 use crate::network::NetworkError;
 use crate::network::http_client::SDK_USER_AGENT;
 use crate::network::{ServiceAddress, ServiceAddressProtocol, TokenProvider};
-use reqwest::blocking::Client;
+use reqwest::blocking::ClientBuilder;
 use url::Url;
 
 /// A MeteringClient pushing metering data to a http server.
@@ -48,24 +48,25 @@ impl MeteringClient for MeteringClientHttp {
             guid
         );
         let url = Url::parse(&url).map_err(|_| NetworkError::UrlParseError(url))?;
-        let client = Client::new();
-        let r = client
+        let client = ClientBuilder::new()
+            .no_proxy()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| MeteringError::from(NetworkError::ReqwestError(e)))?;
+
+        let response = client
             .post(url)
             .header("User-Agent", SDK_USER_AGENT)
             .bearer_auth(self.token_provider.get_access_token()?)
             .json(data)
-            .send();
+            .send()
+            .map_err(|e| MeteringError::from(NetworkError::ReqwestError(e)))?;
 
-        match r {
-            Ok(response) => {
-                let status = response.status();
-                if status.is_success() {
-                    Ok(())
-                } else {
-                    Err(MeteringError::DataNotAccepted(status.to_string()))
-                }
-            }
-            Err(e) => Err(NetworkError::ReqwestError(e).into()),
+        let status = response.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(MeteringError::DataNotAccepted(status.to_string()))
         }
     }
 }
@@ -77,6 +78,22 @@ pub(crate) mod tests {
     use httpmock::Method::POST;
     use httpmock::MockServer;
     use serde_json::json;
+
+    /// When the `tls-rustls-no-provider` feature is active, reqwest panics on
+    /// client construction unless a crypto provider has been installed.  These
+    /// tests talk to a local httpmock server over plain HTTP so they don't
+    /// actually need TLS, but reqwest still requires the provider to be present.
+    /// Installing `ring` here satisfies that requirement for the test process.
+    /// `.ok()` silently ignores "already installed" if another test ran first.
+    #[cfg(feature = "tls-rustls-no-provider")]
+    fn install_test_crypto_provider() {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .ok();
+    }
+
+    #[cfg(not(feature = "tls-rustls-no-provider"))]
+    fn install_test_crypto_provider() {}
     #[derive(Default, Debug, Clone)]
     struct MockTokenProvider {}
 
@@ -93,6 +110,7 @@ pub(crate) mod tests {
     /// - Correct json serialization
     #[test]
     fn test_well_formed_post_request() {
+        install_test_crypto_provider();
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
@@ -125,6 +143,7 @@ pub(crate) mod tests {
     /// In case of the server returning a bad status, `push_metering_data` should fail.
     #[test]
     fn test_error_handling() {
+        install_test_crypto_provider();
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST);

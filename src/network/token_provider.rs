@@ -73,6 +73,7 @@ impl TokenProviderImpl {
 
     fn build_http_client() -> NetworkResult<Client> {
         ClientBuilder::new()
+            .no_proxy()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(NetworkError::ReqwestError)
@@ -160,6 +161,17 @@ mod tests {
     use httpmock::Method::POST;
     use httpmock::MockServer;
 
+    /// See the equivalent helper in `metering::client_http::tests` for rationale.
+    #[cfg(feature = "tls-rustls-no-provider")]
+    fn install_test_crypto_provider() {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .ok();
+    }
+
+    #[cfg(not(feature = "tls-rustls-no-provider"))]
+    fn install_test_crypto_provider() {}
+
     #[test]
     fn test_access_token() {
         let mut access_token = AccessToken::default();
@@ -176,6 +188,7 @@ mod tests {
 
     #[test]
     fn test_ibm_cloud_token_provider_expiration_logic() {
+        install_test_crypto_provider();
         let provider = TokenProviderImpl::new("apikey", "<endpoint>");
         assert!(provider.expired());
 
@@ -209,6 +222,7 @@ mod tests {
 
     #[test]
     fn test_ibm_cloud_token_provider_renew_call() {
+        install_test_crypto_provider();
         let endpoint = "/give/me/a/token";
         let apikey = "12345";
 
