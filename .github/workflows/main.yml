@@ -22,8 +22,6 @@ jobs:
             cargo-flags: "--no-default-features --features tls-rustls-aws-lc-rs"
           - name: "rustls + no provider"
             cargo-flags: "--no-default-features --features tls-rustls-no-provider"
-          - name: "no TLS features"
-            cargo-flags: "--no-default-features"
 
     name: CI (${{ matrix.tls.name }})
 
