@@ -130,6 +130,35 @@
 //! # }
 //! ```
 //!
+// Exactly one TLS backend feature must be enabled.
+#[cfg(not(any(
+    feature = "tls-native-tls",
+    feature = "tls-rustls-aws-lc-rs",
+    feature = "tls-rustls-no-provider"
+)))]
+compile_error!(
+    "No TLS backend selected: enable exactly one of `tls-native-tls`, \
+     `tls-rustls-aws-lc-rs`, or `tls-rustls-no-provider`."
+);
+
+#[cfg(all(feature = "tls-native-tls", feature = "tls-rustls-aws-lc-rs"))]
+compile_error!(
+    "Features `tls-native-tls` and `tls-rustls-aws-lc-rs` are mutually exclusive: \
+     pick exactly one TLS backend."
+);
+
+#[cfg(all(feature = "tls-native-tls", feature = "tls-rustls-no-provider"))]
+compile_error!(
+    "Features `tls-native-tls` and `tls-rustls-no-provider` are mutually exclusive: \
+     pick exactly one TLS backend."
+);
+
+#[cfg(all(feature = "tls-rustls-aws-lc-rs", feature = "tls-rustls-no-provider"))]
+compile_error!(
+    "Features `tls-rustls-aws-lc-rs` and `tls-rustls-no-provider` are mutually exclusive: \
+     pick exactly one TLS backend."
+);
+
 mod client;
 mod entity;
 mod errors;
