@@ -44,3 +44,17 @@ jobs:
     #     cargo install cargo-readme
     #     cargo readme > README.md
     #     git diff --exit-code README.md
+
+  ci-complete:
+    name: CI complete
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all matrix jobs passed
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "One or more build matrix jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "All build matrix jobs succeeded."
