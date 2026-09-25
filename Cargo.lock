@@ -852,7 +852,7 @@ dependencies = [
  "ibm-appconfiguration-rust-sdk",
  "log",
  "murmur3",
- "rand 0.9.4",
+ "rand 0.10.2",
  "reqwest",
  "rstest",
  "rustls",
