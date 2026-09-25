@@ -46,7 +46,7 @@ jobs:
     #     git diff --exit-code README.md
 
   ci-complete:
-    name: CI complete
+    name: build
     needs: build
     if: always()
     runs-on: ubuntu-latest
