@@ -24,6 +24,7 @@ mod common;
 
 #[test]
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    common::install_test_crypto_provider();
     // Bind a random port, so we are sure that there is no server there (client will never connect).
     let server = TcpListener::bind(("127.0.0.1", 0)).expect("Failed to bind");
     let port = server.local_addr().unwrap().port();

@@ -1,6 +1,6 @@
 [package]
 name = "ibm-appconfiguration-rust-sdk"
-version = "0.1.0-rc.0"
+version = "0.1.0-rc.1"
 authors = ["IBM"]
 edition = "2024"
 description = "The IBM Cloud App Configuration Rust SDK is used to perform feature flag and property evaluation based on the configuration on IBM Cloud App Configuration service."
@@ -18,14 +18,33 @@ include = [
 ]
 
 [features]
+# Default TLS backend: system OpenSSL / OS TLS (no cmake required).
+# Disable with `default-features = false` and pick one of the tls-* features below.
+default = ["tls-native-tls"]
+
+# --- TLS backend feature flags (pick exactly one) ---
+
+# Uses the OS-provided TLS library:
+tls-native-tls = ["reqwest/native-tls", "tungstenite/native-tls"]
+
+# Uses rustls (pure-Rust TLS) with aws-lc-rs as the crypto engine.
+tls-rustls-aws-lc-rs = ["reqwest/rustls", "tungstenite/rustls-tls-native-roots"]
+
+# Uses rustls with NO crypto provider compiled in.
+# The application is responsible for installing a provider at startup:
+#   rustls::crypto::ring::default_provider().install_default().unwrap();
+tls-rustls-no-provider = ["reqwest/rustls-no-provider", "tungstenite/rustls-tls-native-roots"]
+
 test_utils = []
 
 [dependencies]
-reqwest = { version = "0.13.0", features = ["json", "blocking", "query", "form"] }
+# No default TLS feature — controlled entirely by the tls-* features above.
+reqwest = { version = "0.13.0", default-features = false, features = ["json", "blocking", "query", "form"] }
 serde = { version = "1.0.216", features = ["derive"] }
 serde_json = { version = "1.0.133" }
 murmur3 = "0.5.2"
-tungstenite = { version = "0.29.0", features = ["native-tls"] }
+# No default TLS feature — controlled entirely by the tls-* features above.
+tungstenite = { version = "0.29.0", default-features = false, features = ["handshake"] }
 url = "2.5.4"
 thiserror = "2.0.7"
 chrono = { version = "0.4", features = ["serde"] }
@@ -33,11 +52,12 @@ log = "0.4.27"
 rand = "0.9.2"
 
 [dev-dependencies]
-ibm-appconfiguration-rust-sdk = { path = ".", features = ["test_utils"] }
+ibm-appconfiguration-rust-sdk = { path = ".", default-features = false, features = ["test_utils"] }
 dotenvy = "0.15.7"
 env_logger = "0.11"
 rstest = "0.26.0"
 httpmock = "0.8.0"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 [badges]
 github = { repository = "IBM/appconfiguration-rust-sdk" }

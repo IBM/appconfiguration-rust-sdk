@@ -11,21 +11,50 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tls:
+          - name: "native-tls (default)"
+            cargo-flags: ""
+          - name: "rustls + aws-lc-rs"
+            cargo-flags: "--no-default-features --features tls-rustls-aws-lc-rs"
+          - name: "rustls + no provider"
+            cargo-flags: "--no-default-features --features tls-rustls-no-provider"
+
+    name: CI (${{ matrix.tls.name }})
 
     steps:
     - uses: actions/checkout@v6
+    - name: Install native-tls system dependencies
+      if: runner.os == 'Linux'
+      run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
     - name: Build
-      run: cargo build --verbose --workspace
+      run: cargo build --verbose --workspace ${{ matrix.tls.cargo-flags }}
     # Tests: we only run library and documentation tests (integration tests are using the remote server!)
     - name: Run tests (unittests)
-      run: cargo test --verbose --workspace
+      run: cargo test --verbose --workspace ${{ matrix.tls.cargo-flags }}
     - name: Run tests (documentation tests)
-      run: cargo test --doc --verbose --workspace
+      run: cargo test --doc --verbose --workspace ${{ matrix.tls.cargo-flags }}
 
     # - name: Test cargo readme is generated
+    #   if: matrix.tls.name == 'native-tls (default)'
     #   run: |
     #     cargo install cargo-readme
     #     cargo readme > README.md
     #     git diff --exit-code README.md
+
+  ci-complete:
+    name: CI complete
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all matrix jobs passed
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "One or more build matrix jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "All build matrix jobs succeeded."

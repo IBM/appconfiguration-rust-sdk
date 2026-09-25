@@ -106,6 +106,7 @@ fn run_server(listener: TcpListener, proceed_rx: Receiver<()>, reconnected_tx: S
 
 #[test]
 fn test_reconnects_after_ws_close() {
+    common::install_test_crypto_provider();
     // Bind once; the server thread will keep accepting connections on the same port.
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind failed");
     let port = listener.local_addr().unwrap().port();

@@ -146,6 +146,22 @@ impl ServerClientImpl {
         service_address: ServiceAddress,
         token_provider: Arc<Box<dyn TokenProvider>>,
     ) -> NetworkResult<Self> {
+        #[cfg(feature = "tls-native-tls")]
+        log::debug!("[TLS] Backend: native-tls (system OpenSSL / SecureTransport / SChannel)");
+        #[cfg(feature = "tls-rustls-aws-lc-rs")]
+        log::debug!("[TLS] Backend: rustls + aws-lc-rs (pure-Rust TLS, BoringSSL crypto)");
+        #[cfg(feature = "tls-rustls-no-provider")]
+        log::debug!(
+            "[TLS] Backend: rustls + no built-in crypto provider (application must call \
+             CryptoProvider::install_default() before the first request)"
+        );
+        #[cfg(not(any(
+            feature = "tls-native-tls",
+            feature = "tls-rustls-aws-lc-rs",
+            feature = "tls-rustls-no-provider"
+        )))]
+        log::debug!("[TLS] Backend: none (no TLS feature enabled — plain connections only)");
+
         Ok(Self {
             service_address,
             token_provider,
@@ -219,7 +235,10 @@ impl ServerClient for ServerClientImpl {
             .error_for_status()
             .map_err(NetworkError::ReqwestError)?
             .json::<ConfigurationJson>()
-            .map_err(|_| NetworkError::ProtocolError)
+            .map_err(|e| {
+                log::debug!("Failed to deserialize configuration JSON: {:?}", e);
+                NetworkError::ProtocolError
+            })
     }
 
     fn get_configuration_monitoring_websocket(
@@ -245,8 +264,28 @@ impl ServerClient for ServerClientImpl {
         let headers = request.headers_mut();
         headers.insert(USER_AGENT, HeaderValue::from_static(SDK_USER_AGENT));
         headers.insert(AUTHORIZATION, self.build_authorization_header()?);
+        #[cfg(feature = "tls-native-tls")]
         log::debug!(
-            "[WEBSOCKET] Establishing WebSocket connection to {}",
+            "[WEBSOCKET] Establishing WebSocket connection to {} (TLS backend: native-tls)",
+            ws_url
+        );
+        #[cfg(feature = "tls-rustls-aws-lc-rs")]
+        log::debug!(
+            "[WEBSOCKET] Establishing WebSocket connection to {} (TLS backend: rustls + aws-lc-rs)",
+            ws_url
+        );
+        #[cfg(feature = "tls-rustls-no-provider")]
+        log::debug!(
+            "[WEBSOCKET] Establishing WebSocket connection to {} (TLS backend: rustls + user-provided crypto)",
+            ws_url
+        );
+        #[cfg(not(any(
+            feature = "tls-native-tls",
+            feature = "tls-rustls-aws-lc-rs",
+            feature = "tls-rustls-no-provider"
+        )))]
+        log::debug!(
+            "[WEBSOCKET] Establishing WebSocket connection to {} (TLS backend: none / plain)",
             ws_url
         );
         let (mut websocket, response) = connect(request).map_err(|error| match error {
@@ -273,8 +312,20 @@ impl ServerClient for ServerClientImpl {
         let timeout_duration = Duration::from_secs(WEBSOCKET_READ_TIMEOUT_SECS);
 
         let timeout_result = match websocket.get_mut() {
-            MaybeTlsStream::Plain(s) => s.set_read_timeout(Some(timeout_duration)),
-            MaybeTlsStream::NativeTls(s) => s.get_mut().set_read_timeout(Some(timeout_duration)),
+            MaybeTlsStream::Plain(s) => {
+                log::debug!("[WEBSOCKET] Underlying stream: Plain TCP");
+                s.set_read_timeout(Some(timeout_duration))
+            }
+            #[cfg(feature = "tls-native-tls")]
+            MaybeTlsStream::NativeTls(s) => {
+                log::debug!("[WEBSOCKET] Underlying stream: NativeTls");
+                s.get_mut().set_read_timeout(Some(timeout_duration))
+            }
+            #[cfg(any(feature = "tls-rustls-aws-lc-rs", feature = "tls-rustls-no-provider"))]
+            MaybeTlsStream::Rustls(s) => {
+                log::debug!("[WEBSOCKET] Underlying stream: Rustls");
+                s.get_mut().set_read_timeout(Some(timeout_duration))
+            }
             _ => {
                 log::warn!("Unknown underlying stream type. Read timeout could not be set.");
                 Ok(())
