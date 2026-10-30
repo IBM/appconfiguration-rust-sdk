@@ -272,6 +272,19 @@ impl AppConfiguration {
     pub fn emitter(&self) -> RuntimeEventEmitter {
         self.runtime_emitter.clone()
     }
+
+    /// Immediately flush all pending analytics data to the server.
+    ///
+    /// Normally the analytics background thread sends data automatically every
+    /// 5 minutes or when the buffer exceeds 30 entries.  Call this to force an
+    /// immediate send — useful in short-lived processes or after a burst of
+    /// events.
+    ///
+    pub fn flush_records(&self) {
+        if let Some(client) = self.client.as_ref() {
+            client.flush_records();
+        }
+    }
 }
 
 impl ConfigurationProvider for AppConfiguration {

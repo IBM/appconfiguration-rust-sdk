@@ -52,6 +52,15 @@ pub(crate) struct Experiment {
     pub variations: Vec<ExperimentVariation>,
     pub traffic_distribution: ExperimentTrafficDistribution,
 }
+/// One metric descriptor attached to a feature by the server config.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub(crate) struct FeatureMetric {
+    pub event_key: String,
+    pub id: String,
+    #[serde(rename = "type")]
+    pub metric_type: String,
+}
+
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct Feature {
     pub name: String,
@@ -67,4 +76,10 @@ pub(crate) struct Feature {
     pub rollout_configuration: Option<RolloutConfiguration>,
     pub collections: Option<Vec<Collection>>,
     pub experiment: Option<Experiment>,
+    /// Present only on GUARDED features — the rollout identifier.
+    #[serde(default)]
+    pub rollout_id: Option<String>,
+    /// Raw metrics array from server; transformed into metric_map at parse time.
+    #[serde(default)]
+    pub metrics: Vec<FeatureMetric>,
 }

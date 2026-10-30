@@ -17,10 +17,11 @@ mod matches_attributes;
 mod rule_operator;
 
 use crate::Value;
+use crate::analytics::record::MetricDescriptor;
 use crate::entity::Entity;
 use crate::errors::Error;
 use crate::errors::Result;
-use crate::models::{DELIMITER, ROLLOUT_TYPE_PROGRESSIVE};
+use crate::models::{DELIMITER, ROLLOUT_TYPE_GUARDED, ROLLOUT_TYPE_PROGRESSIVE};
 use crate::network::serialization::{Segment, SegmentRule, ValueType};
 use crate::segment_evaluation::matches_attributes::MatchesAttributes;
 use crate::utils::{get_current_rollout_percentage, parse_rollout_configuration_phases};
@@ -78,6 +79,49 @@ impl TargetingRules {
         self.segment_rules.is_empty()
     }
 
+    /// Find the first GUARDED segment rule and return its
+    /// `(rollout_id, rollout_percentage, Option<segment_metric_map>)`.
+    /// Used by `FeatureSnapshot::track()` when the feature itself is not GUARDED.
+    ///
+    /// The third element is the segment-level `metric_map`, which takes priority over
+    /// the feature-level map when present — mirrors Python's `Feature.track()` logic:
+    ///   ```python
+    ///   if rule_metric_map and event_key in rule_metric_map:
+    ///       resolved_metric_map = rule_metric_map
+    ///   ```
+    ///
+    /// `feature_rollout_percentage` is the feature-level fallback used when the segment
+    /// rule's rollout_percentage is `"$default"` — mirrors Python's `track()` logic:
+    ///   `rollout_percentage = self.get_rollout_percentage()` when
+    ///   `segment_rule.get('rollout_percentage') == DEFAULT_ROLLOUT_PERCENTAGE`.
+    pub(crate) fn find_guarded_segment_rule(
+        &self,
+        feature_rollout_percentage: u32,
+    ) -> Option<(String, u32, Option<HashMap<String, Vec<MetricDescriptor>>>)> {
+        for sr in &self.segment_rules {
+            if sr.rollout_type.as_deref() == Some(ROLLOUT_TYPE_GUARDED) {
+                if let Some(rid) = &sr.rollout_id {
+                    let pct = sr
+                        .rollout_percentage
+                        .as_ref()
+                        .map(|v| {
+                            if v.is_default() {
+                                // "$default" → fall back to feature-level percentage
+                                feature_rollout_percentage
+                            } else {
+                                v.as_u64()
+                                    .and_then(|n| u32::try_from(n).ok())
+                                    .unwrap_or(feature_rollout_percentage)
+                            }
+                        })
+                        .unwrap_or(feature_rollout_percentage);
+                    return Some((rid.clone(), pct, sr.metric_map.clone()));
+                }
+            }
+        }
+        None
+    }
+
     /// Finds the [`TargetingRule`] and the [`Segment`] which a given entity can be associated to.
     /// Note: A feature/property can have multiple TargetingRules, which define a specific feature/property value. One TargetingRule can point to multiple Segments. Rules and Segments are iterated in order and the first match is reported.
     /// TODO: A TargetingRule can have Rules and Segments also have Rules. Those are easily confused. Especially, as TargetingRules are sometimes referred to as SegmentRules, which causes even greater confusion.
@@ -123,14 +167,34 @@ impl TargetingRule<'_> {
         self.segment_rule.order
     }
 
-    pub(crate) fn entity_id_for_hash(&self, entity_id: String) -> String {
-        if self.segment_rule.rollout_type.as_deref() == Some(ROLLOUT_TYPE_PROGRESSIVE) {
-            if let Some(rollout_config) = &self.segment_rule.rollout_configuration {
-                // Append start_at for entity-stability in progressive rollout
-                return format!("{}{}", entity_id, rollout_config.start_at);
+    pub(crate) fn entity_id_for_hash(&self, entity_id: String, feature_id: &str) -> String {
+        match self.segment_rule.rollout_type.as_deref() {
+            Some(ROLLOUT_TYPE_PROGRESSIVE) => {
+                if let Some(rollout_config) = &self.segment_rule.rollout_configuration {
+                    // entityId:featureId:start_at
+                    format!("{}:{}:{}", entity_id, feature_id, rollout_config.start_at)
+                } else {
+                    entity_id
+                }
+            }
+            Some(ROLLOUT_TYPE_GUARDED) => {
+                // entityId:featureId:rolloutId
+                let rid = self.segment_rule.rollout_id.as_deref().unwrap_or("");
+                format!("{}:{}:{}", entity_id, feature_id, rid)
+            }
+            _ => {
+                // MANUAL or unset — entityId:featureId
+                format!("{}:{}", entity_id, feature_id)
             }
         }
-        entity_id
+    }
+
+    pub(crate) fn rollout_type(&self) -> Option<&str> {
+        self.segment_rule.rollout_type.as_deref()
+    }
+
+    pub(crate) fn rollout_id(&self) -> Option<&str> {
+        self.segment_rule.rollout_id.as_deref()
     }
 
     /// Returns the rollout percentage using the following logic:
@@ -144,9 +208,20 @@ impl TargetingRule<'_> {
                 let key = format!("{}{}{}", self.feature_id, DELIMITER, rule_id);
                 if let Some(btree) = self.rollout_config_map.get(&key) {
                     let current_time_ms = Utc::now().timestamp_millis();
-                    return Ok(get_current_rollout_percentage(btree, current_time_ms));
+                    let pct = get_current_rollout_percentage(btree, current_time_ms);
+                    // TODO: remove — debug print for progressive rollout validation
+                    log::debug!(
+                        "[PROGRESSIVE_ROLLOUT] feature_id={} rule_id={} computed_percentage={}",
+                        self.feature_id,
+                        rule_id,
+                        pct
+                    );
+                    return Ok(pct);
                 }
             }
+            // btree missing (no rule_id, or key not in map): fall back to 0.
+            // Matches Python: segment_rollout_percentage = 0 when rollout_map is None.
+            return Ok(0);
         }
 
         self.segment_rule

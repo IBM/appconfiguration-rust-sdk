@@ -38,5 +38,5 @@ pub(crate) use feature_snapshot::FeatureSnapshot;
 pub(crate) use property_snapshot::PropertySnapshot;
 #[allow(unused_imports)] // used in rollout_parser tests via crate::models::RolloutPhase
 pub(crate) use rollout_configuration::RolloutPhase;
-pub(crate) use rollout_configuration::{DELIMITER, ROLLOUT_TYPE_PROGRESSIVE, RolloutConfiguration};
+pub(crate) use rollout_configuration::{DELIMITER, ROLLOUT_TYPE_GUARDED, ROLLOUT_TYPE_PROGRESSIVE, RolloutConfiguration};
 pub use secret_property::{SecretManager, SecretPropertySnapshot};

@@ -308,6 +308,8 @@ impl<T: ServerClient> UpdateThreadWorker<T> {
     /// * a termination signal is received via `thread_termination_receiver`, OR
     /// * an unrecoverable error occurs (see [`UpdateThreadWorker::recoverable_error`])
 
+    #[allow(unused_assignments)] // counters are read inside the loop (logging + backoff) but
+                                 // Rust's liveness analysis considers the loop-back assignments dead
     fn run_internal(&self, thread_termination_receiver: Receiver<()>) -> Result<()> {
         let mut websocket_retry_attempt = 0u32;
         let mut config_refresh_retry_attempt = 0u32;

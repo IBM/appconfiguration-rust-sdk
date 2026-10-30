@@ -71,6 +71,10 @@ impl TryFrom<(ValueType, config_value::ConfigValue)> for Value {
 
 #[cfg(test)]
 pub(crate) mod fixtures {
+    // Re-export types only needed in test code.
+    pub(crate) use super::config_value::ConfigValue;
+    pub(crate) use super::segments::Segments;
+
     pub(crate) use super::configuration::fixtures::*;
     pub(crate) use super::segment::fixtures::*;
     pub(crate) use super::segment_rule::fixtures::*;

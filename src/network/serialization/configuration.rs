@@ -86,6 +86,8 @@ pub(crate) mod fixtures {
                     rollout_configuration: None,
                     collections: None,
                     experiment: None,
+                    rollout_id: None,
+                    metrics: vec![],
                 }],
                 properties: Vec::new(),
             }],
@@ -128,6 +130,8 @@ pub(crate) mod fixtures {
                     rollout_configuration: None,
                     collections: None,
                     experiment: None,
+                    rollout_id: None,
+                    metrics: vec![],
                 }],
                 properties: Vec::new(),
             }],
@@ -203,6 +207,8 @@ pub(crate) mod fixtures {
                 rule_id: None,
                 rollout_type: None,
                 rollout_configuration: None,
+                rollout_id: None,
+                metric_map: None,
             },
             SegmentRule {
                 rules: vec![Segments {
@@ -214,6 +220,8 @@ pub(crate) mod fixtures {
                 rule_id: None,
                 rollout_type: None,
                 rollout_configuration: None,
+                rollout_id: None,
+                metric_map: None,
             },
         ];
         assert!(segment_rules[0].order > segment_rules[1].order);
@@ -236,6 +244,8 @@ pub(crate) mod fixtures {
                     rollout_configuration: None,
                     collections: None,
                     experiment: None,
+                    rollout_id: None,
+                    metrics: vec![],
                 }],
                 properties: vec![Property {
                     name: "P1".to_string(),

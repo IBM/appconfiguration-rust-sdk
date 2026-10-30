@@ -37,6 +37,7 @@ pub struct RolloutConfiguration {
 /// Rollout type constants — used for future experiment / progressive-rollout checks
 
 pub const ROLLOUT_TYPE_PROGRESSIVE: &str = "PROGRESSIVE";
+pub const ROLLOUT_TYPE_GUARDED: &str = "GUARDED";
 
 /// Delimiter used to combine feature_id and rule_id
 pub const DELIMITER: char = '\u{001F}'; // Unit Separator character

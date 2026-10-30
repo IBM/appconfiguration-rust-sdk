@@ -14,6 +14,8 @@
 
 use std::sync::Arc;
 
+use crate::analytics::analytics::{AnalyticsHandle, start_analytics};
+use crate::analytics::client_http::AnalyticsClientHttp;
 use crate::errors::Result;
 use crate::models::{FeatureSnapshot, PropertySnapshot, SecretPropertySnapshot};
 
@@ -31,6 +33,7 @@ use super::{ConfigurationId, RuntimeStatus};
 pub(crate) struct AppConfigurationClientHttp<T: LiveConfiguration> {
     live_configuration: T,
     metering: MeteringRecorder,
+    analytics: AnalyticsHandle,
 }
 
 impl AppConfigurationClientHttp<LiveConfigurationImpl> {
@@ -54,13 +57,16 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
     ) -> Result<Self> {
         let token_provider = Arc::new(token_provider);
         let server_client = ServerClientImpl::new(service_address.clone(), token_provider.clone())?;
-        let metering_client = MeteringClientHttp::new(service_address, token_provider);
+        let metering_client = MeteringClientHttp::new(service_address.clone(), token_provider.clone());
 
         let metering = start_metering(
             configuration_id.clone(),
             std::time::Duration::from_secs(10 * 60),
             metering_client,
         );
+
+        let analytics_client = AnalyticsClientHttp::new(service_address, token_provider);
+        let analytics = start_analytics(configuration_id.clone(), analytics_client);
 
         // Pre-seed the forwarding listener BEFORE the background thread starts.
         // This guarantees Connected + first RefreshSuccess are never missed.
@@ -73,7 +79,25 @@ impl AppConfigurationClientHttp<LiveConfigurationImpl> {
         Ok(Self {
             live_configuration,
             metering,
+            analytics,
         })
+    }
+}
+
+impl<T: LiveConfiguration> AppConfigurationClientHttp<T> {
+    /// Immediately flush all pending analytics data to the server.
+    ///
+    /// Normally the analytics background thread flushes automatically every
+    /// 5 minutes or when the buffer exceeds 30 entries.  Call this to force an
+    /// immediate send — mirrors Python's `appconfig_client.flush_records()`.
+    pub(crate) fn flush_records(&self) {
+        // Drop a clone of the sender and join the background thread to force
+        // a flush.  We use a dedicated "flush" signal instead: sending a
+        // zero-entry batch would be a no-op, so we rely on the channel
+        // Disconnect approach — but that kills the thread permanently.
+        //
+        // Instead we expose a direct method on the handle.
+        self.analytics.flush();
     }
 }
 
@@ -85,6 +109,7 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
     fn get_feature(&self, feature_id: &str) -> Result<FeatureSnapshot> {
         let mut feature = self.live_configuration.get_feature(feature_id)?;
         feature.metering = Some(self.metering.sender.clone());
+        feature.analytics = Some(self.analytics.sender.clone());
         Ok(feature)
     }
 
@@ -131,6 +156,10 @@ impl<T: LiveConfiguration> ConfigurationProvider for AppConfigurationClientHttp<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analytics::analytics::start_analytics;
+    use crate::analytics::client::AnalyticsClient;
+    use crate::analytics::errors::AnalyticsResult;
+    use crate::analytics::record::AnalyticsPayload;
     use crate::metering::metering::tests::start_metering_mock;
     use crate::models::Configuration;
     use crate::network::live_configuration::CurrentMode;
@@ -141,6 +170,17 @@ mod tests {
     use crate::utils::ThreadStatus;
     use crate::{Feature, Property};
     use rstest::rstest;
+
+    struct NoopAnalyticsClient;
+    impl AnalyticsClient for NoopAnalyticsClient {
+        fn push_analytics_data(&self, _guid: &str, _payload: &AnalyticsPayload) -> AnalyticsResult<()> {
+            Ok(())
+        }
+    }
+
+    fn start_analytics_noop(config_id: ConfigurationId) -> AnalyticsHandle {
+        start_analytics(config_id, NoopAnalyticsClient)
+    }
 
     struct LiveConfigurationMock {
         configuration: Configuration,
@@ -217,12 +257,14 @@ mod tests {
                 "test_env_id".to_string(),
                 "test_collection_id".to_string(),
             );
-            let (metering, metering_recv) = start_metering_mock(configuration_id);
+            let (metering, metering_recv) = start_metering_mock(configuration_id.clone());
+            let analytics = start_analytics_noop(configuration_id);
 
             (
                 AppConfigurationClientHttp {
                     live_configuration: live_cfg_mock,
                     metering,
+                    analytics,
                 },
                 metering_recv,
             )
@@ -280,12 +322,14 @@ mod tests {
                 "test_env_id".to_string(),
                 "test_collection_id".to_string(),
             );
-            let (metering, metering_recv) = start_metering_mock(configuration_id);
+            let (metering, metering_recv) = start_metering_mock(configuration_id.clone());
+            let analytics = start_analytics_noop(configuration_id);
 
             (
                 AppConfigurationClientHttp {
                     live_configuration: live_cfg_mock,
                     metering,
+                    analytics,
                 },
                 metering_recv,
             )

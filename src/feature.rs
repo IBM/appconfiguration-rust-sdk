@@ -84,4 +84,14 @@ pub trait Feature {
     fn get_feature_data_format(&self) -> Result<Option<String>>;
 
     fn get_current_value(&self, entity: &impl Entity) -> Result<FeatureEvaluationResult>;
+
+    /// Records a business metric event for a Guarded Rollout feature.
+    ///
+    /// Call this after `get_current_value()` to track that an entity performed
+    /// a meaningful action (e.g. a conversion). IBM App Configuration will use
+    /// the collected data to measure the impact of the guarded rollout.
+    ///
+    /// * `event_key` — the metric key configured on the feature (e.g. `"checkout"`).
+    /// * `entity_id` — the same entity ID used when calling `get_current_value()`.
+    fn track(&self, event_key: &str, entity_id: &str);
 }

@@ -12,6 +12,26 @@ IBM Cloud App Configuration SDK is used to perform feature flag and property eva
 - [TLS / Crypto backends](#tls--crypto-backends)
 - [Import the SDK](#import-the-sdk)
 - [Usage](#usage)
+  - [Connect using private network connection (optional)](#connect-using-private-network-connection-optional)
+  - [Persistent cache (optional)](#persistent-cache-optional)
+  - [Bootstrap file (optional)](#bootstrap-file-optional)
+- [Get single feature](#get-single-feature)
+- [Get all features](#get-all-features)
+- [Evaluate a feature](#evaluate-a-feature)
+- [Track metrics (Guarded rollout)](#track-metrics-guarded-rollout)
+  - [Example: Evaluating and tracking a guarded feature](#example-evaluating-and-tracking-a-guarded-feature)
+- [Get all properties](#get-all-properties)
+- [Evaluate a property](#evaluate-a-property)
+- [Set listener for feature and property data changes](#set-listener-for-feature-and-property-data-changes)
+  - [Minimal example — log every config change](#minimal-example--log-every-config-change)
+  - [Read flag values inside the callback](#read-flag-values-inside-the-callback)
+  - [All `RuntimeEventKind` variants](#all-runtimeeventkind-variants)
+- [Implementing `Entity`](#implementing-entity)
+- [Supported Data types](#supported-data-types)
+- [Context options](#context-options)
+- [Cleanup](#cleanup)
+- [Fetching the client across other modules](#fetching-the-client-across-other-modules)
+- [Examples](#examples)
 - [Adding URLs to your allowlist](#adding-urls-to-your-allowlist)
 - [License](#license)
 
@@ -34,7 +54,7 @@ Add the SDK to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ibm-appconfiguration-rust-sdk = "0.1.0-rc.0"
+ibm-appconfiguration-rust-sdk = "0.1.0-rc.2"
 ```
 
 ## TLS / Crypto backends
@@ -54,7 +74,7 @@ No action needed. The default feature uses the TLS library already present on yo
 
 ```toml
 [dependencies]
-ibm-appconfiguration-rust-sdk = "0.1.0-rc.0"
+ibm-appconfiguration-rust-sdk = "0.1.0-rc.2"
 ```
 
 ### Switching to rustls + aws-lc-rs
@@ -63,7 +83,7 @@ Requires `cmake` (and sometimes `go`) to be available on the build machine.
 
 ```toml
 [dependencies]
-ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["tls-rustls-aws-lc-rs"] }
+ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.2", default-features = false, features = ["tls-rustls-aws-lc-rs"] }
 ```
 
 ### Bringing your own crypto provider (FIPS, HSM, etc.)
@@ -72,7 +92,7 @@ Use `tls-rustls-no-provider` and register your crypto provider before initialisi
 
 ```toml
 [dependencies]
-ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["tls-rustls-no-provider"] }
+ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.2", default-features = false, features = ["tls-rustls-no-provider"] }
 rustls = "0.23"
 ```
 
@@ -292,20 +312,74 @@ println!("{:?}", result.details.rollout_percentage_applied); // Some(true/false)
 - **entity_id**: Id of the Entity. This will be a string identifier related to the Entity against which the feature is evaluated. For example, an entity might be an instance of an app that runs on a mobile device, a microservice that runs on the cloud, or a component of infrastructure that runs that microservice. For any entity to interact with App Configuration, it must provide a unique entity ID.
 - **entity_attributes**: A `HashMap` consisting of the attribute name and their values that defines the specified entity. This is optional if the feature flag is not configured with any targeting definition. If targeting is configured, then entity attributes should be provided for the rule evaluation. An attribute is a parameter used to define a segment. The SDK uses the attribute values to determine if the specified entity satisfies the targeting rules, and returns the appropriate feature flag value.
 
-## Send custom metrics
+## Track metrics (Guarded rollout)
 
-Record custom metrics for experiments using the `track` method. Calling track will queue the metric event, which will be sent in batches to the App Configuration servers.
+When a feature flag is configured with a **Guarded Rollout** in the IBM Cloud App Configuration service, you can measure the impact of the feature by tracking user interactions or business metrics (such as button clicks, page visits, conversions, or error rates).
+
+In the App Configuration dashboard, metrics are associated with an **Event Key** (the event identifier configured for that feature flag's metric). Use `feature.track(event_key, entity_id)` to record metric events for an entity.
 
 ```rust
-use ibm_appconfiguration_rust_sdk::AppConfigurationClient;
+let feature = client.get_feature("checkout-redesign")?;
 
-client.track("event_key", "entity_id")?;
+// Record a metric event for the entity
+feature.track("checkout_click", "john_doe");
 ```
 
 where:
-- **event_key**: The event key for the metric associated with the running experiment. The event key in your metric and the event key in your code must match exactly.
 
-> **Note:** Custom metric tracking (`track`) is currently a no-op placeholder. It will be replaced with a real implementation in a future release.
+- **event_key**: A string identifier representing the event key configured for the metric in the App Configuration service instance (e.g. `"checkout_click"`, `"purchase_completed"`).
+
+- **entity_id**: The entity ID string. This must match the `entity_id` used when evaluating the feature flag with `get_current_value()`.
+
+### Example: Evaluating and tracking a guarded feature
+
+```rust
+use std::collections::HashMap;
+use ibm_appconfiguration_rust_sdk::{AppConfiguration, AppConfigurationContextOptions, Entity, Value};
+
+struct MyEntity {
+    id: String,
+    city: String,
+    country: String,
+}
+
+impl Entity for MyEntity {
+    fn get_id(&self) -> String { self.id.clone() }
+    fn get_attributes(&self) -> HashMap<String, Value> {
+        HashMap::from([
+            ("city".to_string(),    Value::from(self.city.clone())),
+            ("country".to_string(), Value::from(self.country.clone())),
+        ])
+    }
+}
+
+let mut client = AppConfiguration::new();
+client.init("us-south", "<guid>", "<apikey>")?;
+client.set_context("my-collection", "dev", AppConfigurationContextOptions::default())?;
+client.wait_until_online();
+
+let entity = MyEntity {
+    id: "user_12345".to_string(),
+    city: "Bangalore".to_string(),
+    country: "India".to_string(),
+};
+
+let feature = client.get_feature("checkout-redesign")?;
+
+// 1. Evaluate the feature value for the entity
+let result = feature.get_current_value(&entity)?;
+println!("Feature value: {:?}", result.value);
+
+// 2. Perform actions based on the evaluated feature value in your application
+// ...
+
+// 3. When the user performs the event (e.g., clicks the checkout button), track it
+let event_key = "checkout_click";
+feature.track(event_key, &entity.get_id());
+```
+
+`Flush pending records` :- Use `flush_records()` to immediately send all pending analytics data to the App Configuration service, without waiting for the next scheduled flush (analytics data is normally sent at an interval of 5 minutes). This is useful on page unload or before your application exits to ensure no metric events are lost.
+Function format :- `appconfig_client.flush_records()`
 
 ## Get single property
 

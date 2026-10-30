@@ -70,6 +70,12 @@ impl Feature for FeatureProxy<'_> {
             .get_current_value(entity)
     }
 
+    fn track(&self, event_key: &str, entity_id: &str) {
+        if let Ok(snapshot) = self.client.get_feature(&self.feature_id) {
+            snapshot.track(event_key, entity_id);
+        }
+    }
+
     fn get_value_into<T: TryFrom<Value, Error = crate::Error>>(
         &self,
         entity: &impl Entity,

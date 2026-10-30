@@ -15,6 +15,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ConfigurationDataError;
+use crate::analytics::record::MetricDescriptor;
 use crate::errors::Result;
 use crate::network::serialization::{
     Collection, ConfigurationJson, Feature, Property, Segment, SegmentRule,
@@ -198,6 +199,19 @@ impl ConfigurationProvider for Configuration {
         let enabled_value = (feature.r#type, feature.enabled_value.clone()).try_into()?;
         let disabled_value = (feature.r#type, feature.disabled_value.clone()).try_into()?;
         let feature_type = feature.r#type.to_string();
+
+        // Build metric_map: event_key -> Vec<MetricDescriptor>
+        let mut metric_map: HashMap<String, Vec<MetricDescriptor>> = HashMap::new();
+        for m in &feature.metrics {
+            metric_map
+                .entry(m.event_key.clone())
+                .or_default()
+                .push(MetricDescriptor {
+                    id: m.id.clone(),
+                    metric_type: m.metric_type.clone(),
+                });
+        }
+
         Ok(FeatureSnapshot::new(
             feature.enabled,
             enabled_value,
@@ -211,6 +225,8 @@ impl ConfigurationProvider for Configuration {
             feature.format.clone(),
             segment_rules.clone(),
             None,
+            feature.rollout_id.clone(),
+            metric_map,
         ))
     }
 

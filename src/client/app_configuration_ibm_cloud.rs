@@ -143,6 +143,11 @@ impl AppConfigurationClientIBMCloud {
 
     // ── Public helpers ───────────────────────────────────────────────────────
 
+    /// Immediately flush all pending analytics data to the server.
+    pub fn flush_records(&self) {
+        self.client.flush_records();
+    }
+
     pub fn get_secret(
         &self,
         property_id: &str,

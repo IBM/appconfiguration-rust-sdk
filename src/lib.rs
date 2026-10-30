@@ -49,7 +49,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! ibm-appconfiguration-rust-sdk = "0.1.0-rc.0"
+//! ibm-appconfiguration-rust-sdk = "0.1.0-rc.2"
 //! ```
 //!
 //! ## Switching to rustls + aws-lc-rs
@@ -58,7 +58,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["tls-rustls-aws-lc-rs"] }
+//! ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.2", default-features = false, features = ["tls-rustls-aws-lc-rs"] }
 //! ```
 //!
 //! ## Bringing your own crypto provider (FIPS, HSM, etc.)
@@ -67,7 +67,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.0", default-features = false, features = ["tls-rustls-no-provider"] }
+//! ibm-appconfiguration-rust-sdk = { version = "0.1.0-rc.2", default-features = false, features = ["tls-rustls-no-provider"] }
 //! rustls = "0.23"
 //! ```
 //!
@@ -130,6 +130,7 @@
 //! # }
 //! ```
 //!
+
 // Exactly one TLS backend feature must be enabled.
 #[cfg(not(any(
     feature = "tls-native-tls",
@@ -151,6 +152,7 @@ compile_error!(
      `tls-native-tls`, `tls-rustls-aws-lc-rs`, or `tls-rustls-no-provider`."
 );
 
+pub(crate) mod analytics;
 mod client;
 mod entity;
 mod errors;

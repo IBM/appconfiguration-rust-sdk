@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::analytics::record::MetricDescriptor;
 use crate::models::RolloutConfiguration;
 use crate::network::serialization::config_value::ConfigValue;
 use crate::network::serialization::segments::Segments;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Associates a Feature/Property to one or more Segments
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -31,6 +33,14 @@ pub(crate) struct SegmentRule {
     pub rule_id: Option<String>,
     pub rollout_type: Option<String>,
     pub rollout_configuration: Option<RolloutConfiguration>,
+    /// Present only on GUARDED segment rules.
+    #[serde(default)]
+    pub rollout_id: Option<String>,
+    /// Per-segment metric map override for GUARDED segment rules.
+    /// When present, takes priority over the feature-level metric_map in `track()`.
+    /// Mirrors Python's `SegmentRules.metric_map` field.
+    #[serde(default)]
+    pub metric_map: Option<HashMap<String, Vec<MetricDescriptor>>>,
 }
 
 #[cfg(test)]
@@ -54,6 +64,8 @@ pub mod fixtures {
             rule_id: None,
             rollout_type: None,
             rollout_configuration: None,
+            rollout_id: None,
+            metric_map: None,
         }]
     }
 
@@ -69,6 +81,8 @@ pub mod fixtures {
             rule_id: None,
             rollout_type: None,
             rollout_configuration: None,
+            rollout_id: None,
+            metric_map: None,
         }]
     }
 
@@ -89,6 +103,8 @@ pub mod fixtures {
             rule_id: None,
             rollout_type: None,
             rollout_configuration: None,
+            rollout_id: None,
+            metric_map: None,
         }]
     }
 
@@ -104,6 +120,8 @@ pub mod fixtures {
             rule_id: None,
             rollout_type: None,
             rollout_configuration: None,
+            rollout_id: None,
+            metric_map: None,
         }]
     }
 }
